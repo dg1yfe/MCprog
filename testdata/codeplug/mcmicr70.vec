@@ -38,3 +38,5 @@ CHAN   29 num=29 tx=432650000 rx=432650000 txraw=de2112 rxraw=de061c canon=1 sta
 CHAN   30 num=30 tx=432675000 rx=432675000 txraw=de211a rxraw=de0624 canon=1 state=prog
 CHAN   31 num=31 tx=432700000 rx=432700000 txraw=de2122 rxraw=de062c canon=1 state=prog
 CHAN   32 num=32 tx=439875000 rx=439875000 txraw=de2a2c rxraw=de0f36 canon=1 state=prog
+PL     mode=selectable count=10
+PLLIST 103.5 103.5 103.5 103.5 103.5 103.5 103.5 103.5 103.5 103.5

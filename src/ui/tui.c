@@ -196,7 +196,9 @@ static void draw_list(int sel, int top)
 		if (slot0 == sel)
 			attroff(A_REVERSE);
 	}
-	status("up/down move   enter edit   s save   q quit");
+	status(mc_pl_supported(img.model)
+	           ? "up/down or j/k   enter edit   p PL/CTCSS   s save   q quit"
+	           : "up/down or j/k   enter edit   s save   q quit");
 	refresh();
 }
 
@@ -282,15 +284,15 @@ static void edit_channel(int slot0)
 			         f->provenance == 'S' ? ", meaning UNVERIFIED" : "");
 		}
 		mvprintw(3 + nrows + 1, 2, "%.*s", COLS - 4, line);
-		status("up/down move   enter change   esc back");
+		status("up/down or j/k move   enter change   esc back");
 		refresh();
 
 		ch = getch();
 		if (ch == 27 || ch == 'q')
 			return;
-		if (ch == KEY_UP && sel > 0)
+		if ((ch == KEY_UP || ch == 'k') && sel > 0)
 			sel--;
-		else if (ch == KEY_DOWN && sel < nrows - 1)
+		else if ((ch == KEY_DOWN || ch == 'j') && sel < nrows - 1)
 			sel++;
 		else if (ch == '\n' || ch == KEY_ENTER || ch == ' ') {
 			if (sel >= 2) {
@@ -374,6 +376,112 @@ static void save_file(void)
 	getch();
 }
 
+/* ---- PL / CTCSS, U-2 ------------------------------------------------------------------------
+ * Radio-wide on every model that has it, which is why this is its own page rather than a channel
+ * field: the EVA and EZA 9 hold one tone (or a list the operator picks from at the radio), not a
+ * tone per channel.
+ */
+static void edit_pl(void)
+{
+	int sel = 0;
+
+	if (!mc_pl_supported(img.model)) {
+		status("this model has no PL/CTCSS that the original software can set");
+		getch();
+		return;
+	}
+	for (;;) {
+		mc_pl_mode mode = mc_pl_get_mode(&img);
+		int n = mc_pl_get_count(&img), rows, i, ch;
+		char buf[64], line[256];
+
+		rows = 1 + (mode == MC_PL_SINGLE ? 1 : mode == MC_PL_SELECTABLE ? 1 + n : 0);
+		erase();
+		attron(A_BOLD);
+		mvprintw(0, 0, "PL / CTCSS -- %s", path[0] ? path : "(read from radio)");
+		attroff(A_BOLD);
+		mvprintw(1, 0, "model %s   stored as round(7.984 x f), %s",
+		         img.model->name, "shared by the whole radio");
+
+		for (i = 0; i < rows; i++) {
+			int y = 3 + i;
+			if (i == sel)
+				attron(A_REVERSE);
+			if (i == 0) {
+				mvprintw(y, 2, "%-16s %-14s", "mode",
+				         mode == MC_PL_SINGLE ? "single tone" :
+				         mode == MC_PL_SELECTABLE ? "selectable list" : "off");
+			} else if (mode == MC_PL_SINGLE) {
+				unsigned t = mc_pl_get_tone(&img, 0);
+				snprintf(buf, sizeof buf, "%u.%u Hz", t / 10, t % 10);
+				mvprintw(y, 2, "%-16s %-14s", "tone", t ? buf : "none");
+			} else if (i == 1) {
+				snprintf(buf, sizeof buf, "%d", n);
+				mvprintw(y, 2, "%-16s %-14s", "how many tones", buf);
+			} else {
+				unsigned t = mc_pl_get_tone(&img, i - 2);
+				snprintf(buf, sizeof buf, "%u.%u Hz", t / 10, t % 10);
+				mvprintw(y, 2, "tone %-11d %-14s", i - 1, t ? buf : "none");
+			}
+			if (i == sel)
+				attroff(A_REVERSE);
+		}
+		if (sel == 0)
+			snprintf(line, sizeof line,
+			         "enter cycles off / single / selectable; selectable lets the operator "
+			         "choose at the radio");
+		else
+			snprintf(line, sizeof line,
+			         "%u standard tones, 67.0 to 250.3 Hz; 0 disables. Anything else is refused, "
+			         "never rounded", (unsigned)(mc_pl_standard_count() - 1));
+		mvprintw(3 + rows + 1, 2, "%.*s", COLS - 4, line);
+		status("up/down or j/k move   enter change   esc back");
+		refresh();
+
+		ch = getch();
+		if (ch == 27 || ch == 'q')
+			return;
+		if ((ch == KEY_UP || ch == 'k') && sel > 0)
+			sel--;
+		else if ((ch == KEY_DOWN || ch == 'j') && sel < rows - 1)
+			sel++;
+		else if (ch == '\n' || ch == KEY_ENTER || ch == ' ') {
+			if (sel == 0) {
+				mc_pl_set_mode(&img, mode == MC_PL_OFF ? MC_PL_SINGLE :
+				                     mode == MC_PL_SINGLE ? MC_PL_SELECTABLE : MC_PL_OFF);
+				if (mc_pl_get_mode(&img) == MC_PL_SELECTABLE && mc_pl_get_count(&img) < 1)
+					mc_pl_set_count(&img, 1);
+				dirty = 1;
+				sel = 0;
+			} else if (mode == MC_PL_SELECTABLE && sel == 1) {
+				if (prompt("how many tones (1-10): ", buf, sizeof buf) == 0 && buf[0]) {
+					mc_pl_set_count(&img, atoi(buf));
+					dirty = 1;
+				}
+			} else {
+				int idx = mode == MC_PL_SINGLE ? 0 : sel - 2;
+				unsigned hz = 0, frac = 0;
+				if (prompt("tone in Hz (0 disables): ", buf, sizeof buf) != 0 || !buf[0])
+					continue;
+				{
+					char *dot = strchr(buf, '.');
+					hz = (unsigned)atoi(buf);
+					frac = dot && isdigit((unsigned char)dot[1])
+					           ? (unsigned)(dot[1] - '0') : 0;
+				}
+				if (mc_pl_set_tone(&img, idx, hz * 10 + frac) != 0) {
+					snprintf(line, sizeof line,
+					         "%s is outside 67.0-250.3 Hz -- refused, not rounded", buf);
+					status(line);
+					getch();
+					continue;
+				}
+				dirty = 1;
+			}
+		}
+	}
+}
+
 /* ---- entry point ----------------------------------------------------------------------------- */
 
 int mc_tui_run(mc_image *image, const char *filepath, const char *note)
@@ -409,12 +517,14 @@ int mc_tui_run(mc_image *image, const char *filepath, const char *note)
 				continue;
 			}
 			break;
-		} else if (ch == KEY_UP && sel > 0)
+		} else if ((ch == KEY_UP || ch == 'k') && sel > 0)
 			sel--;
-		else if (ch == KEY_DOWN && sel < img.model->nchan - 1)
+		else if ((ch == KEY_DOWN || ch == 'j') && sel < img.model->nchan - 1)
 			sel++;
 		else if (ch == '\n' || ch == KEY_ENTER)
 			edit_channel(sel);
+		else if (ch == 'p')
+			edit_pl();
 		else if (ch == 's')
 			save_file();
 		if (sel < top)

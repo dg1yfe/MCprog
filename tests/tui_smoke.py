@@ -107,6 +107,27 @@ check('171.23750' in txt and '166.43750' in txt, 'channel 1 shows its golden TX/
 check('terminator' in txt, 'the end of the channel table is marked')
 check('0.00000' not in txt, 'K-24: no row renders as 0.00000 MHz')
 
+# K-14: the PL page must write the tone and the mode byte, and nothing else.
+# eva9_real starts in selectable, so mode cycles selectable -> off -> single; then down to the
+# tone row and type it.
+# j/k rather than the arrow keys: ncurses reads a lone ESC here rather than assembling the
+# escape sequence, which would exit the page instead of moving down.
+DOWN = b'j'
+before, after, out = drive([b' ', b'p', CR, CR, DOWN, CR, b'88.5', CR, ESC, b's', b' ', b'q'],
+                           'fixtures/eva9_real.bin')
+diff = {i for i in range(len(before)) if before[i] != after[i]}
+check(diff <= {0x000, 0x047, 0x048, 0x1FD},
+      'PL edit touched only the tone word, the mode byte and the checksum, got %s'
+      % sorted(map(hex, diff)))
+check(after[0x047] == 0x02 and after[0x048] == 0xC3,
+      'PL 88.5 Hz stored as 02C3, exactly what the 1987 editor wrote')
+check((after[0x1FD] & 0xF0) == 0x60, 'PL mode byte set to 0x60 (single tone)')
+check(sum(after) & 0xFF == 0xFF, 'checksum still valid after a PL edit')
+
+# MCEZ13 must not offer PL: its per-channel indexing is not established.
+_, _, out = drive([b' ', b'p'], 'fixtures/ez13_default_band2.bin')
+check('no PL/CTCSS' in out, 'MCEZ13 says it has no settable PL rather than guessing')
+
 # The EZA models have different flags entirely (K-22).
 _, _, out = drive([b' ', CR], 'fixtures/ez13_default_band2.bin')
 txt = screen(out)

@@ -67,6 +67,12 @@ typedef struct {
 	uint8_t numbered;  /* 1 = record carries a BCD number at +0 and a trakmode at +1   */
 	const mc_flag *flags;
 	uint8_t nflags;
+	/* PL / CTCSS (K-14).  All zero on models where it is not implemented or not established. */
+	uint16_t pl_tone;  /* the single-tone slot                                         */
+	uint16_t pl_list;  /* base of the selectable tone list                             */
+	uint16_t pl_count; /* byte whose HIGH nibble holds the number of selectable tones  */
+	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable                      */
+	uint8_t pl_max;    /* entries in the list                                          */
 } mc_model;
 
 const mc_model *mc_model_by_name(const char *name);
@@ -162,6 +168,33 @@ const mc_flag *mc_flags(const mc_model *m, size_t *n);
 const mc_flag *mc_flag_by_name(const mc_model *m, const char *name);
 int mc_flag_get(const mc_image *img, int slot0, const mc_flag *f);
 void mc_flag_set(mc_image *img, int slot0, const mc_flag *f, int on);
+
+/* ---- PL / CTCSS (K-14) ----------------------------------------------------------------------
+ * Tones are held as round(7.984 x f_Hz), big-endian -- the same law the signalling tones use.  The
+ * encoding is lossy (88.5 Hz stores as 707, which decodes to 88.55), so decoding snaps to the
+ * standard tone list the original software itself carries.  Frequencies are in TENTHS of a Hz
+ * throughout, so no float ever touches a codeplug.
+ */
+#define MC_PL_MAX 10
+
+typedef enum { MC_PL_OFF = 0, MC_PL_SINGLE, MC_PL_SELECTABLE } mc_pl_mode;
+
+/* The standard list, index 0 = 0 meaning no PL.  Returns tenths of a Hz. */
+unsigned mc_pl_standard(size_t i);
+size_t mc_pl_standard_count(void);
+
+uint16_t mc_pl_encode(unsigned dhz);
+unsigned mc_pl_decode(uint16_t word);
+
+int mc_pl_supported(const mc_model *m);
+mc_pl_mode mc_pl_get_mode(const mc_image *img);
+void mc_pl_set_mode(mc_image *img, mc_pl_mode mode);
+/* Number of selectable tones in force; 0 when PL is off or the model has none. */
+int mc_pl_get_count(const mc_image *img);
+void mc_pl_set_count(mc_image *img, int n);
+/* The single tone (MC_PL_SINGLE) or list entry `i` (MC_PL_SELECTABLE), in tenths of a Hz. */
+unsigned mc_pl_get_tone(const mc_image *img, int i);
+int mc_pl_set_tone(mc_image *img, int i, unsigned dhz);
 
 /* ---- conformance dump ----------------------------------------------------------------------
  * Emits the exact format of testdata/codeplug/[*].vec.  Shared by the CLI and the test

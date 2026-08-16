@@ -38,3 +38,5 @@ STALE  29 raw=2900d6ac24d64334
 STALE  30 raw=3000d6ac24d64334
 STALE  31 raw=3100d6ac24d64334
 STALE  32 raw=3200d6ac24d64334
+PL     mode=selectable count=10
+PLLIST - 67.0 110.9 146.2 192.8 - - - - -

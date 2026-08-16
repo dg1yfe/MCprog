@@ -264,6 +264,86 @@ static void test_parity(void)
 	free(vec);
 }
 
+/* ---- PL / CTCSS (K-14) ----------------------------------------------------------------------- */
+
+static void test_pl(void)
+{
+	char *vec = slurp("testdata/pl/pl.vec", NULL), *line, *save;
+	if (!vec)
+		return;
+	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+		char mname[64];
+		unsigned idx, dhz, word, tone, list, cnt, mode, mx;
+
+		if (sscanf(line, "TONE idx=%u dhz=%u word=%x", &idx, &dhz, &word) == 3) {
+			ok(mc_pl_standard(idx) == dhz, "K-14", "the standard tone list matches");
+			ok(mc_pl_encode(dhz) == word, "K-14", "and each entry encodes as expected");
+		} else if (sscanf(line, "PLENC dhz=%u word=%x", &dhz, &word) == 2) {
+			ok(mc_pl_encode(dhz) == word, "K-14", "encode round(7.984 x f)");
+		} else if (sscanf(line, "PLDEC word=%x dhz=%u", &word, &dhz) == 2) {
+			ok(mc_pl_decode((uint16_t)word) == dhz, "K-14",
+			   "decode, snapped to the standard list where one matches");
+		} else if (sscanf(line, "PLMAP model=%63s tone=%x list=%x count=%x mode=%x max=%u",
+		                  mname, &tone, &list, &cnt, &mode, &mx) == 6) {
+			const mc_model *m = mc_model_by_name(mname);
+			if (!m) {
+				failf("K-14", "unknown model %s", mname);
+				continue;
+			}
+			ok(m->pl_tone == tone && m->pl_list == list && m->pl_count == cnt &&
+			       m->pl_mode == mode && m->pl_max == mx,
+			   "K-14", "the per-model PL layout matches");
+		}
+	}
+	free(vec);
+
+	/* Round-trip through a real image: set a tone, read it back, and check nothing else moved. */
+	{
+		size_t len = 0;
+		uint8_t *img_bytes = (uint8_t *)slurp("fixtures/eva9_real.bin", &len);
+		if (img_bytes) {
+			mc_image im;
+			uint8_t before[512];
+			size_t i, moved = 0;
+			im.model = mc_model_by_name("eva_sel5");
+			im.bytes = img_bytes;
+			im.len = len;
+			memcpy(before, img_bytes, len);
+			mc_pl_set_mode(&im, MC_PL_SINGLE);
+			ok(mc_pl_get_mode(&im) == MC_PL_SINGLE, "K-14", "mode reads back as set");
+			ok(mc_pl_set_tone(&im, 0, 885) == 0, "K-14", "88.5 Hz is accepted");
+			ok(mc_pl_get_tone(&im, 0) == 885, "K-14",
+			   "and reads back as 88.5, not 88.55 -- the snap works");
+			ok(img_bytes[0x047] == 0x02 && img_bytes[0x048] == 0xC3, "K-14",
+			   "stored as 02C3, exactly what the 1987 editor wrote");
+			ok((img_bytes[0x1FD] & 0xF0) == 0x60, "K-14", "and the mode byte is 0x60");
+			for (i = 0; i < len; i++)
+				if (before[i] != img_bytes[i])
+					moved++;
+			ok(moved == 3, "K-30", "setting PL moved exactly the tone word and the mode byte");
+			ok(mc_pl_set_tone(&im, 0, 100) != 0, "U-3",
+			   "a frequency below the radio's range is refused, not clamped");
+			/* The count lives in the HIGH nibble; the low one is the selectable-lockout
+			 * marker and must survive (K-30).  No fixture distinguishes the two nibbles,
+			 * so it is exercised directly. */
+			mc_pl_set_mode(&im, MC_PL_SELECTABLE);
+			img_bytes[im.model->pl_count] = 0xA5;
+			mc_pl_set_count(&im, 3);
+			ok(mc_pl_get_count(&im) == 3, "K-14", "the tone count reads back as set");
+			ok((img_bytes[im.model->pl_count] >> 4) == 3, "K-14",
+			   "and it is stored in the high nibble");
+			ok((img_bytes[im.model->pl_count] & 0x0F) == 5, "K-30",
+			   "the low nibble, the selectable-lockout marker, is preserved");
+			mc_pl_set_count(&im, 99);
+			ok(mc_pl_get_count(&im) == im.model->pl_max, "K-14",
+			   "an out-of-range count is clamped to the model's maximum");
+			ok(mc_pl_supported(mc_model_by_name("eza_cspl")) == 0, "K-14",
+			   "MCEZ13 exposes no PL: its per-channel indexing is not established");
+			free(img_bytes);
+		}
+	}
+}
+
 /* ---- edits (K-11, K-22, K-30, U-3) ---------------------------------------------------------- */
 
 static void test_edits(void)
@@ -364,6 +444,7 @@ int main(int argc, char **argv)
 		test_codeplug(CODEPLUGS[i]);
 	test_freq();
 	test_edits();
+	test_pl();
 	test_parity();
 
 	printf("\n%d passed, %d FAILED\n", pass, fail);

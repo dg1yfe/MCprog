@@ -162,6 +162,32 @@ big-endian. These are literal Turbo Pascal reals in the original (`83 68 91 ED 7
 internal scale of 5.28 which appears nowhere in the original software — it only copies them. An
 implementation that synthesises them from 5.28 will be wrong. **[C]**
 
+**K-14 PL / CTCSS.** Radio-wide on every model that has it, so it is not a channel field. Tones are
+`round(7.984 × f_Hz)` big-endian — the same law as K-12. The encoding is **lossy**: 88.5 Hz stores
+as 707, which decodes to 88.55. Decoding therefore **snaps to the standard tone list**, 40 entries
+in tenths of a Hz that the original software itself carries (EVA image, `CS:0x3436`, index 0 = 0.0
+meaning no PL). Without the snap the tool shows 88.6 where the operator typed 88.5. **[C]**
+
+| model | single tone | selectable list | count | mode |
+|---|---|---|---|---|
+| EVA (both) | `0x047` | `0x047 + 2i` | `0x0CE` high nibble | `0x1FD` |
+| EZA 9 | `0x02F` | `0x031 + 2i` | `0x083` high nibble | `0x07F` |
+| EZA 1/3 | — | — | — | — |
+
+Mode byte: `0x60` = single tone, `0xE0` = selectable (the operator picks from the list at the
+radio). The low nibble of the mode byte and of the count byte are not understood and must be
+preserved (K-30) — the count's low nibble is a selectable-lockout marker. Range is 67.0–250.3 Hz,
+or 0 to disable; anything else is refused, never rounded (U-3). **[C]**
+
+> **MCEZ13 is deliberately absent.** Its PL decoder and encoder tables at `0x010` and `0x024` are
+> known, but whether they are indexed per channel is not established, and the model's read is still
+> blocked (see `../doc/EEPROM_MAP_EZA.md`). A programmer that guessed here could write a codeplug
+> no radio wants. It exposes nothing until that is settled.
+>
+> **The EZA 9 nearly went the same way.** An earlier pass concluded it had no PL at all, having
+> tested only the base build — the one of four where the menu entry is inert. `MCEZ9R` and both
+> `MCEZ9M` builds prompt for a frequency. Check every build before concluding a feature is absent.
+
 **K-20 Model descriptor.** These genuinely vary and must be data, not assumptions:
 
 | model | size | checksum | channels | band | ref dividers |

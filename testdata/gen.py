@@ -59,6 +59,37 @@ FLAGS = {
     'eza_cspl': [('clock_shift', 6, 'tx', 1, 'C'), ('reserved_b7', 7, 'tx', 0, 'S')],
 }
 FLAGS['eva_sel5'] = FLAGS['eva_56']
+# --- PL / CTCSS, spec K-14 ---------------------------------------------------------------------
+# The standard tone list the original software carries (EVA image, CS:0x3436): 40 little-endian
+# words in tenths of a Hz, index 0 = 0.0 meaning "no PL".  Storage is round(7.984 x f_Hz)
+# big-endian, the same law as the tone constants -- so 88.5 Hz stores as 707 and decodes to 88.55.
+# Decoding therefore snaps to this list, which is why the original never shows 88.6.
+PL_TONES = [0, 670, 693, 719, 744, 770, 797, 825, 854, 885, 915, 974, 1000, 1035, 1072, 1109,
+            1148, 1188, 1230, 1273, 1318, 1365, 1413, 1462, 1514, 1567, 1622, 1679, 1738, 1799,
+            1862, 1928, 2035, 2065, 2107, 2181, 2257, 2336, 2418, 2503]
+
+# Per-model PL layout, all measured by write-back oracle.  MCEZ13 is deliberately absent: its
+# tables are known but the per-channel indexing is not, and its read is still blocked.
+PL = {
+    'eva_56':   dict(tone=0x047, list=0x047, count=0x0CE, mode=0x1FD, max=10),
+    'eva_sel5': dict(tone=0x047, list=0x047, count=0x0CE, mode=0x1FD, max=10),
+    'eza_sel5': dict(tone=0x02F, list=0x031, count=0x083, mode=0x07F, max=10),
+}
+
+
+def pl_encode(dhz):
+    """round(7.984 * f_Hz) with f in tenths of a Hz, in integers."""
+    return (7984 * dhz + 5000) // 10000
+
+
+def pl_decode(word):
+    """Nearest standard tone, or the computed value in tenths of a Hz when none matches."""
+    for d in PL_TONES:
+        if d and pl_encode(d) == word:
+            return d
+    return (word * 10000 + 3992) // 7984
+
+
 P_BY_BAND = {1: 80, 2: 80, 3: 128, 4: 254}
 IF_HZ = 21_400_000
 
@@ -122,6 +153,22 @@ def vec_codeplug(path, model, band_hint=None):
                 L.append('STALE  %-2d raw=%s' % (i + 1, e[o:o + m['stride']].hex()))
     else:
         L.append('NOTE   band unprogrammed -- frequencies are not computable (spec K-10)')
+    pl = PL.get(model)
+    if pl:
+        mode = {0x60: 'single', 0xE0: 'selectable'}.get(e[pl['mode']] & 0xF0, 'off')
+        if mode == 'off':
+            # With PL disabled the count and list bytes hold unrelated data; rendering them as
+            # tones would be the same mistake as printing an unprogrammed channel as 0.00000.
+            L.append('PL     mode=off')
+        elif mode == 'single':
+            w = (e[pl['tone']] << 8) | e[pl['tone'] + 1]
+            L.append('PL     mode=single tone=%.1f' % (pl_decode(w) / 10))
+        else:
+            n = min(e[pl['count']] >> 4, pl['max'])
+            tones = [(e[pl['list'] + 2 * i] << 8) | e[pl['list'] + 2 * i + 1] for i in range(n)]
+            L.append('PL     mode=selectable count=%d' % n)
+            L.append('PLLIST %s' % ' '.join('%.1f' % (pl_decode(w) / 10) if w else '-'
+                                            for w in tones))
     open(os.path.join(OUT, 'codeplug', os.path.basename(path).split('.')[0].lower() + '.vec'),
          'w').write('\n'.join(L) + '\n')
     return len(L)
@@ -213,6 +260,29 @@ def vec_edit():
             L.append('EDIT img=%s model=%s op=%s slot=%d arg=%d changed=%s'
                      % (path, model, op, slot, arg, chg or 'none'))
     open(os.path.join(OUT, 'edit', 'edits.vec'), 'w').write('\n'.join(L) + '\n')
+    return len(L)
+
+
+def vec_pl():
+    """The PL tone codec and the standard list, spec K-14."""
+    L = ['# PL / CTCSS vectors, spec K-14',
+         '# TONE idx=<n> dhz=<tenths of a Hz> word=<4 hex>   the standard list, index 0 = no PL',
+         '# PLENC dhz=<tenths> word=<4 hex>      round(7.984 * f_Hz), big-endian',
+         '# PLDEC word=<4 hex> dhz=<tenths>      snapped to the standard list where one matches',
+         '# PLMAP model=<m> tone=<off> list=<off> count=<off> mode=<off> max=<n>']
+    for i, d in enumerate(PL_TONES):
+        L.append('TONE idx=%d dhz=%d word=%04x' % (i, d, pl_encode(d)))
+    for d in PL_TONES[1:]:
+        L.append('PLENC dhz=%d word=%04x' % (d, pl_encode(d)))
+        L.append('PLDEC word=%04x dhz=%d' % (pl_encode(d), d))
+    # non-standard values must still round-trip through the law, just without snapping
+    for w in (0x0300, 0x0500, 0x07FF):
+        L.append('PLDEC word=%04x dhz=%d' % (w, pl_decode(w)))
+    for m in sorted(PL):
+        p = PL[m]
+        L.append('PLMAP model=%s tone=%03x list=%03x count=%03x mode=%03x max=%d'
+                 % (m, p['tone'], p['list'], p['count'], p['mode'], p['max']))
+    open(os.path.join(OUT, 'pl', 'pl.vec'), 'w').write('\n'.join(L) + '\n')
     return len(L)
 
 
@@ -361,13 +431,14 @@ SAMPLES = [
 ]
 
 if __name__ == '__main__':
-    for d in ('codeplug', 'edit', 'freq', 'parity', 'proto', 'traces'):
+    for d in ('codeplug', 'edit', 'freq', 'parity', 'pl', 'proto', 'traces'):
         os.makedirs(os.path.join(OUT, d), exist_ok=True)
     for path, model in SAMPLES:
         n = vec_codeplug(path, model)
         print('  codeplug/%-22s %d lines' % (os.path.basename(path).split('.')[0].lower() + '.vec', n))
     print('  freq/roundtrip.vec        %d lines' % vec_freq())
     print('  edit/edits.vec            %d lines' % vec_edit())
+    print('  pl/pl.vec                 %d lines' % vec_pl())
     print('  proto/header.vec          %d lines' % vec_header())
     print('  parity/parity.vec         %d lines' % vec_parity())
     for src, name, note in [

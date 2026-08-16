@@ -14,3 +14,4 @@ CHAN   5  num=-- tx=0 rx=21400000 txraw=d80000 rxraw=d80000 canon=1 state=empty
 CHAN   6  num=-- tx=0 rx=21400000 txraw=d80000 rxraw=d80000 canon=1 state=empty
 CHAN   7  num=-- tx=0 rx=21400000 txraw=d80000 rxraw=d80000 canon=1 state=empty
 CHAN   8  num=-- tx=0 rx=21400000 txraw=d80000 rxraw=d80000 canon=1 state=empty
+PL     mode=off

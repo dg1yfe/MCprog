@@ -258,3 +258,123 @@ void mc_flag_set(mc_image *img, int slot0, const mc_flag *fl, int on)
 			img->bytes[off] &= (uint8_t)~(1u << fl->bit);
 	}
 }
+
+/* ---- PL / CTCSS, K-14 ----------------------------------------------------------------------- */
+
+/* The list the original software carries (EVA image, CS:0x3436): 40 little-endian words in tenths
+ * of a Hz, index 0 = 0.0 meaning no PL.  Held here because decoding snaps to it. */
+static const unsigned PL_STD[] = {
+	0, 670, 693, 719, 744, 770, 797, 825, 854, 885, 915, 974, 1000, 1035, 1072, 1109,
+	1148, 1188, 1230, 1273, 1318, 1365, 1413, 1462, 1514, 1567, 1622, 1679, 1738, 1799,
+	1862, 1928, 2035, 2065, 2107, 2181, 2257, 2336, 2418, 2503
+};
+
+unsigned mc_pl_standard(size_t i)
+{
+	return i < sizeof PL_STD / sizeof PL_STD[0] ? PL_STD[i] : 0;
+}
+
+size_t mc_pl_standard_count(void)
+{
+	return sizeof PL_STD / sizeof PL_STD[0];
+}
+
+uint16_t mc_pl_encode(unsigned dhz)
+{
+	return (uint16_t)((7984u * dhz + 5000u) / 10000u);
+}
+
+unsigned mc_pl_decode(uint16_t word)
+{
+	size_t i;
+	if (!word)
+		return 0;
+	/* Snap: the storage is lossy, so 707 means the 88.5 the operator typed, not 88.55. */
+	for (i = 1; i < sizeof PL_STD / sizeof PL_STD[0]; i++)
+		if (mc_pl_encode(PL_STD[i]) == word)
+			return PL_STD[i];
+	return ((unsigned)word * 10000u + 3992u) / 7984u;
+}
+
+int mc_pl_supported(const mc_model *m)
+{
+	return m->pl_mode != 0;
+}
+
+mc_pl_mode mc_pl_get_mode(const mc_image *img)
+{
+	uint8_t v;
+	if (!mc_pl_supported(img->model))
+		return MC_PL_OFF;
+	v = (uint8_t)(img->bytes[img->model->pl_mode] & 0xF0);
+	if (v == 0x60)
+		return MC_PL_SINGLE;
+	if (v == 0xE0)
+		return MC_PL_SELECTABLE;
+	return MC_PL_OFF;
+}
+
+void mc_pl_set_mode(mc_image *img, mc_pl_mode mode)
+{
+	uint8_t *p;
+	if (!mc_pl_supported(img->model))
+		return;
+	p = &img->bytes[img->model->pl_mode];
+	/* Only the high nibble is ours; the low nibble is not understood, so it is preserved (K-30). */
+	*p = (uint8_t)((*p & 0x0F) |
+	               (mode == MC_PL_SINGLE ? 0x60 : mode == MC_PL_SELECTABLE ? 0xE0 : 0x00));
+}
+
+int mc_pl_get_count(const mc_image *img)
+{
+	int n;
+	if (mc_pl_get_mode(img) != MC_PL_SELECTABLE)
+		return 0;
+	n = img->bytes[img->model->pl_count] >> 4;
+	return n > img->model->pl_max ? img->model->pl_max : n;
+}
+
+void mc_pl_set_count(mc_image *img, int n)
+{
+	uint8_t *p;
+	if (!mc_pl_supported(img->model))
+		return;
+	if (n < 1)
+		n = 1;
+	if (n > img->model->pl_max)
+		n = img->model->pl_max;
+	p = &img->bytes[img->model->pl_count];
+	*p = (uint8_t)((*p & 0x0F) | (n << 4)); /* low nibble is the selectable-lockout marker */
+}
+
+static size_t pl_slot(const mc_image *img, int i)
+{
+	const mc_model *m = img->model;
+	return mc_pl_get_mode(img) == MC_PL_SINGLE ? m->pl_tone
+	                                           : m->pl_list + (size_t)i * 2;
+}
+
+unsigned mc_pl_get_tone(const mc_image *img, int i)
+{
+	size_t o;
+	if (!mc_pl_supported(img->model) || i < 0 || i >= img->model->pl_max)
+		return 0;
+	o = pl_slot(img, i);
+	return mc_pl_decode((uint16_t)((img->bytes[o] << 8) | img->bytes[o + 1]));
+}
+
+int mc_pl_set_tone(mc_image *img, int i, unsigned dhz)
+{
+	size_t o;
+	uint16_t w;
+	if (!mc_pl_supported(img->model) || i < 0 || i >= img->model->pl_max)
+		return -1;
+	/* 0 disables, as the original's prompt says; otherwise the radio's stated range. */
+	if (dhz && (dhz < 670 || dhz > 2510))
+		return -1;
+	w = dhz ? mc_pl_encode(dhz) : 0;
+	o = pl_slot(img, i);
+	img->bytes[o] = (uint8_t)(w >> 8);
+	img->bytes[o + 1] = (uint8_t)(w & 0xFF);
+	return 0;
+}

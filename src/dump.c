@@ -41,14 +41,16 @@ static void hex(char *dst, const uint8_t *b, size_t n)
 	dst[n * 2] = 0;
 }
 
+static void dump_pl(FILE *f, const mc_image *img);
+static void dump_channels(FILE *f, const mc_image *img, unsigned p, int live, int term);
+
 void mc_dump_vec(FILE *f, const mc_image *img, const char *path)
 {
 	const mc_model *m = img->model;
 	int band = mc_band_index(img);
 	unsigned p = mc_band_p(band);
 	int term = 0, live = mc_channel_count(img, &term);
-	char pbuf[16], tbuf[16], tx[8], rx[8], raw[40];
-	int i;
+	char pbuf[16], tbuf[16];
 
 	fprintf(f, "IMG    %s\n", path);
 	fprintf(f, "MODEL  %s size=%d\n", m->name, (int)img->len);
@@ -68,11 +70,51 @@ void mc_dump_vec(FILE *f, const mc_image *img, const char *path)
 		snprintf(tbuf, sizeof tbuf, "none");
 	fprintf(f, "CHANS  terminated=%d slots=%d terminator=%s\n", live, m->nchan, tbuf);
 
-	if (!p) {
+	if (!p)
 		/* K-10: band 7 is unprogrammed.  This is a question for the user, not an error. */
 		fprintf(f, "NOTE   band unprogrammed -- frequencies are not computable (spec K-10)\n");
+	else
+		dump_channels(f, img, p, live, term);
+	dump_pl(f, img);
+}
+
+/* K-14.  With PL off the count and list bytes hold unrelated data, so rendering them as tones
+ * would repeat the mistake K-24 forbids for unprogrammed channels. */
+static void dump_pl(FILE *f, const mc_image *img)
+{
+	int i, n;
+	if (!mc_pl_supported(img->model))
 		return;
+	switch (mc_pl_get_mode(img)) {
+	case MC_PL_OFF:
+		fprintf(f, "PL     mode=off\n");
+		return;
+	case MC_PL_SINGLE:
+		fprintf(f, "PL     mode=single tone=%u.%u\n", mc_pl_get_tone(img, 0) / 10,
+		        mc_pl_get_tone(img, 0) % 10);
+		return;
+	default:
+		break;
 	}
+	n = mc_pl_get_count(img);
+	fprintf(f, "PL     mode=selectable count=%d\n", n);
+	fprintf(f, "PLLIST");
+	for (i = 0; i < n; i++) {
+		unsigned t = mc_pl_get_tone(img, i);
+		if (t)
+			fprintf(f, " %u.%u", t / 10, t % 10);
+		else
+			fprintf(f, " -");
+	}
+	fputc('\n', f);
+}
+
+static void dump_channels(FILE *f, const mc_image *img, unsigned p, int live, int term)
+{
+	const mc_model *m = img->model;
+	char tx[8], rx[8], raw[40];
+	int i;
+	{
 
 	for (i = 0; i < live; i++) {
 		mc_channel c;
@@ -96,4 +138,5 @@ void mc_dump_vec(FILE *f, const mc_image *img, const char *path)
 			hex(raw, c.raw, m->stride);
 			fprintf(f, "STALE  %-2d raw=%s\n", c.slot, raw);
 		}
+	}
 }

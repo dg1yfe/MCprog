@@ -1,0 +1,129 @@
+# PL / CTCSS vectors, spec K-14
+# TONE idx=<n> dhz=<tenths of a Hz> word=<4 hex>   the standard list, index 0 = no PL
+# PLENC dhz=<tenths> word=<4 hex>      round(7.984 * f_Hz), big-endian
+# PLDEC word=<4 hex> dhz=<tenths>      snapped to the standard list where one matches
+# PLMAP model=<m> tone=<off> list=<off> count=<off> mode=<off> max=<n>
+TONE idx=0 dhz=0 word=0000
+TONE idx=1 dhz=670 word=0217
+TONE idx=2 dhz=693 word=0229
+TONE idx=3 dhz=719 word=023e
+TONE idx=4 dhz=744 word=0252
+TONE idx=5 dhz=770 word=0267
+TONE idx=6 dhz=797 word=027c
+TONE idx=7 dhz=825 word=0293
+TONE idx=8 dhz=854 word=02aa
+TONE idx=9 dhz=885 word=02c3
+TONE idx=10 dhz=915 word=02db
+TONE idx=11 dhz=974 word=030a
+TONE idx=12 dhz=1000 word=031e
+TONE idx=13 dhz=1035 word=033a
+TONE idx=14 dhz=1072 word=0358
+TONE idx=15 dhz=1109 word=0375
+TONE idx=16 dhz=1148 word=0395
+TONE idx=17 dhz=1188 word=03b4
+TONE idx=18 dhz=1230 word=03d6
+TONE idx=19 dhz=1273 word=03f8
+TONE idx=20 dhz=1318 word=041c
+TONE idx=21 dhz=1365 word=0442
+TONE idx=22 dhz=1413 word=0468
+TONE idx=23 dhz=1462 word=048f
+TONE idx=24 dhz=1514 word=04b9
+TONE idx=25 dhz=1567 word=04e3
+TONE idx=26 dhz=1622 word=050f
+TONE idx=27 dhz=1679 word=053d
+TONE idx=28 dhz=1738 word=056c
+TONE idx=29 dhz=1799 word=059c
+TONE idx=30 dhz=1862 word=05cf
+TONE idx=31 dhz=1928 word=0603
+TONE idx=32 dhz=2035 word=0659
+TONE idx=33 dhz=2065 word=0671
+TONE idx=34 dhz=2107 word=0692
+TONE idx=35 dhz=2181 word=06cd
+TONE idx=36 dhz=2257 word=070a
+TONE idx=37 dhz=2336 word=0749
+TONE idx=38 dhz=2418 word=078b
+TONE idx=39 dhz=2503 word=07ce
+PLENC dhz=670 word=0217
+PLDEC word=0217 dhz=670
+PLENC dhz=693 word=0229
+PLDEC word=0229 dhz=693
+PLENC dhz=719 word=023e
+PLDEC word=023e dhz=719
+PLENC dhz=744 word=0252
+PLDEC word=0252 dhz=744
+PLENC dhz=770 word=0267
+PLDEC word=0267 dhz=770
+PLENC dhz=797 word=027c
+PLDEC word=027c dhz=797
+PLENC dhz=825 word=0293
+PLDEC word=0293 dhz=825
+PLENC dhz=854 word=02aa
+PLDEC word=02aa dhz=854
+PLENC dhz=885 word=02c3
+PLDEC word=02c3 dhz=885
+PLENC dhz=915 word=02db
+PLDEC word=02db dhz=915
+PLENC dhz=974 word=030a
+PLDEC word=030a dhz=974
+PLENC dhz=1000 word=031e
+PLDEC word=031e dhz=1000
+PLENC dhz=1035 word=033a
+PLDEC word=033a dhz=1035
+PLENC dhz=1072 word=0358
+PLDEC word=0358 dhz=1072
+PLENC dhz=1109 word=0375
+PLDEC word=0375 dhz=1109
+PLENC dhz=1148 word=0395
+PLDEC word=0395 dhz=1148
+PLENC dhz=1188 word=03b4
+PLDEC word=03b4 dhz=1188
+PLENC dhz=1230 word=03d6
+PLDEC word=03d6 dhz=1230
+PLENC dhz=1273 word=03f8
+PLDEC word=03f8 dhz=1273
+PLENC dhz=1318 word=041c
+PLDEC word=041c dhz=1318
+PLENC dhz=1365 word=0442
+PLDEC word=0442 dhz=1365
+PLENC dhz=1413 word=0468
+PLDEC word=0468 dhz=1413
+PLENC dhz=1462 word=048f
+PLDEC word=048f dhz=1462
+PLENC dhz=1514 word=04b9
+PLDEC word=04b9 dhz=1514
+PLENC dhz=1567 word=04e3
+PLDEC word=04e3 dhz=1567
+PLENC dhz=1622 word=050f
+PLDEC word=050f dhz=1622
+PLENC dhz=1679 word=053d
+PLDEC word=053d dhz=1679
+PLENC dhz=1738 word=056c
+PLDEC word=056c dhz=1738
+PLENC dhz=1799 word=059c
+PLDEC word=059c dhz=1799
+PLENC dhz=1862 word=05cf
+PLDEC word=05cf dhz=1862
+PLENC dhz=1928 word=0603
+PLDEC word=0603 dhz=1928
+PLENC dhz=2035 word=0659
+PLDEC word=0659 dhz=2035
+PLENC dhz=2065 word=0671
+PLDEC word=0671 dhz=2065
+PLENC dhz=2107 word=0692
+PLDEC word=0692 dhz=2107
+PLENC dhz=2181 word=06cd
+PLDEC word=06cd dhz=2181
+PLENC dhz=2257 word=070a
+PLDEC word=070a dhz=2257
+PLENC dhz=2336 word=0749
+PLDEC word=0749 dhz=2336
+PLENC dhz=2418 word=078b
+PLDEC word=078b dhz=2418
+PLENC dhz=2503 word=07ce
+PLDEC word=07ce dhz=2503
+PLDEC word=0300 dhz=962
+PLDEC word=0500 dhz=1603
+PLDEC word=07ff dhz=2564
+PLMAP model=eva_56 tone=047 list=047 count=0ce mode=1fd max=10
+PLMAP model=eva_sel5 tone=047 list=047 count=0ce mode=1fd max=10
+PLMAP model=eza_sel5 tone=02f list=031 count=083 mode=07f max=10

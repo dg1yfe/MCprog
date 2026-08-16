@@ -1,0 +1,177 @@
+/*
+ *   MCprog - A programmer for the Motorola MC micro radio family,
+ *            replacing the 1987 Radio Service Software
+ *
+ *   Copyright (C) 2026  Felix Erckenbrecht, DG1YFE
+ *
+ *    This file is part of MCprog.
+ *
+ *    MCprog is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    MCprog is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with MCprog.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    SPDX-License-Identifier: GPL-3.0-or-later
+ */
+/* MC micro codeplug decoding -- see ../../spec.md, section 6 (K-n requirements).
+ *
+ * This layer is pure byte manipulation over an in-memory EEPROM image.  It does no I/O, knows
+ * nothing about the serial link and nothing about the terminal, so it is testable headlessly and
+ * is shared unchanged between the file editor and the radio programmer.
+ */
+#ifndef MC_CODEPLUG_H
+#define MC_CODEPLUG_H
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+
+/* ---- channel flag bits (K-22) ---------------------------------------------------------------
+ * NOT portable between models: bit 3 is clock shift on the EVA and auto-acknowledge on the EZA 9,
+ * and MCEZ13 has almost none of them because PL lives in tables instead.  The editor writes flags
+ * into BOTH halves of a channel record unless `half` says otherwise.
+ */
+typedef enum { MC_HALF_BOTH = 0, MC_HALF_TX, MC_HALF_RX } mc_half;
+
+typedef struct {
+	const char *name;
+	uint8_t bit;
+	mc_half half;
+	uint8_t inverted;  /* stored sense is reversed (MCEZ13 clock shift: 1 = off) */
+	char provenance;   /* 'C' measured against the original, 'S' disassembly only */
+} mc_flag;
+
+/* ---- model descriptor (K-20) ---------------------------------------------------------------
+ * These fields genuinely differ between models, so they are data rather than assumptions.  The
+ * checksum *rule* is identical everywhere; only the byte carrying it moves.
+ */
+typedef struct {
+	const char *name;
+	uint16_t size;     /* nominal device size, bytes                                   */
+	uint16_t cksum;    /* offset of the checksum byte                                  */
+	uint16_t chan;     /* offset of the channel table                                  */
+	uint16_t band;     /* offset of the band byte; index is bits 4-6                   */
+	uint16_t refdiv;   /* offset of the reference divider pair (2 x 16-bit big-endian) */
+	uint8_t nchan;     /* channel slots                                                */
+	uint8_t stride;    /* bytes per channel record                                     */
+	uint8_t tx;        /* offset of the TX triplet within a record                     */
+	uint8_t rx;        /* offset of the RX triplet within a record                     */
+	uint8_t numbered;  /* 1 = record carries a BCD number at +0 and a trakmode at +1   */
+	const mc_flag *flags;
+	uint8_t nflags;
+} mc_model;
+
+const mc_model *mc_model_by_name(const char *name);
+const mc_model *mc_model_by_index(size_t i); /* NULL past the end; for enumeration */
+
+/* Largest device this tool handles, so callers can size a buffer without allocating. */
+#define MC_IMG_MAX 1024
+
+/* Detection is ADVISORY: it reports what fits and proposes one, and the user may override.  Size
+ * plus a valid checksum is all the evidence a file carries, and eva_56 and eva_sel5 are
+ * indistinguishable by layout -- `note` says so when more than one fits.  Returns NULL if nothing
+ * does. */
+const mc_model *mc_model_detect(const uint8_t *bytes, size_t len, char *note, size_t notesz);
+
+/* ---- image ---------------------------------------------------------------------------------- */
+typedef struct {
+	const mc_model *model;
+	uint8_t *bytes;
+	size_t len;
+} mc_image;
+
+/* Checksum (K-2): the stored byte is chosen so the whole device sums to 0xFF mod 256. */
+uint8_t mc_checksum_stored(const mc_image *img);
+uint8_t mc_checksum_total(const mc_image *img);
+int mc_checksum_valid(const mc_image *img);
+/* Recompute the stored byte so the image becomes valid.  Returns the byte written. */
+uint8_t mc_checksum_fix(mc_image *img);
+
+/* Band (K-10).  Index 7 means unprogrammed: ask the user, do not treat it as an error. */
+int mc_band_index(const mc_image *img);
+int mc_band_raster(const mc_image *img);
+/* Channel-spacing divisor P for a band index, or 0 if the band does not determine one. */
+unsigned mc_band_p(int band_index);
+
+uint16_t mc_refdiv(const mc_image *img, int which); /* which = 0 or 1 */
+
+/* ---- frequency codec (K-10, K-11) ----------------------------------------------------------
+ *   coarse = ((b0 & 3) << 8) | b1
+ *   step   = (b0 & 4) ? 3125 : 2500
+ *   hz     = (coarse * P + b2) * step
+ * The RX field holds the local oscillator; the displayed RX frequency is this + MC_IF_HZ.
+ */
+#define MC_IF_HZ 21400000u
+
+uint32_t mc_freq_decode(const uint8_t raw[3], unsigned p);
+/* Canonical (K-11): always emits b2 < p.  `flags` supplies b0 bits 3-7, which carry per-channel
+ * option bits and must be preserved (K-22).  Returns 0 on success, -1 if hz is not representable. */
+int mc_freq_encode(uint32_t hz, unsigned p, unsigned step, uint8_t flags, uint8_t out[3]);
+/* K-11: b2 is a full byte but p <= 254, so b2 >= p is a legal alternate spelling that the original
+ * software does emit.  Decoders must accept it; encoders must not produce it. */
+int mc_freq_is_canonical(const uint8_t raw[3], unsigned p);
+
+/* ---- channels (K-21, K-23, K-24) ------------------------------------------------------------ */
+typedef enum {
+	MC_CH_PROGRAMMED = 0, /* a real channel                                          */
+	MC_CH_EMPTY,          /* allocated but unprogrammed: valid number, zero frequency */
+	MC_CH_STALE           /* past the terminator: content is leftover, preserve it    */
+} mc_chan_state;
+
+typedef struct {
+	int slot; /* 1-based */
+	mc_chan_state state;
+	uint8_t num;      /* BCD number byte; 0 when the model has no numbers */
+	uint8_t raw[16];  /* the record verbatim, `stride` bytes */
+	uint8_t txraw[3], rxraw[3];
+	uint32_t tx_hz, rx_hz; /* rx_hz already includes MC_IF_HZ */
+	int canonical;         /* both triplets have b2 < p */
+} mc_channel;
+
+/* K-23: the table is terminated, not sparse.  Returns the number of live channels and, via
+ * `terminator`, the 1-based slot holding the 0xFF terminator (0 if the table runs to the end). */
+int mc_channel_count(const mc_image *img, int *terminator);
+/* Decode one 0-based slot.  `p` may be 0 when the band is unprogrammed, in which case the
+ * frequencies are left at 0 and only the raw bytes are filled in. */
+int mc_channel_get(const mc_image *img, int slot0, unsigned p, mc_channel *out);
+
+/* ---- editing (K-11, K-22, K-30) -------------------------------------------------------------
+ * These change only the bytes the field owns.  None of them touches the checksum; call
+ * mc_checksum_fix afterwards, so that saving is an explicit act.
+ */
+typedef enum { MC_TX = 0, MC_RX } mc_dir;
+
+/* Channel raster, from the band byte's bit 7.  Feeding this to the encoder is what makes bit 2 of
+ * b0 come out right; MCEZ13 band 2 is 2500 Hz where the EVA samples are 3125. */
+unsigned mc_step_hz(const mc_image *img);
+
+/* Set one half of a channel record.  For MC_RX, `hz` is the DISPLAYED frequency and the first IF
+ * is subtracted here.  Returns 0, or -1 if the frequency is not representable -- which the caller
+ * must surface rather than clamp (U-3). */
+int mc_channel_set_freq(mc_image *img, int slot0, mc_dir dir, uint32_t hz);
+
+const mc_flag *mc_flags(const mc_model *m, size_t *n);
+const mc_flag *mc_flag_by_name(const mc_model *m, const char *name);
+int mc_flag_get(const mc_image *img, int slot0, const mc_flag *f);
+void mc_flag_set(mc_image *img, int slot0, const mc_flag *f, int on);
+
+/* ---- conformance dump ----------------------------------------------------------------------
+ * Emits the exact format of testdata/codeplug/[*].vec.  Shared by the CLI and the test
+ * suite so that what the tests check is what the tool prints.
+ */
+void mc_dump_vec(FILE *f, const mc_image *img, const char *path);
+
+/* ---- software parity (P-2), used by the protocol layer -------------------------------------- */
+uint8_t mc_parity_tx(uint8_t b);
+/* Returns 0 and stores the 7-bit value on success, -1 on a parity error. */
+int mc_parity_rx(uint8_t b, uint8_t *out);
+
+#endif /* MC_CODEPLUG_H */

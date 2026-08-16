@@ -1,0 +1,26 @@
+# edit vectors, spec K-11 / K-22 / K-30
+# EDIT img=<path> model=<m> op=<op> slot=<1-based> arg=<value>
+#      changed=<off>:<old>:<new>|... , offsets in hex, ALWAYS including the checksum
+# ops: set_tx <Hz>  set_rx <displayed Hz>  flag:<name> <0|1>
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=set_tx slot=1 arg=145000000 changed=000:37:eb|0e3:ac:44|0e4:4c:00
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=set_rx slot=1 arg=160000000 changed=000:37:3d|0e6:44:2a|0e7:0c:20
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=set_tx slot=3 arg=433500000 changed=unrepresentable
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=flag:decode slot=1 arg=0 changed=000:37:57|0e2:96:86|0e5:96:86
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=flag:decode slot=1 arg=1 changed=none
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=flag:encode slot=1 arg=1 changed=000:37:b7|0e2:96:d6|0e5:96:d6
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=flag:power_high slot=1 arg=0 changed=0e2:96:16|0e5:96:16
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=flag:clock_shift slot=1 arg=1 changed=000:37:27|0e2:96:9e|0e5:96:9e
+EDIT img=fixtures/eva9_real.bin model=eva_sel5 op=flag:tx_inhibit slot=2 arg=1 changed=000:37:f7|0ea:16:36|0ed:16:36
+EDIT img=samples/MCMICR70.DAT model=eva_56 op=set_tx slot=1 arg=435000000 changed=000:bb:38|0e3:23:24|0e4:86:08
+EDIT img=samples/MCMICR70.DAT model=eva_56 op=flag:encode slot=1 arg=1 changed=none
+EDIT img=samples/MCMICR70.DAT model=eva_56 op=flag:clock_shift slot=5 arg=1 changed=none
+EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=set_tx slot=1 arg=145000000 changed=000:37:13|0c9:20:44
+EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=set_rx slot=1 arg=160000000 changed=000:37:6f|0cc:62:2a
+EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:clock_shift slot=1 arg=1 changed=000:37:b7|0cb:5e:de
+EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:decode slot=1 arg=0 changed=000:37:57|0c8:de:ce|0cb:5e:4e
+EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:auto_ack slot=1 arg=0 changed=000:37:47|0c8:de:d6|0cb:5e:56
+EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:power_high slot=1 arg=1 changed=none
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=set_tx slot=1 arg=145000000 changed=003:ed:16|03b:40:42|03c:00:d5
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:clock_shift slot=1 arg=1 changed=003:ed:2d|03b:40:00
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:clock_shift slot=1 arg=0 changed=none
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:reserved_b7 slot=1 arg=1 changed=003:ed:6d|03b:40:c0

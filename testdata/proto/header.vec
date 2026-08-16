@@ -1,0 +1,34 @@
+# command header vectors, spec P-3
+# HDR cmd=<3 chars> addr=<4 hex> want=<7 hex>
+# 3 command characters then 4 nibble-characters of address, high nibble first,
+# each 0x30 + nibble
+HDR cmd=)40 addr=0000 want=29343030303030
+HDR cmd=)40 addr=0040 want=29343030303430
+HDR cmd=)40 addr=00c0 want=29343030303c30
+HDR cmd=)40 addr=0100 want=29343030313030
+HDR cmd=)40 addr=01c0 want=29343030313c30
+HDR cmd=)40 addr=0200 want=29343030323030
+HDR cmd=)40 addr=000f want=2934303030303f
+HDR cmd=)40 addr=1234 want=29343031323334
+HDR cmd=)40 addr=abcd want=2934303a3b3c3d
+HDR cmd=)40 addr=ffff want=2934303f3f3f3f
+HDR cmd=)01 addr=0000 want=29303130303030
+HDR cmd=)01 addr=0040 want=29303130303430
+HDR cmd=)01 addr=00c0 want=29303130303c30
+HDR cmd=)01 addr=0100 want=29303130313030
+HDR cmd=)01 addr=01c0 want=29303130313c30
+HDR cmd=)01 addr=0200 want=29303130323030
+HDR cmd=)01 addr=000f want=2930313030303f
+HDR cmd=)01 addr=1234 want=29303131323334
+HDR cmd=)01 addr=abcd want=2930313a3b3c3d
+HDR cmd=)01 addr=ffff want=2930313f3f3f3f
+HDR cmd=(40 addr=0000 want=28343030303030
+HDR cmd=(40 addr=0040 want=28343030303430
+HDR cmd=(40 addr=00c0 want=28343030303c30
+HDR cmd=(40 addr=0100 want=28343030313030
+HDR cmd=(40 addr=01c0 want=28343030313c30
+HDR cmd=(40 addr=0200 want=28343030323030
+HDR cmd=(40 addr=000f want=2834303030303f
+HDR cmd=(40 addr=1234 want=28343031323334
+HDR cmd=(40 addr=abcd want=2834303a3b3c3d
+HDR cmd=(40 addr=ffff want=2834303f3f3f3f

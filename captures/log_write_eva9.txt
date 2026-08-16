@@ -1,0 +1,2260 @@
+633 - pc   : ffffffff ÿ
+001 - pc   : 0 
+001 - pc   : ffffffff ÿ
+001 - pc   : 0 
+002 - pc   : ffffffff ÿ
+001 - pc   : 0 
+488 - pc   : ffffffff ÿ
+001 - pc   : 1 
+145 - pc   : ffffffff ÿ
+001 - pc   : 0 
+447 - pc   : ffffffff ÿ
+001 - pc   : 1 
+329 - pc   : 29 )
+001 - pc   : 30 0
+015 - pc   : 31 1
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+027 - radio: 28 (
+009 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 30 0
+009 - radio: 30 0
+009 - radio: 37 7
+008 - radio: 33 3
+159 - pc   : 28 (
+001 - pc   : 34 4
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 33 3
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 32 2
+015 - pc   : 3f ?
+001 - pc   : 36 6
+014 - pc   : 30 0
+002 - pc   : 36 6
+012 - pc   : 31 1
+001 - pc   : 36 6
+015 - pc   : 3d =
+001 - pc   : 36 6
+013 - pc   : 3e >
+002 - pc   : 3a :
+013 - pc   : 36 6
+002 - pc   : 36 6
+014 - pc   : 3e >
+001 - pc   : 3a :
+014 - pc   : 38 8
+001 - pc   : 36 6
+014 - pc   : 3e >
+001 - pc   : 30 0
+015 - pc   : 33 3
+001 - pc   : 30 0
+013 - pc   : 36 6
+001 - pc   : 30 0
+013 - pc   : 39 9
+002 - pc   : 30 0
+013 - pc   : 3a :
+001 - pc   : 30 0
+017 - pc   : 32 2
+001 - pc   : 30 0
+011 - pc   : 35 5
+002 - pc   : 30 0
+014 - pc   : 38 8
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+002 - pc   : 30 0
+013 - pc   : 34 4
+001 - pc   : 30 0
+013 - pc   : 37 7
+001 - pc   : 3a :
+014 - pc   : 3a :
+002 - pc   : 31 1
+013 - pc   : 33 3
+001 - pc   : 33 3
+015 - pc   : 38 8
+001 - pc   : 31 1
+013 - pc   : 33 3
+001 - pc   : 33 3
+015 - pc   : 3c <
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 31 1
+014 - pc   : 33 3
+001 - pc   : 33 3
+014 - pc   : 3c <
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+003 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+132 - radio: 6 
+711 - radio: 6 
+019 - pc   : 29 )
+001 - pc   : 34 4
+015 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+025 - radio: 28 (
+010 - radio: 34 4
+008 - radio: 30 0
+008 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 37 7
+011 - radio: 33 3
+008 - radio: 30 0
+008 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 32 2
+007 - radio: 3f ?
+009 - radio: 36 6
+008 - radio: 30 0
+007 - radio: 36 6
+010 - radio: 31 1
+008 - radio: 36 6
+008 - radio: 3d =
+008 - radio: 36 6
+008 - radio: 3e >
+008 - radio: 3a :
+011 - radio: 36 6
+008 - radio: 36 6
+007 - radio: 3e >
+008 - radio: 3a :
+009 - radio: 38 8
+007 - radio: 36 6
+011 - radio: 3e >
+007 - radio: 30 0
+008 - radio: 33 3
+010 - radio: 30 0
+006 - radio: 36 6
+009 - radio: 30 0
+007 - radio: 39 9
+010 - radio: 30 0
+009 - radio: 3a :
+008 - radio: 30 0
+007 - radio: 32 2
+009 - radio: 30 0
+008 - radio: 35 5
+010 - radio: 30 0
+007 - radio: 38 8
+008 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 31 1
+010 - radio: 30 0
+008 - radio: 34 4
+008 - radio: 30 0
+009 - radio: 37 7
+007 - radio: 3a :
+008 - radio: 3a :
+010 - radio: 31 1
+008 - radio: 33 3
+009 - radio: 33 3
+007 - radio: 38 8
+008 - radio: 31 1
+008 - radio: 33 3
+010 - radio: 33 3
+008 - radio: 3c <
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 33 3
+008 - radio: 33 3
+008 - radio: 3c <
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+017 - pc   : 28 (
+005 - pc   : 34 4
+011 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 34 4
+013 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+002 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+010 - pc   : 30 0
+007 - pc   : 30 0
+001 - pc   : 30 0
+012 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+016 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+007 - pc   : 30 0
+007 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+016 - pc   : 30 0
+001 - pc   : 30 0
+012 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+017 - pc   : 30 0
+001 - pc   : 30 0
+010 - pc   : 31 1
+001 - pc   : 37 7
+014 - pc   : 30 0
+015 - pc   : 37 7
+001 - pc   : 30 0
+001 - pc   : 37 7
+012 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 30 0
+015 - pc   : 31 1
+001 - pc   : 30 0
+013 - pc   : 32 2
+001 - pc   : 30 0
+015 - pc   : 33 3
+001 - pc   : 30 0
+014 - pc   : 34 4
+001 - pc   : 30 0
+014 - pc   : 35 5
+002 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+002 - pc   : 37 7
+013 - pc   : 30 0
+002 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+002 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+133 - radio: 6 
+711 - radio: 6 
+018 - pc   : 29 )
+001 - pc   : 34 4
+014 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 34 4
+014 - pc   : 30 0
+026 - radio: 28 (
+008 - radio: 34 4
+008 - radio: 30 0
+011 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 34 4
+007 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+011 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+007 - radio: 30 0
+012 - radio: 30 0
+004 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 37 7
+008 - radio: 30 0
+007 - radio: 37 7
+009 - radio: 30 0
+010 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 37 7
+009 - radio: 30 0
+007 - radio: 37 7
+008 - radio: 30 0
+010 - radio: 37 7
+008 - radio: 30 0
+009 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 31 1
+010 - radio: 37 7
+009 - radio: 30 0
+007 - radio: 37 7
+009 - radio: 30 0
+007 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+009 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+009 - radio: 37 7
+009 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 31 1
+009 - radio: 30 0
+008 - radio: 31 1
+007 - radio: 30 0
+010 - radio: 32 2
+008 - radio: 30 0
+008 - radio: 33 3
+009 - radio: 30 0
+008 - radio: 34 4
+008 - radio: 30 0
+010 - radio: 35 5
+008 - radio: 37 7
+007 - radio: 30 0
+009 - radio: 37 7
+007 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 37 7
+008 - radio: 30 0
+007 - radio: 37 7
+009 - radio: 30 0
+007 - radio: 37 7
+008 - radio: 30 0
+011 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 37 7
+009 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+010 - radio: 37 7
+007 - radio: 30 0
+012 - radio: 30 0
+005 - radio: 30 0
+007 - radio: 37 7
+008 - radio: 30 0
+011 - radio: 37 7
+007 - radio: 30 0
+009 - radio: 37 7
+008 - radio: 30 0
+007 - radio: 37 7
+008 - radio: 30 0
+010 - radio: 37 7
+009 - radio: 30 0
+016 - pc   : 28 (
+001 - pc   : 34 4
+016 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 38 8
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+002 - pc   : 37 7
+012 - pc   : 30 0
+002 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 30 0
+014 - pc   : 32 2
+001 - pc   : 38 8
+014 - pc   : 32 2
+001 - pc   : 38 8
+014 - pc   : 33 3
+001 - pc   : 38 8
+014 - pc   : 34 4
+001 - pc   : 37 7
+013 - pc   : 30 0
+002 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+002 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 34 4
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+012 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+002 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 31 1
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+019 - pc   : 31 1
+001 - pc   : 37 7
+010 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 31 1
+015 - pc   : 34 4
+001 - pc   : 30 0
+014 - pc   : 3e >
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 31 1
+016 - pc   : 3e >
+001 - pc   : 35 5
+013 - pc   : 34 4
+001 - pc   : 39 9
+013 - pc   : 35 5
+001 - pc   : 3e >
+015 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 31 1
+001 - pc   : 3a :
+015 - pc   : 32 2
+001 - pc   : 3b ;
+014 - pc   : 3c <
+002 - pc   : 30 0
+012 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 30 0
+133 - radio: 6 
+709 - radio: 6 
+018 - pc   : 29 )
+001 - pc   : 34 4
+014 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 38 8
+014 - pc   : 30 0
+026 - radio: 28 (
+007 - radio: 34 4
+009 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 38 8
+009 - radio: 30 0
+007 - radio: 37 7
+008 - radio: 30 0
+009 - radio: 37 7
+009 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+011 - radio: 30 0
+007 - radio: 37 7
+009 - radio: 30 0
+007 - radio: 37 7
+009 - radio: 30 0
+007 - radio: 37 7
+010 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+009 - radio: 37 7
+008 - radio: 30 0
+007 - radio: 30 0
+010 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 31 1
+009 - radio: 30 0
+008 - radio: 32 2
+007 - radio: 38 8
+008 - radio: 32 2
+010 - radio: 38 8
+008 - radio: 33 3
+008 - radio: 38 8
+008 - radio: 34 4
+007 - radio: 37 7
+009 - radio: 30 0
+011 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+010 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+010 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 34 4
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+007 - radio: 37 7
+011 - radio: 30 0
+006 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 31 1
+010 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+009 - radio: 37 7
+007 - radio: 31 1
+011 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 37 7
+008 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+010 - radio: 31 1
+008 - radio: 34 4
+008 - radio: 30 0
+008 - radio: 3e >
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 31 1
+008 - radio: 3e >
+008 - radio: 35 5
+008 - radio: 34 4
+008 - radio: 39 9
+008 - radio: 35 5
+008 - radio: 3e >
+010 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 3a :
+011 - radio: 32 2
+007 - radio: 3b ;
+008 - radio: 3c <
+009 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+021 - pc   : 28 (
+001 - pc   : 34 4
+009 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 3c <
+013 - pc   : 30 0
+001 - pc   : 30 0
+016 - pc   : 30 0
+002 - pc   : 30 0
+012 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 33 3
+014 - pc   : 32 2
+001 - pc   : 33 3
+014 - pc   : 38 8
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+002 - pc   : 30 0
+012 - pc   : 30 0
+001 - pc   : 3c <
+015 - pc   : 3c <
+001 - pc   : 3c <
+014 - pc   : 3c <
+001 - pc   : 3c <
+014 - pc   : 3c <
+002 - pc   : 3c <
+012 - pc   : 3c <
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3a :
+013 - pc   : 3f ?
+001 - pc   : 37 7
+015 - pc   : 37 7
+001 - pc   : 30 0
+013 - pc   : 31 1
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 31 1
+014 - pc   : 36 6
+001 - pc   : 38 8
+013 - pc   : 31 1
+002 - pc   : 31 1
+013 - pc   : 32 2
+001 - pc   : 30 0
+014 - pc   : 31 1
+002 - pc   : 3e >
+015 - pc   : 3e >
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 30 0
+012 - pc   : 3f ?
+001 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 3c <
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 30 0
+014 - pc   : 31 1
+002 - pc   : 30 0
+012 - pc   : 30 0
+001 - pc   : 3d =
+014 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 30 0
+002 - pc   : 3d =
+012 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 30 0
+001 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+002 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+138 - radio: 6 
+710 - radio: 6 
+018 - pc   : 29 )
+001 - pc   : 34 4
+015 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 30 0
+002 - pc   : 3c <
+013 - pc   : 30 0
+024 - radio: 28 (
+010 - radio: 34 4
+009 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 3c <
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 30 0
+011 - radio: 30 0
+007 - radio: 33 3
+008 - radio: 32 2
+008 - radio: 33 3
+008 - radio: 38 8
+007 - radio: 30 0
+010 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 31 1
+009 - radio: 30 0
+008 - radio: 30 0
+007 - radio: 3c <
+011 - radio: 3c <
+007 - radio: 3c <
+009 - radio: 3c <
+008 - radio: 3c <
+007 - radio: 3c <
+009 - radio: 3c <
+009 - radio: 3c <
+008 - radio: 3f ?
+010 - radio: 3f ?
+006 - radio: 3a :
+008 - radio: 3f ?
+009 - radio: 37 7
+010 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 31 1
+009 - radio: 36 6
+008 - radio: 38 8
+008 - radio: 31 1
+009 - radio: 31 1
+009 - radio: 32 2
+008 - radio: 30 0
+008 - radio: 31 1
+007 - radio: 3e >
+010 - radio: 3e >
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 30 0
+009 - radio: 3f ?
+008 - radio: 30 0
+008 - radio: 30 0
+009 - radio: 3c <
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 30 0
+007 - radio: 31 1
+008 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 3d =
+010 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 30 0
+011 - radio: 30 0
+005 - radio: 30 0
+009 - radio: 3d =
+010 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 30 0
+008 - radio: 30 0
+007 - radio: 30 0
+008 - radio: 3f ?
+010 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+017 - pc   : 28 (
+001 - pc   : 34 4
+015 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+002 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+130 - radio: 6 
+710 - radio: 6 
+017 - pc   : 29 )
+002 - pc   : 34 4
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 30 0
+030 - pc   : 30 0
+020 - radio: 28 (
+013 - radio: 34 4
+005 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 31 1
+009 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+015 - radio: 3f ?
+004 - radio: 3f ?
+009 - radio: 3f ?
+006 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+018 - radio: 3f ?
+001 - radio: 3f ?
+004 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+013 - radio: 3f ?
+005 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+011 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+019 - pc   : 28 (
+001 - pc   : 34 4
+015 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 34 4
+013 - pc   : 30 0
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+002 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+004 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+009 - pc   : 3f ?
+001 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+132 - radio: 6 
+708 - radio: 6 
+017 - pc   : 29 )
+001 - pc   : 34 4
+016 - pc   : 30 0
+001 - pc   : 30 0
+013 - pc   : 31 1
+001 - pc   : 34 4
+015 - pc   : 30 0
+026 - radio: 28 (
+008 - radio: 34 4
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 34 4
+008 - radio: 30 0
+009 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+006 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+011 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+010 - radio: 3f ?
+006 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+012 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+005 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+015 - radio: 3f ?
+003 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+017 - pc   : 28 (
+002 - pc   : 34 4
+013 - pc   : 30 0
+002 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 38 8
+013 - pc   : 30 0
+003 - pc   : 3f ?
+013 - pc   : 3f ?
+007 - pc   : 3f ?
+008 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+016 - pc   : 3f ?
+001 - pc   : 3f ?
+011 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+133 - radio: 6 
+708 - radio: 6 
+017 - pc   : 29 )
+004 - pc   : 34 4
+013 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 38 8
+014 - pc   : 30 0
+025 - radio: 28 (
+008 - radio: 34 4
+014 - radio: 30 0
+007 - radio: 30 0
+004 - radio: 31 1
+009 - radio: 38 8
+008 - radio: 30 0
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+011 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+006 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+009 - radio: 3f ?
+018 - pc   : 28 (
+002 - pc   : 34 4
+014 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 3c <
+013 - pc   : 30 0
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+003 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+003 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+002 - pc   : 3f ?
+012 - pc   : 3f ?
+001 - pc   : 3f ?
+015 - pc   : 3f ?
+001 - pc   : 3f ?
+014 - pc   : 3f ?
+001 - pc   : 3f ?
+013 - pc   : 3f ?
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 30 0
+014 - pc   : 32 2
+001 - pc   : 30 0
+014 - pc   : 33 3
+001 - pc   : 30 0
+015 - pc   : 34 4
+001 - pc   : 30 0
+013 - pc   : 35 5
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+003 - pc   : 30 0
+011 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+002 - pc   : 37 7
+015 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+013 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 30 0
+015 - pc   : 30 0
+001 - pc   : 30 0
+014 - pc   : 31 1
+001 - pc   : 30 0
+015 - pc   : 32 2
+001 - pc   : 30 0
+014 - pc   : 33 3
+001 - pc   : 30 0
+014 - pc   : 34 4
+001 - pc   : 30 0
+013 - pc   : 35 5
+002 - pc   : 37 7
+014 - pc   : 30 0
+001 - pc   : 37 7
+014 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 31 1
+002 - pc   : 30 0
+012 - pc   : 30 0
+001 - pc   : 31 1
+016 - pc   : 30 0
+001 - pc   : 31 1
+012 - pc   : 30 0
+133 - radio: 6 
+710 - radio: 6 
+018 - pc   : 29 )
+002 - pc   : 34 4
+013 - pc   : 30 0
+002 - pc   : 30 0
+013 - pc   : 31 1
+001 - pc   : 3c <
+014 - pc   : 30 0
+027 - radio: 28 (
+010 - radio: 34 4
+008 - radio: 30 0
+007 - radio: 30 0
+009 - radio: 31 1
+007 - radio: 3c <
+009 - radio: 30 0
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 3f ?
+011 - radio: 3f ?
+005 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+007 - radio: 3f ?
+014 - radio: 3f ?
+002 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+011 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+008 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+010 - radio: 3f ?
+008 - radio: 3f ?
+007 - radio: 3f ?
+008 - radio: 3f ?
+009 - radio: 3f ?
+007 - radio: 3f ?
+010 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 30 0
+009 - radio: 32 2
+007 - radio: 30 0
+008 - radio: 33 3
+009 - radio: 30 0
+009 - radio: 34 4
+008 - radio: 30 0
+009 - radio: 35 5
+009 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 37 7
+011 - radio: 30 0
+006 - radio: 30 0
+009 - radio: 30 0
+007 - radio: 37 7
+009 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+008 - radio: 37 7
+007 - radio: 30 0
+009 - radio: 37 7
+007 - radio: 30 0
+008 - radio: 37 7
+010 - radio: 30 0
+008 - radio: 37 7
+009 - radio: 30 0
+007 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 30 0
+008 - radio: 32 2
+008 - radio: 30 0
+008 - radio: 33 3
+010 - radio: 30 0
+008 - radio: 34 4
+008 - radio: 30 0
+008 - radio: 35 5
+009 - radio: 37 7
+007 - radio: 30 0
+010 - radio: 37 7
+008 - radio: 30 0
+008 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 30 0
+008 - radio: 30 0
+010 - radio: 31 1
+008 - radio: 30 0
+008 - radio: 31 1
+008 - radio: 30 0

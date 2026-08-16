@@ -1,0 +1,141 @@
+# software parity vectors, spec P-2
+# TX in=<byte> out=<byte>     odd parity of bits 0-6 placed in bit 7
+# RX in=<byte> ok=<0|1> val=<byte>
+TX in=00 out=80
+TX in=01 out=01
+TX in=02 out=02
+TX in=03 out=83
+TX in=04 out=04
+TX in=05 out=85
+TX in=06 out=86
+TX in=07 out=07
+TX in=08 out=08
+TX in=09 out=89
+TX in=0a out=8a
+TX in=0b out=0b
+TX in=0c out=8c
+TX in=0d out=0d
+TX in=0e out=0e
+TX in=0f out=8f
+TX in=10 out=10
+TX in=11 out=91
+TX in=12 out=92
+TX in=13 out=13
+TX in=14 out=94
+TX in=15 out=15
+TX in=16 out=16
+TX in=17 out=97
+TX in=18 out=98
+TX in=19 out=19
+TX in=1a out=1a
+TX in=1b out=9b
+TX in=1c out=1c
+TX in=1d out=9d
+TX in=1e out=9e
+TX in=1f out=1f
+TX in=20 out=20
+TX in=21 out=a1
+TX in=22 out=a2
+TX in=23 out=23
+TX in=24 out=a4
+TX in=25 out=25
+TX in=26 out=26
+TX in=27 out=a7
+TX in=28 out=a8
+TX in=29 out=29
+TX in=2a out=2a
+TX in=2b out=ab
+TX in=2c out=2c
+TX in=2d out=ad
+TX in=2e out=ae
+TX in=2f out=2f
+TX in=30 out=b0
+TX in=31 out=31
+TX in=32 out=32
+TX in=33 out=b3
+TX in=34 out=34
+TX in=35 out=b5
+TX in=36 out=b6
+TX in=37 out=37
+TX in=38 out=38
+TX in=39 out=b9
+TX in=3a out=ba
+TX in=3b out=3b
+TX in=3c out=bc
+TX in=3d out=3d
+TX in=3e out=3e
+TX in=3f out=bf
+TX in=40 out=40
+TX in=41 out=c1
+TX in=42 out=c2
+TX in=43 out=43
+TX in=44 out=c4
+TX in=45 out=45
+TX in=46 out=46
+TX in=47 out=c7
+TX in=48 out=c8
+TX in=49 out=49
+TX in=4a out=4a
+TX in=4b out=cb
+TX in=4c out=4c
+TX in=4d out=cd
+TX in=4e out=ce
+TX in=4f out=4f
+TX in=50 out=d0
+TX in=51 out=51
+TX in=52 out=52
+TX in=53 out=d3
+TX in=54 out=54
+TX in=55 out=d5
+TX in=56 out=d6
+TX in=57 out=57
+TX in=58 out=58
+TX in=59 out=d9
+TX in=5a out=da
+TX in=5b out=5b
+TX in=5c out=dc
+TX in=5d out=5d
+TX in=5e out=5e
+TX in=5f out=df
+TX in=60 out=e0
+TX in=61 out=61
+TX in=62 out=62
+TX in=63 out=e3
+TX in=64 out=64
+TX in=65 out=e5
+TX in=66 out=e6
+TX in=67 out=67
+TX in=68 out=68
+TX in=69 out=e9
+TX in=6a out=ea
+TX in=6b out=6b
+TX in=6c out=ec
+TX in=6d out=6d
+TX in=6e out=6e
+TX in=6f out=ef
+TX in=70 out=70
+TX in=71 out=f1
+TX in=72 out=f2
+TX in=73 out=73
+TX in=74 out=f4
+TX in=75 out=75
+TX in=76 out=76
+TX in=77 out=f7
+TX in=78 out=f8
+TX in=79 out=79
+TX in=7a out=7a
+TX in=7b out=fb
+TX in=7c out=7c
+TX in=7d out=fd
+TX in=7e out=fe
+TX in=7f out=7f
+RX in=00 ok=0 val=00
+RX in=ff ok=0 val=7f
+RX in=30 ok=0 val=30
+RX in=b0 ok=1 val=30
+RX in=06 ok=0 val=06
+RX in=86 ok=1 val=06
+RX in=15 ok=1 val=15
+RX in=95 ok=0 val=15
+RX in=2a ok=1 val=2a
+RX in=aa ok=0 val=2a

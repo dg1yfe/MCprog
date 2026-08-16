@@ -442,8 +442,8 @@ static void edit_pl(void)
 		}
 		if (mode == MC_PL_TABLE)
 			snprintf(line, sizeof line,
-			         "this radio decodes PL as well as encoding it; the decoder uses its own "
-			         "law, round(61.107 x f)");
+			         "decodes PL as well as encoding it (decoder law round(61.107 x f)). The "
+			         "1987 software sets all ten alike; per-slot use is untested on a radio.");
 		else if (sel == 0)
 			snprintf(line, sizeof line,
 			         "enter cycles off / single / selectable; selectable lets the operator "

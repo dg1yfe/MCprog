@@ -89,6 +89,31 @@ static void dump_pl(FILE *f, const mc_image *img)
 	case MC_PL_OFF:
 		fprintf(f, "PL     mode=off\n");
 		return;
+	case MC_PL_TABLE: {
+		/* MCEZ13: an encoder table and a decoder table, the latter on its own law. */
+		int k;
+		n = mc_pl_get_count(img);
+		fprintf(f, "PL     mode=table count=%d\n", n);
+		fprintf(f, "PLLIST");
+		for (k = 0; k < n; k++) {
+			unsigned t = mc_pl_get_tone(img, k);
+			if (t)
+				fprintf(f, " %u.%u", t / 10, t % 10);
+			else
+				fprintf(f, " -");
+		}
+		fputc('\n', f);
+		fprintf(f, "PLDEC ");
+		for (k = 0; k < n; k++) {
+			unsigned t = mc_pl_dec_get(img, k);
+			if (t)
+				fprintf(f, " %u.%u", t / 10, t % 10);
+			else
+				fprintf(f, " -");
+		}
+		fputc('\n', f);
+		return;
+	}
 	case MC_PL_SINGLE:
 		fprintf(f, "PL     mode=single tone=%u.%u\n", mc_pl_get_tone(img, 0) / 10,
 		        mc_pl_get_tone(img, 0) % 10);

@@ -71,7 +71,8 @@ typedef struct {
 	uint16_t pl_tone;  /* the single-tone slot                                         */
 	uint16_t pl_list;  /* base of the selectable tone list                             */
 	uint16_t pl_count; /* byte whose HIGH nibble holds the number of selectable tones  */
-	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable                      */
+	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable; 0 = model has none  */
+	uint16_t pl_dec;   /* PL DECODER table base (MCEZ13 only); 0 = model cannot decode */
 	uint8_t pl_max;    /* entries in the list                                          */
 } mc_model;
 
@@ -177,7 +178,8 @@ void mc_flag_set(mc_image *img, int slot0, const mc_flag *f, int on);
  */
 #define MC_PL_MAX 10
 
-typedef enum { MC_PL_OFF = 0, MC_PL_SINGLE, MC_PL_SELECTABLE } mc_pl_mode;
+/* MC_PL_TABLE is for models with no mode byte at all -- MCEZ13 simply carries its tables. */
+typedef enum { MC_PL_OFF = 0, MC_PL_SINGLE, MC_PL_SELECTABLE, MC_PL_TABLE } mc_pl_mode;
 
 /* The standard list, index 0 = 0 meaning no PL.  Returns tenths of a Hz. */
 unsigned mc_pl_standard(size_t i);
@@ -187,6 +189,14 @@ uint16_t mc_pl_encode(unsigned dhz);
 unsigned mc_pl_decode(uint16_t word);
 
 int mc_pl_supported(const mc_model *m);
+/* MCEZ13 is the only model that decodes PL as well as encoding it, and it uses a DIFFERENT law:
+ * round(61.107 x f_Hz) rather than round(7.984 x f_Hz).  Measured at 67.0, 103.5 and 250.3 Hz,
+ * which bounds the constant to [61.1063, 61.1087]. */
+int mc_pl_has_decoder(const mc_model *m);
+uint16_t mc_pl_dec_encode(unsigned dhz);
+unsigned mc_pl_dec_decode(uint16_t word);
+unsigned mc_pl_dec_get(const mc_image *img, int i);
+int mc_pl_dec_set(mc_image *img, int i, unsigned dhz);
 mc_pl_mode mc_pl_get_mode(const mc_image *img);
 void mc_pl_set_mode(mc_image *img, mc_pl_mode mode);
 /* Number of selectable tones in force; 0 when PL is off or the model has none. */

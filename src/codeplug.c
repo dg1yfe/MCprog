@@ -298,7 +298,53 @@ unsigned mc_pl_decode(uint16_t word)
 
 int mc_pl_supported(const mc_model *m)
 {
-	return m->pl_mode != 0;
+	return m->pl_list != 0;
+}
+
+int mc_pl_has_decoder(const mc_model *m)
+{
+	return m->pl_dec != 0;
+}
+
+/* The decoder's law is its own: round(61.107 x f_Hz), against the encoder's round(7.984 x f_Hz). */
+uint16_t mc_pl_dec_encode(unsigned dhz)
+{
+	return (uint16_t)((61107u * dhz + 5000u) / 10000u);
+}
+
+unsigned mc_pl_dec_decode(uint16_t word)
+{
+	size_t i;
+	if (!word)
+		return 0;
+	for (i = 1; i < sizeof PL_STD / sizeof PL_STD[0]; i++)
+		if (mc_pl_dec_encode(PL_STD[i]) == word)
+			return PL_STD[i];
+	return ((unsigned)word * 10000u + 30553u) / 61107u;
+}
+
+unsigned mc_pl_dec_get(const mc_image *img, int i)
+{
+	size_t o;
+	if (!mc_pl_has_decoder(img->model) || i < 0 || i >= img->model->pl_max)
+		return 0;
+	o = img->model->pl_dec + (size_t)i * 2;
+	return mc_pl_dec_decode((uint16_t)((img->bytes[o] << 8) | img->bytes[o + 1]));
+}
+
+int mc_pl_dec_set(mc_image *img, int i, unsigned dhz)
+{
+	size_t o;
+	uint16_t w;
+	if (!mc_pl_has_decoder(img->model) || i < 0 || i >= img->model->pl_max)
+		return -1;
+	if (dhz && (dhz < 670 || dhz > 2510))
+		return -1;
+	w = dhz ? mc_pl_dec_encode(dhz) : 0;
+	o = img->model->pl_dec + (size_t)i * 2;
+	img->bytes[o] = (uint8_t)(w >> 8);
+	img->bytes[o + 1] = (uint8_t)(w & 0xFF);
+	return 0;
 }
 
 mc_pl_mode mc_pl_get_mode(const mc_image *img)
@@ -306,6 +352,8 @@ mc_pl_mode mc_pl_get_mode(const mc_image *img)
 	uint8_t v;
 	if (!mc_pl_supported(img->model))
 		return MC_PL_OFF;
+	if (!img->model->pl_mode)
+		return MC_PL_TABLE; /* MCEZ13: the tables are simply there */
 	v = (uint8_t)(img->bytes[img->model->pl_mode] & 0xF0);
 	if (v == 0x60)
 		return MC_PL_SINGLE;
@@ -317,7 +365,7 @@ mc_pl_mode mc_pl_get_mode(const mc_image *img)
 void mc_pl_set_mode(mc_image *img, mc_pl_mode mode)
 {
 	uint8_t *p;
-	if (!mc_pl_supported(img->model))
+	if (!mc_pl_supported(img->model) || !img->model->pl_mode)
 		return;
 	p = &img->bytes[img->model->pl_mode];
 	/* Only the high nibble is ours; the low nibble is not understood, so it is preserved (K-30). */
@@ -328,7 +376,10 @@ void mc_pl_set_mode(mc_image *img, mc_pl_mode mode)
 int mc_pl_get_count(const mc_image *img)
 {
 	int n;
-	if (mc_pl_get_mode(img) != MC_PL_SELECTABLE)
+	mc_pl_mode m = mc_pl_get_mode(img);
+	if (m == MC_PL_TABLE)
+		return img->model->pl_max;
+	if (m != MC_PL_SELECTABLE)
 		return 0;
 	n = img->bytes[img->model->pl_count] >> 4;
 	return n > img->model->pl_max ? img->model->pl_max : n;
@@ -337,7 +388,7 @@ int mc_pl_get_count(const mc_image *img)
 void mc_pl_set_count(mc_image *img, int n)
 {
 	uint8_t *p;
-	if (!mc_pl_supported(img->model))
+	if (!mc_pl_supported(img->model) || !img->model->pl_count)
 		return;
 	if (n < 1)
 		n = 1;
@@ -352,6 +403,7 @@ static size_t pl_slot(const mc_image *img, int i)
 	const mc_model *m = img->model;
 	return mc_pl_get_mode(img) == MC_PL_SINGLE ? m->pl_tone
 	                                           : m->pl_list + (size_t)i * 2;
+	/* MC_PL_TABLE and MC_PL_SELECTABLE both index the list */
 }
 
 unsigned mc_pl_get_tone(const mc_image *img, int i)

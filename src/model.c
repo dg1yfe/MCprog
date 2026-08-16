@@ -63,11 +63,12 @@ static const mc_flag FLAGS_EZ13[] = {
  * encoder tables are known but the per-channel indexing is not, and its read is still blocked, so
  * the tool exposes nothing rather than guessing. */
 static const mc_model MODELS[] = {
-	/* name       size cksum  chan   band  refdiv nch str tx rx num  flags          PL: tone  list count mode max */
-	{ "eva_56",    512, 0x000, 0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 10 },
-	{ "eva_sel5",  512, 0x000, 0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 10 },
-	{ "eza_sel5",  256, 0x000, 0x0C8, 0x082, 0x0C4,  8, 6, 0, 3, 0, NF(FLAGS_EZA9), 0x02F, 0x031, 0x083, 0x07F, 10 },
-	{ "eza_cspl",  128, 0x001, 0x039, 0x037, 0x002,  8, 6, 0, 3, 0, NF(FLAGS_EZ13), 0, 0, 0, 0, 0 },
+	/* name       size cksum  chan   band  refdiv nch str tx rx num  flags          PL: tone  list count mode   dec  max */
+	{ "eva_56",    512, 0x000, 0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10 },
+	{ "eva_sel5",  512, 0x000, 0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10 },
+	{ "eza_sel5",  256, 0x000, 0x0C8, 0x082, 0x0C4,  8, 6, 0, 3, 0, NF(FLAGS_EZA9), 0x02F, 0x031, 0x083, 0x07F, 0,     10 },
+	/* MCEZ13 has no mode byte: it simply carries an encoder table and a decoder table. */
+	{ "eza_cspl",  128, 0x001, 0x039, 0x037, 0x002,  8, 6, 0, 3, 0, NF(FLAGS_EZ13), 0x022, 0x022, 0,     0,     0x00E, 10 },
 };
 static const size_t NMODELS = sizeof MODELS / sizeof MODELS[0];
 

@@ -74,12 +74,26 @@ PL = {
     'eva_56':   dict(tone=0x047, list=0x047, count=0x0CE, mode=0x1FD, max=10),
     'eva_sel5': dict(tone=0x047, list=0x047, count=0x0CE, mode=0x1FD, max=10),
     'eza_sel5': dict(tone=0x02F, list=0x031, count=0x083, mode=0x07F, max=10),
+    # MCEZ13 has no mode byte: an encoder table and, uniquely, a decoder table on its own law.
+    'eza_cspl': dict(tone=0x022, list=0x022, count=None, mode=None, dec=0x00E, max=10),
 }
 
 
 def pl_encode(dhz):
     """round(7.984 * f_Hz) with f in tenths of a Hz, in integers."""
     return (7984 * dhz + 5000) // 10000
+
+
+def pl_dec_encode(dhz):
+    """MCEZ13's PL DECODER law: round(61.107 x f_Hz), against the encoder's round(7.984 x f)."""
+    return (61107 * dhz + 5000) // 10000
+
+
+def pl_dec_decode(word):
+    for d in PL_TONES:
+        if d and pl_dec_encode(d) == word:
+            return d
+    return (word * 10000 + 30553) // 61107
 
 
 def pl_decode(word):
@@ -154,7 +168,18 @@ def vec_codeplug(path, model, band_hint=None):
     else:
         L.append('NOTE   band unprogrammed -- frequencies are not computable (spec K-10)')
     pl = PL.get(model)
-    if pl:
+    if pl and pl['mode'] is None:
+        # MCEZ13: both tables, always present
+        L.append('PL     mode=table count=%d' % pl['max'])
+        L.append('PLLIST %s' % ' '.join(
+            '%.1f' % (pl_decode(w) / 10) if w else '-'
+            for w in [(e[pl['list'] + 2 * i] << 8) | e[pl['list'] + 2 * i + 1]
+                      for i in range(pl['max'])]))
+        L.append('PLDEC  %s' % ' '.join(
+            '%.1f' % (pl_dec_decode(w) / 10) if w else '-'
+            for w in [(e[pl['dec'] + 2 * i] << 8) | e[pl['dec'] + 2 * i + 1]
+                      for i in range(pl['max'])]))
+    elif pl:
         mode = {0x60: 'single', 0xE0: 'selectable'}.get(e[pl['mode']] & 0xF0, 'off')
         if mode == 'off':
             # With PL disabled the count and list bytes hold unrelated data; rendering them as
@@ -269,7 +294,8 @@ def vec_pl():
          '# TONE idx=<n> dhz=<tenths of a Hz> word=<4 hex>   the standard list, index 0 = no PL',
          '# PLENC dhz=<tenths> word=<4 hex>      round(7.984 * f_Hz), big-endian',
          '# PLDEC word=<4 hex> dhz=<tenths>      snapped to the standard list where one matches',
-         '# PLMAP model=<m> tone=<off> list=<off> count=<off> mode=<off> max=<n>']
+         '# PLMAP model=<m> tone=<off> list=<off> count=<off> mode=<off> dec=<off> max=<n>',
+         '# PLDENC / PLDDEC: the MCEZ13 DECODER law, round(61.107 * f_Hz), 0 where absent']
     for i, d in enumerate(PL_TONES):
         L.append('TONE idx=%d dhz=%d word=%04x' % (i, d, pl_encode(d)))
     for d in PL_TONES[1:]:
@@ -280,8 +306,13 @@ def vec_pl():
         L.append('PLDEC word=%04x dhz=%d' % (w, pl_decode(w)))
     for m in sorted(PL):
         p = PL[m]
-        L.append('PLMAP model=%s tone=%03x list=%03x count=%03x mode=%03x max=%d'
-                 % (m, p['tone'], p['list'], p['count'], p['mode'], p['max']))
+        L.append('PLMAP model=%s tone=%03x list=%03x count=%03x mode=%03x dec=%03x max=%d'
+                 % (m, p['tone'], p['list'], p['count'] or 0, p['mode'] or 0,
+                    p.get('dec') or 0, p['max']))
+    # the decoder law, on the tones the original itself lists
+    for d in PL_TONES[1:]:
+        L.append('PLDENC dhz=%d word=%04x' % (d, pl_dec_encode(d)))
+        L.append('PLDDEC word=%04x dhz=%d' % (pl_dec_encode(d), d))
     open(os.path.join(OUT, 'pl', 'pl.vec'), 'w').write('\n'.join(L) + '\n')
     return len(L)
 

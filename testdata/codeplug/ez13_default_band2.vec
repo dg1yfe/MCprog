@@ -14,3 +14,6 @@ CHAN   5  num=-- tx=0 rx=21400000 txraw=000000 rxraw=000000 canon=1 state=empty
 CHAN   6  num=-- tx=0 rx=21400000 txraw=000000 rxraw=000000 canon=1 state=empty
 CHAN   7  num=-- tx=0 rx=21400000 txraw=000000 rxraw=000000 canon=1 state=empty
 CHAN   8  num=-- tx=0 rx=21400000 txraw=000000 rxraw=000000 canon=1 state=empty
+PL     mode=table count=10
+PLLIST 67.0 67.0 67.0 67.0 67.0 67.0 67.0 67.0 67.0 67.0
+PLDEC  67.0 67.0 67.0 67.0 67.0 67.0 67.0 67.0 67.0 67.0

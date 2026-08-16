@@ -395,19 +395,33 @@ static void edit_pl(void)
 		int n = mc_pl_get_count(&img), rows, i, ch;
 		char buf[64], line[256];
 
-		rows = 1 + (mode == MC_PL_SINGLE ? 1 : mode == MC_PL_SELECTABLE ? 1 + n : 0);
+		/* MC_PL_TABLE (MCEZ13) has no mode byte: an encoder list and a decoder list, always
+		 * present, so there is no mode row to cycle and twice as many tone rows. */
+		if (mode == MC_PL_TABLE)
+			rows = 2 * n;
+		else
+			rows = 1 + (mode == MC_PL_SINGLE ? 1 : mode == MC_PL_SELECTABLE ? 1 + n : 0);
 		erase();
 		attron(A_BOLD);
 		mvprintw(0, 0, "PL / CTCSS -- %s", path[0] ? path : "(read from radio)");
 		attroff(A_BOLD);
-		mvprintw(1, 0, "model %s   stored as round(7.984 x f), %s",
-		         img.model->name, "shared by the whole radio");
+		mvprintw(1, 0, "model %s   %s   shared by the whole radio", img.model->name,
+		         mc_pl_has_decoder(img.model)
+		             ? "encode round(7.984 x f), decode round(61.107 x f)"
+		             : "stored as round(7.984 x f)");
 
 		for (i = 0; i < rows; i++) {
 			int y = 3 + i;
 			if (i == sel)
 				attron(A_REVERSE);
-			if (i == 0) {
+			if (mode == MC_PL_TABLE) {
+				int enc = i < n;
+				int k = enc ? i : i - n;
+				unsigned t = enc ? mc_pl_get_tone(&img, k) : mc_pl_dec_get(&img, k);
+				snprintf(buf, sizeof buf, "%u.%u Hz", t / 10, t % 10);
+				mvprintw(y, 2, "%-7s %-8d %-14s", enc ? "encode" : "decode", k + 1,
+				         t ? buf : "none");
+			} else if (i == 0) {
 				mvprintw(y, 2, "%-16s %-14s", "mode",
 				         mode == MC_PL_SINGLE ? "single tone" :
 				         mode == MC_PL_SELECTABLE ? "selectable list" : "off");
@@ -426,7 +440,11 @@ static void edit_pl(void)
 			if (i == sel)
 				attroff(A_REVERSE);
 		}
-		if (sel == 0)
+		if (mode == MC_PL_TABLE)
+			snprintf(line, sizeof line,
+			         "this radio decodes PL as well as encoding it; the decoder uses its own "
+			         "law, round(61.107 x f)");
+		else if (sel == 0)
 			snprintf(line, sizeof line,
 			         "enter cycles off / single / selectable; selectable lets the operator "
 			         "choose at the radio");
@@ -446,7 +464,25 @@ static void edit_pl(void)
 		else if ((ch == KEY_DOWN || ch == 'j') && sel < rows - 1)
 			sel++;
 		else if (ch == '\n' || ch == KEY_ENTER || ch == ' ') {
-			if (sel == 0) {
+			if (mode == MC_PL_TABLE) {
+				int enc = sel < n, k = enc ? sel : sel - n;
+				unsigned hz = 0, frac = 0;
+				char *dot;
+				if (prompt("tone in Hz (0 disables): ", buf, sizeof buf) != 0 || !buf[0])
+					continue;
+				dot = strchr(buf, '.');
+				hz = (unsigned)atoi(buf);
+				frac = dot && isdigit((unsigned char)dot[1]) ? (unsigned)(dot[1] - '0') : 0;
+				if ((enc ? mc_pl_set_tone(&img, k, hz * 10 + frac)
+				         : mc_pl_dec_set(&img, k, hz * 10 + frac)) != 0) {
+					snprintf(line, sizeof line,
+					         "%s is outside 67.0-250.3 Hz -- refused, not rounded", buf);
+					status(line);
+					getch();
+					continue;
+				}
+				dirty = 1;
+			} else if (sel == 0) {
 				mc_pl_set_mode(&img, mode == MC_PL_OFF ? MC_PL_SINGLE :
 				                     mode == MC_PL_SINGLE ? MC_PL_SELECTABLE : MC_PL_OFF);
 				if (mc_pl_get_mode(&img) == MC_PL_SELECTABLE && mc_pl_get_count(&img) < 1)

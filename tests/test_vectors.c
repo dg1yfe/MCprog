@@ -273,7 +273,7 @@ static void test_pl(void)
 		return;
 	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
 		char mname[64];
-		unsigned idx, dhz, word, tone, list, cnt, mode, mx;
+		unsigned idx, dhz, word, tone, list, cnt, mode, dec, mx;
 
 		if (sscanf(line, "TONE idx=%u dhz=%u word=%x", &idx, &dhz, &word) == 3) {
 			ok(mc_pl_standard(idx) == dhz, "K-14", "the standard tone list matches");
@@ -283,15 +283,21 @@ static void test_pl(void)
 		} else if (sscanf(line, "PLDEC word=%x dhz=%u", &word, &dhz) == 2) {
 			ok(mc_pl_decode((uint16_t)word) == dhz, "K-14",
 			   "decode, snapped to the standard list where one matches");
-		} else if (sscanf(line, "PLMAP model=%63s tone=%x list=%x count=%x mode=%x max=%u",
-		                  mname, &tone, &list, &cnt, &mode, &mx) == 6) {
+		} else if (sscanf(line, "PLDENC dhz=%u word=%x", &dhz, &word) == 2) {
+			ok(mc_pl_dec_encode(dhz) == word, "K-14",
+			   "the MCEZ13 decoder law, round(61.107 x f)");
+		} else if (sscanf(line, "PLDDEC word=%x dhz=%u", &word, &dhz) == 2) {
+			ok(mc_pl_dec_decode((uint16_t)word) == dhz, "K-14",
+			   "and decodes back, snapped to the standard list");
+		} else if (sscanf(line, "PLMAP model=%63s tone=%x list=%x count=%x mode=%x dec=%x max=%u",
+		                  mname, &tone, &list, &cnt, &mode, &dec, &mx) == 7) {
 			const mc_model *m = mc_model_by_name(mname);
 			if (!m) {
 				failf("K-14", "unknown model %s", mname);
 				continue;
 			}
 			ok(m->pl_tone == tone && m->pl_list == list && m->pl_count == cnt &&
-			       m->pl_mode == mode && m->pl_max == mx,
+			       m->pl_mode == mode && m->pl_dec == dec && m->pl_max == mx,
 			   "K-14", "the per-model PL layout matches");
 		}
 	}
@@ -337,8 +343,12 @@ static void test_pl(void)
 			mc_pl_set_count(&im, 99);
 			ok(mc_pl_get_count(&im) == im.model->pl_max, "K-14",
 			   "an out-of-range count is clamped to the model's maximum");
-			ok(mc_pl_supported(mc_model_by_name("eza_cspl")) == 0, "K-14",
-			   "MCEZ13 exposes no PL: its per-channel indexing is not established");
+			ok(mc_pl_supported(mc_model_by_name("eza_cspl")) == 1, "K-14",
+			   "MCEZ13 does have PL, now that its read is solved");
+			ok(mc_pl_has_decoder(mc_model_by_name("eza_cspl")) == 1, "K-14",
+			   "and it is the only model that decodes PL as well as encoding it");
+			ok(mc_pl_has_decoder(mc_model_by_name("eva_sel5")) == 0, "K-14",
+			   "the EVA and EZA 9 encode only -- there is no PL decode on them");
 			free(img_bytes);
 		}
 	}

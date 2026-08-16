@@ -2,7 +2,8 @@
 # TONE idx=<n> dhz=<tenths of a Hz> word=<4 hex>   the standard list, index 0 = no PL
 # PLENC dhz=<tenths> word=<4 hex>      round(7.984 * f_Hz), big-endian
 # PLDEC word=<4 hex> dhz=<tenths>      snapped to the standard list where one matches
-# PLMAP model=<m> tone=<off> list=<off> count=<off> mode=<off> max=<n>
+# PLMAP model=<m> tone=<off> list=<off> count=<off> mode=<off> dec=<off> max=<n>
+# PLDENC / PLDDEC: the MCEZ13 DECODER law, round(61.107 * f_Hz), 0 where absent
 TONE idx=0 dhz=0 word=0000
 TONE idx=1 dhz=670 word=0217
 TONE idx=2 dhz=693 word=0229
@@ -124,6 +125,85 @@ PLDEC word=07ce dhz=2503
 PLDEC word=0300 dhz=962
 PLDEC word=0500 dhz=1603
 PLDEC word=07ff dhz=2564
-PLMAP model=eva_56 tone=047 list=047 count=0ce mode=1fd max=10
-PLMAP model=eva_sel5 tone=047 list=047 count=0ce mode=1fd max=10
-PLMAP model=eza_sel5 tone=02f list=031 count=083 mode=07f max=10
+PLMAP model=eva_56 tone=047 list=047 count=0ce mode=1fd dec=000 max=10
+PLMAP model=eva_sel5 tone=047 list=047 count=0ce mode=1fd dec=000 max=10
+PLMAP model=eza_cspl tone=022 list=022 count=000 mode=000 dec=00e max=10
+PLMAP model=eza_sel5 tone=02f list=031 count=083 mode=07f dec=000 max=10
+PLDENC dhz=670 word=0ffe
+PLDDEC word=0ffe dhz=670
+PLDENC dhz=693 word=108b
+PLDDEC word=108b dhz=693
+PLDENC dhz=719 word=112a
+PLDDEC word=112a dhz=719
+PLDENC dhz=744 word=11c2
+PLDDEC word=11c2 dhz=744
+PLDENC dhz=770 word=1261
+PLDDEC word=1261 dhz=770
+PLDENC dhz=797 word=1306
+PLDDEC word=1306 dhz=797
+PLDENC dhz=825 word=13b1
+PLDDEC word=13b1 dhz=825
+PLDENC dhz=854 word=1463
+PLDDEC word=1463 dhz=854
+PLDENC dhz=885 word=1520
+PLDDEC word=1520 dhz=885
+PLDENC dhz=915 word=15d7
+PLDDEC word=15d7 dhz=915
+PLDENC dhz=974 word=1740
+PLDDEC word=1740 dhz=974
+PLDENC dhz=1000 word=17df
+PLDDEC word=17df dhz=1000
+PLDENC dhz=1035 word=18b5
+PLDDEC word=18b5 dhz=1035
+PLDENC dhz=1072 word=1997
+PLDDEC word=1997 dhz=1072
+PLDENC dhz=1109 word=1a79
+PLDDEC word=1a79 dhz=1109
+PLDENC dhz=1148 word=1b67
+PLDDEC word=1b67 dhz=1148
+PLDENC dhz=1188 word=1c5c
+PLDDEC word=1c5c dhz=1188
+PLDENC dhz=1230 word=1d5c
+PLDDEC word=1d5c dhz=1230
+PLDENC dhz=1273 word=1e63
+PLDDEC word=1e63 dhz=1273
+PLDENC dhz=1318 word=1f76
+PLDDEC word=1f76 dhz=1318
+PLDENC dhz=1365 word=2095
+PLDDEC word=2095 dhz=1365
+PLDENC dhz=1413 word=21ba
+PLDDEC word=21ba dhz=1413
+PLDENC dhz=1462 word=22e6
+PLDDEC word=22e6 dhz=1462
+PLDENC dhz=1514 word=2424
+PLDDEC word=2424 dhz=1514
+PLDENC dhz=1567 word=2567
+PLDDEC word=2567 dhz=1567
+PLDENC dhz=1622 word=26b8
+PLDDEC word=26b8 dhz=1622
+PLDENC dhz=1679 word=2814
+PLDDEC word=2814 dhz=1679
+PLDENC dhz=1738 word=297c
+PLDDEC word=297c dhz=1738
+PLDENC dhz=1799 word=2af1
+PLDDEC word=2af1 dhz=1799
+PLDENC dhz=1862 word=2c72
+PLDDEC word=2c72 dhz=1862
+PLDENC dhz=1928 word=2e05
+PLDDEC word=2e05 dhz=1928
+PLDENC dhz=2035 word=3093
+PLDDEC word=3093 dhz=2035
+PLDENC dhz=2065 word=314b
+PLDDEC word=314b dhz=2065
+PLDENC dhz=2107 word=324b
+PLDDEC word=324b dhz=2107
+PLDENC dhz=2181 word=340f
+PLDDEC word=340f dhz=2181
+PLDENC dhz=2257 word=35e0
+PLDDEC word=35e0 dhz=2257
+PLDENC dhz=2336 word=37c3
+PLDDEC word=37c3 dhz=2336
+PLDENC dhz=2418 word=39b8
+PLDDEC word=39b8 dhz=2418
+PLDENC dhz=2503 word=3bbf
+PLDDEC word=3bbf dhz=2503

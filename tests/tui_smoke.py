@@ -124,9 +124,11 @@ check(after[0x047] == 0x02 and after[0x048] == 0xC3,
 check((after[0x1FD] & 0xF0) == 0x60, 'PL mode byte set to 0x60 (single tone)')
 check(sum(after) & 0xFF == 0xFF, 'checksum still valid after a PL edit')
 
-# MCEZ13 must not offer PL: its per-channel indexing is not established.
+# MCEZ13 does have PL, and uniquely both directions.
 _, _, out = drive([b' ', b'p'], 'fixtures/ez13_default_band2.bin')
-check('no PL/CTCSS' in out, 'MCEZ13 says it has no settable PL rather than guessing')
+check('encode' in out and 'decode' in out,
+      'MCEZ13 PL page shows both an encoder and a decoder list')
+check('67.0 Hz' in out, 'and the factory default reads 67.0 Hz, not a "no decode" sentinel')
 
 # The EZA models have different flags entirely (K-22).
 _, _, out = drive([b' ', CR], 'fixtures/ez13_default_band2.bin')

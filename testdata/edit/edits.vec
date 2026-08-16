@@ -20,7 +20,7 @@ EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:clock_shift slot=1 
 EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:decode slot=1 arg=0 changed=000:37:57|0c8:de:ce|0cb:5e:4e
 EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:auto_ack slot=1 arg=0 changed=000:37:47|0c8:de:d6|0cb:5e:56
 EDIT img=fixtures/eza9_programmed.bin model=eza_sel5 op=flag:power_high slot=1 arg=1 changed=none
-EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=set_tx slot=1 arg=145000000 changed=003:ed:16|03b:40:42|03c:00:d5
-EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:clock_shift slot=1 arg=1 changed=003:ed:2d|03b:40:00
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=set_tx slot=1 arg=145000000 changed=001:ed:16|039:40:42|03a:00:d5
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:clock_shift slot=1 arg=1 changed=001:ed:2d|039:40:00
 EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:clock_shift slot=1 arg=0 changed=none
-EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:reserved_b7 slot=1 arg=1 changed=003:ed:6d|03b:40:c0
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:reserved_b7 slot=1 arg=1 changed=001:ed:6d|039:40:c0

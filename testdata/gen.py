@@ -42,8 +42,8 @@ MODELS = {
                      band=0x0DC, refdiv=0x0D4, numbered=True),
     'eza_sel5': dict(size=256, cksum=0x000, chan=0x0C8, nchan=8, stride=6, tx=0, rx=3,
                      band=0x082, refdiv=0x0C4, numbered=False),
-    'eza_cspl': dict(size=128, cksum=0x003, chan=0x03B, nchan=8, stride=6, tx=0, rx=3,
-                     band=0x039, refdiv=0x004, numbered=False),
+    'eza_cspl': dict(size=128, cksum=0x001, chan=0x039, nchan=8, stride=6, tx=0, rx=3,
+                     band=0x037, refdiv=0x002, numbered=False),
 }
 # --- per-model channel flag bits, spec K-22 ----------------------------------------------------
 # (name, bit, half, inverted, provenance).  half: 'both' | 'tx' | 'rx'.  These are NOT portable
@@ -56,7 +56,7 @@ FLAGS = {
                  ('tx_inhibit', 5, 'both', 0, 'C'), ('encode', 6, 'both', 0, 'C'),
                  ('clock_shift', 7, 'rx', 0, 'C'), ('power_high', 7, 'tx', 0, 'S')],
     # MCEZ13 carries almost no per-channel flags: PL lives in tables, TX inhibit is global.
-    'eza_cspl': [('clock_shift', 6, 'tx', 1, 'C'), ('reserved_b7', 7, 'tx', 0, 'S')],
+    'eza_cspl': [('clock_shift', 6, 'tx', 1, 'C'), ('reserved_b7', 7, 'tx', 0, 'S')],  # offsets -2
 }
 FLAGS['eva_sel5'] = FLAGS['eva_56']
 # --- PL / CTCSS, spec K-14 ---------------------------------------------------------------------

@@ -46,7 +46,7 @@ void mc_serial_defaults(mc_serial_opts *o)
 {
 	o->baud = 1200;
 	o->sw_parity = 1;
-	o->modem_init = 1;
+	o->line_setup = 1;
 }
 
 static unsigned sr_now(mc_transport *t)
@@ -160,8 +160,10 @@ mc_transport *mc_serial_open(const char *device, const mc_serial_opts *o, char *
 	dcb.fInX = FALSE;
 	dcb.fNull = FALSE;
 	dcb.fAbortOnError = FALSE;
-	/* P-11: DTR down, RTS up.  The interface drives a transistor from DTR, so leaving it asserted
-	 * -- which most USB bridges do on open -- holds the radio in the wrong state. */
+	/* P-11: DTR down, RTS up.  DTR feeds the level shifter through a PNP transistor and RTS is the
+	 * radio's HUB/PGM line; most USB bridges raise both on open, which is the wrong state for
+	 * both.  Set here as well as in EscapeCommFunction below, because the DCB is what the driver
+	 * reapplies on later state changes. */
 	dcb.fDtrControl = DTR_CONTROL_DISABLE;
 	dcb.fRtsControl = RTS_CONTROL_ENABLE;
 	if (!SetCommState(h, &dcb)) {
@@ -171,7 +173,7 @@ mc_transport *mc_serial_open(const char *device, const mc_serial_opts *o, char *
 	}
 	PurgeComm(h, PURGE_RXCLEAR | PURGE_TXCLEAR);
 
-	if (o->modem_init) {
+	if (o->line_setup) {
 		/* P-12: everything down, 500 ms, RTS up, 1300 ms. */
 		EscapeCommFunction(h, CLRDTR);
 		EscapeCommFunction(h, CLRRTS);

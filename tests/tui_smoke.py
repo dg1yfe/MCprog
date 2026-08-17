@@ -148,5 +148,106 @@ check('reserved_b7' in out, 'and the bit it preserves but never exposes')
 check('decode' not in out and 'encode' not in out,
       'K-22: MCEZ13 has no per-channel encode/decode flags')
 
+# ---- the radio cycle: read, edit, write back, with no file anywhere (M5 + M7) ----------------
+# build/ptyserv serves fixtures/eva9_real.bin over a pty, so this exercises the same code path a
+# real radio would, minus the wire itself.
+
+RADIO = '/tmp/mc_tui_radio.bin'
+
+
+def drive_radio(keys, src, enable_write=True, settle=0.35, final_wait=1.0):
+    """Run the TUI against a fake radio on a pty.  Returns (before, after, output)."""
+    import subprocess
+    shutil.copyfile(src, RADIO)
+    before = open(RADIO, 'rb').read()
+    srv = subprocess.Popen(['build/ptyserv', RADIO, '120000'], stdout=subprocess.PIPE, text=True)
+    dev = srv.stdout.readline().strip()
+    time.sleep(0.4)
+    argv = [BIN, '--port', dev, '--no-modem-init', '--baud', '0']
+    if enable_write:
+        argv.append('--enable-write')
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.environ.update(TERM='xterm', LINES='40', COLUMNS='100')
+        os.execv(BIN, argv)
+        os._exit(1)
+    out = b''
+
+    def pump(t):
+        nonlocal out
+        end = time.time() + t
+        while time.time() < end:
+            if select.select([fd], [], [], 0.05)[0]:
+                try:
+                    out += os.read(fd, 65536)
+                except OSError:
+                    return
+    pump(2.0)  # the initial read of the whole codeplug
+    for k in keys:
+        os.write(fd, k)
+        pump(settle)
+    pump(final_wait)  # a write is eight records with a burn delay each; do not cut it off
+    # SIGKILL and WNOHANG, never SIGTERM and a blocking wait: if the radio has gone away the client
+    # can be stuck in a read that no signal it handles will interrupt, and the harness then hangs
+    # instead of failing.
+    try:
+        os.kill(pid, signal.SIGKILL)
+        os.waitpid(pid, os.WNOHANG)
+    except (ProcessLookupError, ChildProcessError):
+        pass
+    os.close(fd)
+    srv.terminate()          # SIGTERM makes ptyserv save its EEPROM before exiting
+    try:
+        srv.wait(timeout=5)
+    except Exception:
+        srv.kill()
+        srv.wait(timeout=5)
+    return before, open(RADIO, 'rb').read(), out.decode('latin1', 'replace')
+
+
+if os.access('build/ptyserv', os.X_OK):
+    for f in os.listdir('.'):
+        if f.startswith('mcprog-backup'):
+            os.remove(f)
+
+    # W-1: without the opt-in the key is there and refuses, rather than silently doing nothing.
+    # The status line is redrawn in pieces, so these assertions go through the renderer: the raw
+    # stream splits "written and verified" across a cursor move.
+    before, after, out = drive_radio([b' ', b'w'], 'fixtures/eva9_real.bin', enable_write=False)  # noqa
+    check('disabled' in screen(out), 'W-1: w without --enable-write says writing is disabled')
+    check(before == after, 'W-1: and the radio is untouched')
+
+    # The whole point of M5+M7: read a radio, edit it, write it back, no file on disk at any stage.
+    before, after, out = drive_radio(
+        [b' ', CR, CR, b'171.2625', CR, ESC, b'w', b'y', CR], 'fixtures/eva9_real.bin',
+        final_wait=8.0)
+    diff = {i for i in range(len(before)) if before[i] != after[i]}
+    # Not the whole phrase: the status line went from "writing -- do not disconnect" to "written
+    # and verified", ncurses redrew only the tail after the shared "writ", and the full phrase
+    # therefore appears contiguously in neither the stream nor ansi.py's render of it.
+    check('and verified: 8 records' in out, 'W-4: the TUI writes the radio and says it verified')
+    check(diff and diff <= {0x000, 0x0E2, 0x0E3, 0x0E4},
+          'W-3: only the edited TX field and the checksum changed, got %s' % sorted(map(hex, diff)))
+    check(sum(after) & 0xFF == 0xFF, 'K-2: the radio ends up with a valid checksum')
+    dec = lambda t, P: ((((t[0] & 3) << 8) | t[1]) * P + t[2]) * (3125 if t[0] & 4 else 2500)
+    check(dec(after[0xE2:0xE5], 80) == 171_262_500,
+          'K-10: the radio holds the frequency that was typed')
+    backups = [f for f in os.listdir('.') if f.startswith('mcprog-backup')]
+    check(len(backups) == 1, 'W-2: exactly one backup was written, got %r' % backups)
+    check(backups and open(backups[0], 'rb').read() == before,
+          "W-2: and it holds the radio's contents from before the write")
+    for f in backups:
+        os.remove(f)
+
+    # Answering anything but y must not write.
+    before, after, out = drive_radio([b' ', CR, CR, b'171.2625', CR, ESC, b'w', b'n', CR],
+                                     'fixtures/eva9_real.bin')
+    check(before == after, 'W-1: declining the confirmation leaves the radio untouched')
+    check('not written' in screen(out), 'W-1: and says so')
+    check(not [f for f in os.listdir('.') if f.startswith('mcprog-backup')],
+          'W-2: a declined write leaves no backup behind')
+else:
+    print('SKIP  build/ptyserv is not built -- the radio cycle was not exercised')
+
 print('\n%d passed, %d FAILED' % (ok, bad))
 sys.exit(1 if bad else 0)

@@ -52,7 +52,7 @@ void mc_serial_defaults(mc_serial_opts *o)
 {
 	o->baud = 1200;
 	o->sw_parity = 1;
-	o->modem_init = 1;
+	o->line_setup = 1;
 }
 
 static unsigned elapsed_ms(const struct timespec *t0)
@@ -178,9 +178,11 @@ static int configure(serial *s, const mc_serial_opts *o, char *err, size_t errsz
 	}
 	tcflush(s->fd, TCIOFLUSH);
 
-	if (o->modem_init) {
-		/* P-12: MCR = 0, wait 500 ms, assert RTS, wait 1300 ms.  P-11: DTR stays DOWN -- most
-		 * USB adapters raise both on open, and the interface uses DTR to drive a transistor.
+	if (o->line_setup) {
+		/* P-12: MCR = 0, wait 500 ms, assert RTS, wait 1300 ms.  P-11: DTR stays DOWN, which puts
+		 * the line at its negative level -- that is the level shifter's supply, not a modem
+		 * signal, and most USB adapters would raise it on open.  RTS drives the radio's HUB/PGM
+		 * input: asserting it is what asks the radio for programming mode.
 		 * On a pty these ioctls are meaningless and fail; that is not an error there. */
 		int bits = 0;
 		if (ioctl(s->fd, TIOCMSET, &bits) == 0) {

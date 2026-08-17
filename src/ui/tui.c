@@ -200,8 +200,8 @@ static void draw_list(int sel, int top)
 	}
 	status(opening_note ? opening_note
 	                    : mc_pl_supported(img.model)
-	                          ? "up/down or j/k   enter edit   p PL/CTCSS   s save   q quit"
-	                          : "up/down or j/k   enter edit   s save   q quit");
+	                          ? "j/k move  enter edit  p PL/CTCSS  s save  w write radio  q quit"
+	                          : "j/k move  enter edit  s save  w write radio  q quit");
 	refresh();
 }
 
@@ -523,7 +523,37 @@ static void edit_pl(void)
 
 /* ---- entry point ----------------------------------------------------------------------------- */
 
-int mc_tui_run(mc_image *image, const char *filepath, const char *note)
+/* W-1.  With no writer the key still responds, and says why it will not do anything -- a disabled
+ * action the user can see beats a key that silently does nothing. */
+static void write_radio(mc_tui_writer writer, void *wctx)
+{
+	char msg[256], buf[8];
+
+	if (!writer) {
+		status("writing is disabled -- start with --port DEV --enable-write to turn it on");
+		getch();
+		return;
+	}
+	if (dirty) {
+		mc_checksum_fix(&img); /* the radio must never be sent an invalid checksum */
+		dirty = 0;
+	}
+	snprintf(msg, sizeof msg, "write this codeplug to the radio? the radio's contents are "
+	                          "backed up first  [y/N] ");
+	if (prompt(msg, buf, sizeof buf) != 0 || (buf[0] != 'y' && buf[0] != 'Y')) {
+		status("not written");
+		getch();
+		return;
+	}
+	status("writing -- do not disconnect the radio");
+	refresh();
+	writer(wctx, &img, msg, sizeof msg);
+	status(msg);
+	getch();
+}
+
+int mc_tui_run(mc_image *image, const char *filepath, const char *note,
+               mc_tui_writer writer, void *wctx)
 {
 	int sel = 0, top = 0;
 
@@ -563,6 +593,8 @@ int mc_tui_run(mc_image *image, const char *filepath, const char *note)
 			edit_pl();
 		else if (ch == 's')
 			save_file();
+		else if (ch == 'w')
+			write_radio(writer, wctx);
 		if (sel < top)
 			top = sel;
 		if (sel >= top + rows)

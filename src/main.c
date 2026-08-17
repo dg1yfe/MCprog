@@ -34,6 +34,7 @@
 #include "mc/codeplug.h"
 #include "mc/serial.h"
 #include "mc/tui.h"
+#include "mc/write.h"
 
 static uint8_t img_bytes[MC_IMG_MAX];
 static FILE *tracef;
@@ -51,18 +52,51 @@ static void usage(FILE *f)
 	        "  mcprog --port DEV --read f.DAT   read the radio to a file and exit\n"
 	        "  mcprog --port DEV --identify     print what the radio says it is\n"
 	        "  mcprog --dump-vec file.DAT       print the conformance decode of a file\n"
+	        "  mcprog --list-models             describe every model this build knows\n"
+	        "\n"
+	        "  mcprog --port DEV --enable-write            read, edit, then 'w' writes it back\n"
+	        "  mcprog --port DEV --write f.DAT --enable-write   write a file to the radio\n"
 	        "\n"
 	        "options:\n"
 	        "  --model NAME      override model detection\n"
 	        "  --log FILE        record the wire in .trace format (with --port)\n"
 	        "  --baud N          default 1200; 0 leaves the port's speed alone\n"
-	        "  --no-modem-init   skip the DTR/RTS opening sequence (1.8 s)\n"
+	        "  --no-line-setup   skip the DTR/RTS opening sequence (1.8 s).  DTR supplies the\n"
+	        "                    interface; RTS is the radio's HUB/PGM line, which selects\n"
+	        "                    programming mode -- so a real radio needs this left on\n"
+	        "  --enable-write    permit writing; without it no write path exists (W-1)\n"
 	        "\n"
-	        "Writing to a radio is not implemented yet.\n"
+	        "A write always backs the radio up first, refuses unless every changed byte is one\n"
+	        "this program writes, and reads every record back to verify it.\n"
 	        "models:");
 	for (i = 0; (m = mc_model_by_index(i)) != NULL; i++)
 		fprintf(f, " %s", m->name);
-	fprintf(f, "\n");
+	fprintf(f, "   (--list-models describes them)\n");
+}
+
+/* Sizes and offsets are shown because they are how a user checks that a codeplug of unknown origin
+ * is the model they think it is; PL is shown because it is the one capability that differs in what
+ * the editor will offer. */
+static void list_models(void)
+{
+	const mc_model *m;
+	size_t i;
+
+	printf("%-10s %5s %5s %8s  %-7s %s\n", "name", "bytes", "cksum", "channels", "PL", "radios");
+	for (i = 0; (m = mc_model_by_index(i)) != NULL; i++) {
+		char chans[24], pl[16];
+		snprintf(chans, sizeof chans, "%u x %u", m->nchan, m->stride);
+		if (m->pl_dec)
+			snprintf(pl, sizeof pl, "enc+dec");
+		else if (m->pl_tone)
+			snprintf(pl, sizeof pl, "enc");
+		else
+			snprintf(pl, sizeof pl, "-");
+		printf("%-10s %5u 0x%03X %8s  %-7s %s\n", m->name, m->size, m->cksum, chans, pl,
+		       m->about ? m->about : "");
+	}
+	printf("\nModel detection is by size and checksum, so the two 512-byte EVA models cannot be\n"
+	       "told apart from the bytes alone -- use --model to choose.\n");
 }
 
 static void wirelog(void *ctx, int tx, const uint8_t *buf, size_t n)
@@ -191,10 +225,43 @@ static long read_radio(const char *port, const mc_serial_opts *o, const char *lo
 	return (long)len;
 }
 
+struct wctx {
+	const char *port;
+	const mc_serial_opts *opts;
+};
+
+/* Opening the port again for the write, rather than holding it across an editing session, keeps
+ * the DTR/RTS sequence exactly as it is on a fresh connection and leaves nothing to go stale. */
+static int do_write(void *ctx, const mc_image *img, char *msg, size_t msgsz)
+{
+	struct wctx *w = ctx;
+	mc_transport *t;
+	mc_session s;
+	mc_write_report rep;
+	char err[160];
+
+	t = mc_serial_open(w->port, w->opts, err, sizeof err);
+	if (!t) {
+		snprintf(msg, msgsz, "%s", err);
+		return -1;
+	}
+	mc_session_init(&s, t);
+	if (mc_write_radio(&s, img, &rep) != 0) {
+		snprintf(msg, msgsz, "NOT written: %s", rep.err);
+		mc_serial_close(t);
+		return -1;
+	}
+	mc_serial_close(t);
+	snprintf(msg, msgsz, "written and verified: %d records, %d bytes changed, backup in %s",
+	         rep.records, rep.changed, rep.backup);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	const char *port = NULL, *readto = NULL, *want = NULL, *logpath = NULL, *file = NULL;
-	int identify = 0, dumpvec = 0, i;
+	const char *writefrom = NULL;
+	int identify = 0, dumpvec = 0, enable_write = 0, i;
 	mc_serial_opts o;
 	const mc_model *model = NULL;
 	mc_image img;
@@ -213,12 +280,20 @@ int main(int argc, char **argv)
 			logpath = argv[++i];
 		else if (!strcmp(argv[i], "--baud") && i + 1 < argc)
 			o.baud = (unsigned)atoi(argv[++i]);
-		else if (!strcmp(argv[i], "--no-modem-init"))
-			o.modem_init = 0;
+		else if (!strcmp(argv[i], "--no-line-setup") || !strcmp(argv[i], "--no-modem-init"))
+			o.line_setup = 0; /* the old spelling still works; there was never a modem */
 		else if (!strcmp(argv[i], "--identify"))
 			identify = 1;
 		else if (!strcmp(argv[i], "--dump-vec"))
 			dumpvec = 1;
+		else if (!strcmp(argv[i], "--list-models")) {
+			list_models();
+			return 0;
+		}
+		else if (!strcmp(argv[i], "--enable-write"))
+			enable_write = 1;
+		else if (!strcmp(argv[i], "--write") && i + 1 < argc)
+			writefrom = argv[++i];
 		else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
 			usage(stdout);
 			return 0;
@@ -233,12 +308,20 @@ int main(int argc, char **argv)
 		usage(stderr);
 		return 2;
 	}
+	if (writefrom && (!port || !enable_write)) {
+		fprintf(stderr, "mcprog: --write needs --port and --enable-write\n");
+		return 2;
+	}
 	if (port && file) {
 		fprintf(stderr, "mcprog: give a port or a file, not both\n");
 		return 2;
 	}
 
-	if (port) {
+	if (writefrom) {
+		len = load_file(writefrom); /* the payload comes from the file, not the radio */
+		if (len < 0)
+			return 1;
+	} else if (port) {
 		int ident_only = identify && !readto;
 		len = read_radio(port, &o, logpath, ident_only);
 		if (len < 0)
@@ -254,7 +337,9 @@ int main(int argc, char **argv)
 	if (want) {
 		model = mc_model_by_name(want);
 		if (!model) {
-			fprintf(stderr, "mcprog: unknown model %s\n", want);
+			fprintf(stderr, "mcprog: unknown model %s -- these are the ones this build knows:\n\n",
+			        want);
+			list_models();
 			return 2;
 		}
 		snprintf(note, sizeof note, "model %s given on the command line", want);
@@ -283,11 +368,16 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	if (!model) {
-		if (port)
+		/* A rescue copy is for bytes that exist nowhere else -- a radio read we could not decode.
+		 * With --write the bytes came from a file the user already has. */
+		if (port && !writefrom)
 			rescue((size_t)len, note);
 		else
 			fprintf(stderr, "mcprog: %s\n", note);
-		fprintf(stderr, "       use --model to say which it is\n");
+		/* Naming a model does not help when the size matched and the checksum is what failed --
+		 * that codeplug is damaged, and --model would only silence the diagnosis. */
+		if (!strstr(note, "checksum"))
+			fprintf(stderr, "       use --model to say which it is\n");
 		return 1;
 	}
 	img.model = model;
@@ -312,5 +402,16 @@ int main(int argc, char **argv)
 		mc_dump_vec(stdout, &img, file ? file : "(radio)");
 		return 0;
 	}
-	return mc_tui_run(&img, file, note);
+	{
+		struct wctx w;
+		char msg[256];
+		w.port = port;
+		w.opts = &o;
+		if (writefrom) { /* non-interactive: write the named file and report */
+			int rc = do_write(&w, &img, msg, sizeof msg);
+			printf("%s\n", msg);
+			return rc ? 1 : 0;
+		}
+		return mc_tui_run(&img, file, note, (port && enable_write) ? do_write : NULL, &w);
+	}
 }

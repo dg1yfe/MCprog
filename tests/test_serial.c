@@ -130,7 +130,7 @@ static pid_t spawn_radio(int master, int slave, const uint8_t *image, size_t len
 		memcpy(eep, image, len);
 		mc_serial_defaults(&o);
 		o.baud = 0;         /* a pty has no line speed; do not slow the test to 1200 baud */
-		o.modem_init = 0;   /* and no modem control lines to sequence */
+		o.line_setup = 0;   /* and no modem control lines to sequence */
 		o.sw_parity = radio_parity;
 		t = mc_serial_attach(slave, &o, err, sizeof err);
 		if (!t)
@@ -170,7 +170,7 @@ static mc_transport *client(int master, int parity)
 	mc_transport *t;
 	mc_serial_defaults(&o);
 	o.baud = 0;
-	o.modem_init = 0;
+	o.line_setup = 0;
 	o.sw_parity = parity;
 	t = mc_serial_attach(master, &o, err, sizeof err);
 	if (!t)

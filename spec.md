@@ -61,6 +61,16 @@ clear, `CSTOPB` clear, `CRTSCTS` clear, and `ISTRIP`/`INPCK`/`PARMRK`/`IXON`/`IX
 explicitly. **[S]**
 **P-12** On open: `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms. **[S]**
 
+> Neither line is doing modem control, and nothing here is a handshake. In the interface of
+> `doc/ANALYSIS.md` §3, **DTR supplies the level shifter's negative rail** and **RTS drives the
+> radio's HUB/PGM input, which is what puts the radio into programming mode** -- reported by the
+> user, who has built the interface, and consistent with the schematic: DTR drives a BC557 (a PNP,
+> so it conducts when its base is pulled negative) through 27 k, and RTS runs straight through.
+> An RS-232 line that is *de-asserted* sits at its negative level, so `MCR=0` is what puts a
+> negative voltage on DTR. That reading reconciles P-12 with the hardware, but it has not been
+> measured on a radio: if the shifter instead needs DTR **raised**, P-12 is wrong and the first
+> hardware contact will show it. **[?]**
+
 ## 3. Commands
 
 **P-20** `*` (0x2A) — **identify**. Returns the ident string nibble-encoded, terminated by `0x1A`.
@@ -258,11 +268,26 @@ allowed on confirmation; saving with ERRORs is refused.
 the reason shown.
 **W-2** A full read of the radio is dumped to a timestamped backup file before the first write byte.
 Failure to read or to write the backup aborts the write.
-**W-3** Pre-write gates, all fatal: checksum valid; band not 7; model and size match; serial matches
-the pre-write read; every K-30 byte matches what the radio just returned.
+**W-3** Pre-write gates, all fatal: checksum valid; band not 7; model and size match; every byte
+that differs from what the radio just returned is one MCprog itself writes (K-30). A write that
+would change nothing is refused rather than performed.
+
+> The serial number is covered by the K-30 gate rather than by a check of its own: if it differs
+> from the pre-write read, the write is refused along with every other unaccountable difference.
 **W-4** Verify every record after writing (P-42). Abort on mismatch, naming the record, the offset
 and the backup path.
 **W-5** Increment the write counter on radio writes only, never on file saves, then recompute the
 checksum.
+
+> **Not implemented, deliberately.** The counter's offset differs per model and is only partly
+> measured -- 0x0AF on the SEL5 EVA, 0x09E on the EZA 9, and on the 5/6-tone build a write moves
+> 0x0B0 and 0x0B1 together, of which only one is plausibly a counter. Implementing it from a guess
+> would write a byte MCprog cannot account for into somebody's radio, which is what W-3 exists to
+> prevent. The cost of omitting it is that the radio does not record having been reprogrammed.
+> **[?]**
 **W-6** Record order 0..N faithful to the original. `--checksum-last` may be offered, but the
 faithful order is the only one known to work on hardware.
+
+> W-1 to W-4 and W-6 are implemented in `src/write.c` and asserted in `tests/test_write.c`, each
+> gate proven by being made to fire. The whole path runs against the forked fake radio over a pty;
+> **it has never run against a physical radio.** **[C]** for the code, **[?]** for the hardware.

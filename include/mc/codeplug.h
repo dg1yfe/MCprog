@@ -76,6 +76,7 @@ typedef struct {
 	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable; 0 = model has none  */
 	uint16_t pl_dec;   /* PL DECODER table base (MCEZ13 only); 0 = model cannot decode */
 	uint8_t pl_max;    /* entries in the list                                          */
+	const char *about; /* which radios this describes, for --list-models               */
 } mc_model;
 
 const mc_model *mc_model_by_name(const char *name);

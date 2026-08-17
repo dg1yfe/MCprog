@@ -18,7 +18,13 @@ read 512 bytes (8 records)
 2 models fit (eva_56, eva_sel5); assuming eva_56 -- use --model to choose
 checksum valid
 wrote mine.dat
+$ mcprog --list-models                     # what this build knows
+$ mcprog --port /dev/ttyUSB0 --enable-write   # read, edit, then 'w' writes it back
 ```
+
+Reading a radio, editing it and writing it back needs no file at any stage. Writing is off unless
+you ask for it, always backs the radio up first, refuses any change it cannot account for, and
+reads every record back to check it.
 
 One binary. A radio and a file are two sources of the same thing, so either leads to the same
 editor; naming an output file makes it non-interactive instead, which is what a script or a bug
@@ -32,13 +38,32 @@ report wants.
 | protocol library | replays all three hardware captures byte for byte |
 | TUI | channel list, per-channel editor, save with checksum |
 | serial transport | POSIX (tested) and Win32 (compiles, **never run on hardware**) |
+| writing | gated, backed up and verified; W-5 (write counter) deliberately omitted |
 | reading a real radio | **untested** — needs the interface cable |
-| writing a real radio | not implemented; needs W-1..W-6 first |
+| writing a real radio | **untested** — same |
 
 Nothing here has yet touched a physical radio. Everything is verified against captured hardware
-sessions and against the original software running under emulation.
+sessions, against a fake radio on a pty, and against the original software running under emulation.
+
+### Trying it without a radio
+
+`build/ptyserv` is a radio on a pseudo-terminal, so the whole tool — including the write path — can
+be exercised with no hardware:
+
+```
+$ make build/ptyserv
+$ ./build/ptyserv fixtures/eva9_real.bin
+/dev/ttys004
+$ ./build/mcprog --port /dev/ttys004 --no-line-setup --baud 0 --enable-write
+```
+
+`--baud 0` and `--no-line-setup` are wanted because a pseudo-terminal has neither a line speed nor
+the control lines. Against a real radio, leave both alone: DTR supplies the interface's level
+shifter and RTS drives the radio's HUB/PGM input, which is what selects programming mode.
 
 ## Supported models
+
+`mcprog --list-models` prints this table from the binary itself.
 
 | model | size | channels | notes |
 |---|---|---|---|

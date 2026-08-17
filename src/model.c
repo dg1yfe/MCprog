@@ -64,12 +64,16 @@ static const mc_flag FLAGS_EZ13[] = {
  * the tool exposes nothing rather than guessing. */
 static const mc_model MODELS[] = {
 	/* name       size cksum cklen  chan   band  refdiv nch str tx rx num  flags          PL: tone  list count mode   dec  max */
-	{ "eva_56",    512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10 },
-	{ "eva_sel5",  512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10 },
-	{ "eza_sel5",  256, 0x000, 0,    0x0C8, 0x082, 0x0C4,  8, 6, 0, 3, 0, NF(FLAGS_EZA9), 0x02F, 0x031, 0x083, 0x07F, 0,     10 },
+	{ "eva_56",    512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10,
+	  "EVA, 5/6-tone signalling -- MCEV_56" },
+	{ "eva_sel5",  512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10,
+	  "EVA, SEL5 signalling -- MCEV9, MCEV9M" },
+	{ "eza_sel5",  256, 0x000, 0,    0x0C8, 0x082, 0x0C4,  8, 6, 0, 3, 0, NF(FLAGS_EZA9), 0x02F, 0x031, 0x083, 0x07F, 0,     10,
+	  "EZA, SEL5 signalling -- MCEZ9 and its R/M builds" },
 	/* MCEZ13: no mode byte -- an encoder table and a decoder table -- and its checksum covers 126
 	 * of its 128 bytes, measured off the sum loop at CS:0x767E. */
-	{ "eza_cspl",  128, 0x001, 126,  0x039, 0x037, 0x002,  8, 6, 0, 3, 0, NF(FLAGS_EZ13), 0x022, 0x022, 0,     0,     0x00E, 10 },
+	{ "eza_cspl",  128, 0x001, 126,  0x039, 0x037, 0x002,  8, 6, 0, 3, 0, NF(FLAGS_EZ13), 0x022, 0x022, 0,     0,     0x00E, 10,
+	  "EZA, CS/PL -- MCEZ13, the 128-byte variant" },
 };
 static const size_t NMODELS = sizeof MODELS / sizeof MODELS[0];
 
@@ -122,8 +126,27 @@ const mc_model *mc_model_detect(const uint8_t *bytes, size_t len, char *note, si
 		snprintf(list + strlen(list), sizeof list - strlen(list), "%s%s", n > 1 ? ", " : "",
 		         m->name);
 	}
-	if (!best)
-		snprintf(note, notesz, "no model matches %u bytes with a valid checksum", (unsigned)len);
+	if (!best) {
+		/* Distinguish "nothing is this size" from "the right size, bad checksum" -- the second is
+		 * a damaged or hand-edited codeplug, and saying so beats "use --model". */
+		const mc_model *sized = NULL;
+		for (i = 0; (m = mc_model_by_index(i)) != NULL; i++)
+			if (m->size == len) {
+				sized = m;
+				break;
+			}
+		if (sized) {
+			mc_image t;
+			t.model = sized;
+			t.bytes = (uint8_t *)bytes;
+			t.len = len;
+			snprintf(note, notesz,
+			         "%u bytes matches model %s, but its checksum is invalid (sums to 0x%02X, "
+			         "should be 0xFF)", (unsigned)len, sized->name, mc_checksum_total(&t));
+		} else {
+			snprintf(note, notesz, "no model is %u bytes", (unsigned)len);
+		}
+	}
 	else if (n > 1)
 		snprintf(note, notesz, "%u models fit (%s); assuming %s -- use --model to choose",
 		         (unsigned)n, list, best->name);

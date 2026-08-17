@@ -24,7 +24,7 @@ endif
 
 # serial_win32.c self-excludes with #ifdef _WIN32, so it can sit in SRC on every platform.
 SRC   := src/codeplug.c src/model.c src/dump.c src/protocol.c src/replay.c \
-         src/fakeradio.c src/serial_posix.c src/serial_win32.c
+         src/fakeradio.c src/serial_posix.c src/serial_win32.c src/write.c
 OBJ   := $(SRC:src/%.c=build/%.o)
 ROOT  ?= .
 
@@ -56,16 +56,25 @@ build/test_vectors: tests/test_vectors.c $(OBJ) $(HDRS) | build
 build/test_protocol: tests/test_protocol.c $(OBJ) $(HDRS) | build
 	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS)
 
+# Not a test: a radio on a pty, so the whole tool can be exercised without hardware.  Windows has
+# no pty, so it is POSIX-only and not part of `all`.
+build/ptyserv: tests/ptyserv.c $(OBJ) $(HDRS) | build
+	$(CC) $(CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDLIBS)
+
+build/test_write: tests/test_write.c $(OBJ) $(HDRS) | build
+	$(CC) $(CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDLIBS)
+
 build/test_serial: tests/test_serial.c $(OBJ) $(HDRS) | build
 	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LIBUTIL)
 
-test: build/test_vectors build/test_protocol build/test_serial
+test: build/test_vectors build/test_protocol build/test_serial build/test_write
 	@./build/test_vectors $(ROOT)
 	@./build/test_protocol $(ROOT)
 	@./build/test_serial $(ROOT)
+	@./build/test_write $(ROOT)
 
 # Drives the real ncurses binary through a pty; the M3 criteria are behavioural.
-smoke: build/mcprog
+smoke: build/ptyserv build/mcprog
 	@python3 tests/tui_smoke.py
 
 # Everything: unit + conformance + pty smoke + the Windows cross-compile.

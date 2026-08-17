@@ -32,6 +32,12 @@
  * asked for a name the first time they save.  `note` is shown once on the status line, which is how
  * model detection reports what it found.
  */
-int mc_tui_run(mc_image *image, const char *filepath, const char *note);
+/* Called when the user asks to write the radio.  Return 0 on success; put a one-line result in
+ * `msg` either way.  Pass NULL for `writer` and the action is offered but refused with a reason --
+ * which is how W-1 is enforced: without the opt-in there is no code path to a write at all. */
+typedef int (*mc_tui_writer)(void *ctx, const mc_image *img, char *msg, size_t msgsz);
+
+int mc_tui_run(mc_image *image, const char *filepath, const char *note,
+               mc_tui_writer writer, void *wctx);
 
 #endif /* MC_TUI_H */

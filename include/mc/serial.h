@@ -36,10 +36,13 @@
 typedef struct {
 	unsigned baud;  /* 1200 for a radio (P-10); 0 leaves the port's current speed alone */
 	int sw_parity;  /* 1 = add/verify odd parity in bit 7 (P-2) */
-	int modem_init; /* 1 = the P-11/P-12 opening sequence, which takes 1.8 s */
+	/* 1 = the P-11/P-12 opening sequence, which takes 1.8 s.  Despite the RS-232 names, neither
+	 * line carries modem control here: DTR supplies the level shifter and RTS drives the radio's
+	 * HUB/PGM input, which is what selects programming mode.  Off for a pty, which has neither. */
+	int line_setup;
 } mc_serial_opts;
 
-/* baud 1200, software parity on, modem init on. */
+/* baud 1200, software parity on, line setup on. */
 void mc_serial_defaults(mc_serial_opts *o);
 
 mc_transport *mc_serial_open(const char *device, const mc_serial_opts *o, char *err, size_t errsz);

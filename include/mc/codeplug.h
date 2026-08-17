@@ -97,6 +97,15 @@ typedef struct {
 	size_t len;
 } mc_image;
 
+/* Does this image actually contain everything the model addresses?
+ *
+ * Every accessor below indexes at fixed model offsets.  Nothing else validates that the buffer is
+ * long enough, so a truncated file -- or the right file with the wrong --model -- would read past
+ * the end.  Callers MUST run this before using an image they did not construct themselves.
+ * Returns 0 if the image is usable, or the number of bytes the model needs when it is not.
+ */
+size_t mc_image_check(const mc_image *img);
+
 /* Checksum (K-2).  The stored byte is chosen so the covered range sums to 0xFF mod 256.  That
  * range is the whole device on every model but MCEZ13, which covers all but its last two bytes --
  * so this is per-model data, not a constant. */

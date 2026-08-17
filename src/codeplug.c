@@ -25,6 +25,33 @@
 #include <string.h>
 #include "mc/codeplug.h"
 
+/* ---- bounds ---------------------------------------------------------------------------------- */
+
+size_t mc_image_check(const mc_image *img)
+{
+	const mc_model *m = img->model;
+	size_t need = 0, x;
+
+	/* the highest byte any accessor can touch, per model */
+	x = (size_t)m->cksum + 1;                                     if (x > need) need = x;
+	x = (size_t)m->band + 1;                                      if (x > need) need = x;
+	x = (size_t)m->refdiv + 4;                                    if (x > need) need = x;
+	x = (size_t)m->chan + (size_t)m->nchan * m->stride;           if (x > need) need = x;
+	if (m->cksum_len) {
+		x = m->cksum_len;                                         if (x > need) need = x;
+	}
+	if (m->pl_list) {
+		x = (size_t)m->pl_list + (size_t)m->pl_max * 2;            if (x > need) need = x;
+		x = (size_t)m->pl_tone + 2;                                if (x > need) need = x;
+	}
+	if (m->pl_dec) {
+		x = (size_t)m->pl_dec + (size_t)m->pl_max * 2;             if (x > need) need = x;
+	}
+	if (m->pl_count) { x = (size_t)m->pl_count + 1;                if (x > need) need = x; }
+	if (m->pl_mode)  { x = (size_t)m->pl_mode + 1;                 if (x > need) need = x; }
+	return img->len >= need ? 0 : need;
+}
+
 /* ---- checksum, K-2 -------------------------------------------------------------------------- */
 
 uint8_t mc_checksum_stored(const mc_image *img)

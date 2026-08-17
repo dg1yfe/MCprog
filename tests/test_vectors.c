@@ -177,6 +177,35 @@ static void test_codeplug(const char *vecrel)
 	free(want);
 	free(got);
 
+	/* The image must contain everything the model addresses.  Without this every accessor reads
+	 * past the end of a truncated file -- confirmed with AddressSanitizer before it was added. */
+	ok(mc_image_check(&img) == 0, "K-20", "the fixture satisfies its model's bounds");
+	{
+		mc_image probe = img;
+		size_t need, i;
+		/* asked of an empty image, the check reports how many bytes the model addresses */
+		probe.len = 0;
+		need = mc_image_check(&probe);
+		ok(need > 0 && need <= img.len, "K-20", "the model reports a sane addressed extent");
+		probe.len = need - 1;
+		ok(mc_image_check(&probe) != 0, "K-20", "one byte below that extent is rejected");
+		probe.len = need;
+		ok(mc_image_check(&probe) == 0, "K-20", "exactly that extent is accepted");
+		{
+			mc_image shortimg = probe;
+			(void)shortimg;
+		}
+		/* and every other model that is larger than this file must be rejected too */
+		for (i = 0; mc_model_by_index(i); i++) {
+			const mc_model *other = mc_model_by_index(i);
+			mc_image t = img;
+			t.model = other;
+			if (other->size > img.len)
+				ok(mc_image_check(&t) != 0, "K-20",
+				   "a model larger than the file is rejected");
+		}
+	}
+
 	/* K-2: the covered range is per-model.  MCEZ13 excludes its last two bytes, and no fixture
 	 * exercises that because theirs happen to be zero -- so set one and check it is ignored. */
 	if (model->cksum_len && model->cksum_len < img.len) {

@@ -248,7 +248,12 @@ int main(int argc, char **argv)
 			img.model = model;
 			img.bytes = img_bytes;
 			img.len = (size_t)len;
-			printf("checksum %s\n", mc_checksum_valid(&img) ? "valid" : "INVALID (saved anyway)");
+			if (mc_image_check(&img))
+				printf("model %s does not fit %u bytes; saved raw, not decoded\n",
+				       model->name, (unsigned)len);
+			else
+				printf("checksum %s\n",
+				       mc_checksum_valid(&img) ? "valid" : "INVALID (saved anyway)");
 		}
 		printf("wrote %s\n", readto);
 		return 0;
@@ -260,6 +265,16 @@ int main(int argc, char **argv)
 	img.model = model;
 	img.bytes = img_bytes;
 	img.len = (size_t)len;
+	{
+		size_t need = mc_image_check(&img);
+		if (need) {
+			fprintf(stderr,
+			        "mcprog: %s is %ld bytes but model %s addresses %u -- refusing to read past "
+			        "the end of the file\n",
+			        file ? file : "(radio)", len, model->name, (unsigned)need);
+			return 1;
+		}
+	}
 
 	if (dumpvec) {
 		mc_dump_vec(stdout, &img, file ? file : "(radio)");

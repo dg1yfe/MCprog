@@ -46,10 +46,21 @@ struct mc_replay {
 static void push(mc_replay *r, uint8_t dir, uint8_t v, unsigned ts)
 {
 	if (r->n == r->cap) {
-		r->cap = r->cap ? r->cap * 2 : 4096;
-		r->val = realloc(r->val, r->cap);
-		r->dir = realloc(r->dir, r->cap);
-		r->ts = realloc(r->ts, r->cap * sizeof *r->ts);
+		size_t cap = r->cap ? r->cap * 2 : 4096;
+		uint8_t *val = realloc(r->val, cap);
+		uint8_t *dr = realloc(r->dir, cap);
+		unsigned *ts2 = realloc(r->ts, cap * sizeof *r->ts);
+		if (!val || !dr || !ts2) {
+			/* keep whatever was allocated -- close() frees it -- and stop growing */
+			r->val = val ? val : r->val;
+			r->dir = dr ? dr : r->dir;
+			r->ts = ts2 ? ts2 : r->ts;
+			return;
+		}
+		r->cap = cap;
+		r->val = val;
+		r->dir = dr;
+		r->ts = ts2;
 	}
 	r->val[r->n] = v;
 	r->dir[r->n] = dir;
@@ -139,7 +150,10 @@ mc_replay *mc_replay_open(const char *path, char *err, size_t errsz)
 		for (i = 0; i < nb; i++) {
 			unsigned v;
 			unsigned ts = nb > 1 ? t0 + (unsigned)((t1 - t0) * i / (nb - 1)) : t0;
-			sscanf(hex + i * 2, "%2x", &v);
+			/* Unchecked, this leaves v indeterminate on a malformed trace and pushes garbage
+			 * onto the wire. */
+			if (sscanf(hex + i * 2, "%2x", &v) != 1)
+				break;
 			/* 0x00 and 0x01 appear in the PC stream at the start of a capture and again where
 			 * the 2011 log changes phase.  They are line-state artifacts of the capture rig,
 			 * not protocol -- no legal protocol byte is below 0x06 -- so they are dropped

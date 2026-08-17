@@ -299,12 +299,16 @@ static void probe_02(void)
 	int got;
 
 	mc_put_header(hdr, ")02", 0x0000);
+	if (R.s.log)
+		R.s.log(R.s.logctx, 1, hdr, 7); /* this probe bypasses the session, so log it by hand */
 	if (R.s.t->send(R.s.t, hdr, 7) != 0) {
 		note("P-22", "`)02` (never seen in any capture)", R_FAIL, "unknown -- this is the point",
 		     "send failed: %s", R.s.t->err);
 		return;
 	}
 	got = R.s.t->recv(R.s.t, reply, sizeof reply, MC_T_BYTE);
+	if (got > 0 && R.s.log)
+		R.s.log(R.s.logctx, 0, reply, (size_t)got);
 	if (got <= 0) {
 		note("P-22", "`)02` (never seen in any capture)", R_INFO,
 		     "unknown; the guess is a 2-byte reply",
@@ -560,10 +564,14 @@ int mc_selftest(const mc_selftest_opts *o)
 	{
 		char a[MC_IDENT_MAX];
 		size_t la = 0;
-		note("P-20", "ident still answered after a full session",
-		     mc_identify(&R.s, a, sizeof a, &la) == 0 ? R_PASS : R_DIFFERS,
+		/* Sequenced deliberately.  Calling mc_identify() inside note()'s argument list left the
+		 * format string to be chosen from a `la` that had not been written yet -- C does not order
+		 * argument evaluation -- and the first hardware run duly reported "as documented" beside
+		 * "no reply". */
+		int again = mc_identify(&R.s, a, sizeof a, &la);
+		note("P-20", "ident still answered after a full session", again == 0 ? R_PASS : R_DIFFERS,
 		     "the radio answers `*` at any point, not once per power-up",
-		     la ? "answered, %u bytes" : "no reply", (unsigned)la);
+		     again == 0 ? "answered again, %u bytes" : "no reply (%u bytes)", (unsigned)la);
 	}
 
 	if (R.trace)

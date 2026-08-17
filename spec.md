@@ -88,22 +88,45 @@ explicitly. **[S]**
 ## 3. Commands
 
 **P-20** `*` (0x2A) — **identify**. Returns the ident string nibble-encoded, terminated by `0x1A`.
-The captured EVA reply is 41 bytes: `EV9.01.00.11 455M11-3     5/6 Tone radio` + 0x1A. **[C]**
+**Its length varies by model**; `0x1A` is the terminator to trust, not a byte count. **[C]**
 
-> This is *not* once per power-up. The capture sends `*` twice, 36 s apart, and both are answered.
-> Never cache the assumption. **[C]**
+| radio | bytes | ident |
+|---|---|---|
+| EVA 9, 5/6-tone (2009 capture) | 41 | `EV9.01.00.11 455M11-3     5/6 Tone radio` |
+| EZA 9 (hardware, 17 Aug 2026) | 37 | `EZ9.00.02.03 Copr,1987 Motorola GmbH` |
+
+> This is *not* once per power-up. The EVA capture sends `*` twice, 36 s apart, and both are
+> answered; the EZA 9 answered four times in one session, including after a full 256-byte read, and
+> all four replies were identical. Never cache the assumption. **[C]**
 
 **P-21** `)01`+addr — **attention / probe**. Returns `(01`+addr + **one byte**, `eeprom[addr]`. The
 capture's two calls return `0x36` then `0x73` — different values, so plainly codeplug data. **[C]**
 
-**P-22** `)02`+addr — serial-number pre-write check, returns `(02`+addr + **two** bytes. Appears in
-**none of the three** captures. Implement it, but **never gate a write on it** — use a full
-pre-write read, which is strictly stronger. **[S]**
+**P-22** `)02`+addr — returns `(02`+addr + **two** bytes: `eeprom[addr]` and `eeprom[addr+1]`. It
+appears in none of the three captures, so it was a guess from the disassembly until an EZA 9
+answered it: `)020000` returned `FB 02`, and `)010000` / `)010001` on the same radio returned `FB`
+and `02`. It is a two-byte read, not a serial-number command. **[C]**
 
-**P-23** `)40`+addr — read 64 bytes, reply `(40`+addr + 128 nibble-characters. **[C]**
+> Still **never gate a write on it** — a full pre-write read is strictly stronger, and W-3 does
+> exactly that.
 
-**P-24** Past the end of memory the radio replies with the **echoed 7-byte header and then `0x15`**.
-A parser that accepts only a bare NAK misparses the end of every read. Accept both forms. **[C]**
+**P-23** `)40`+addr — read 64 bytes, reply `(40`+addr + 128 nibble-characters. During a sequential
+read every record after the first is requested with a leading `0x06`, the acknowledgement of the
+previous one — confirmed on hardware, where all four EZA 9 records after the first carried it.
+**[C]**
+
+> A record takes about 1.25 s at 1200 baud: 135 characters out and back, plus the turnaround. A
+> whole 256-byte EZA 9 read measured 5015 ms. **[C]**
+
+**P-24** Past the end of memory the radio NAKs, in one of **two forms — both real**:
+
+| form | seen on |
+|---|---|
+| echoed 7-byte header, then `0x15` | the EVA captures |
+| a bare `0x15` | an EZA 9, on hardware (17 Aug 2026) |
+
+Accepting only one misparses the end of every read on the other. This is not a spec ambiguity to be
+resolved but a difference between radios, so accept both. **[C]**
 
 **P-25** `(40`+addr+128 chars — write 64 bytes. The reply is **two bare ACK bytes, no header**: the
 first ~130 ms after the last data byte (command accepted), the second **~710 ms** later (EEPROM burn

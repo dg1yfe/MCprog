@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "mc/codeplug.h"
 #include "mc/serial.h"
 #include "mc/tui.h"
@@ -112,6 +113,29 @@ static int save_raw(const char *file, size_t len)
 	}
 	fclose(f);
 	return 0;
+}
+
+/* A read that cannot be decoded is still a read: 1200 baud takes the better part of a minute, and
+ * a radio whose codeplug is unrecognised is exactly the one worth keeping a copy of.  Never exit
+ * having thrown one away. */
+static void rescue(size_t len, const char *why)
+{
+	char name[64];
+	time_t now = time(NULL);
+	struct tm *tm = localtime(&now);
+	FILE *f;
+
+	strftime(name, sizeof name, "mcprog-rescue-%Y%m%d-%H%M%S.dat", tm);
+	f = fopen(name, "wb");
+	if (!f || fwrite(img_bytes, 1, len, f) != len) {
+		fprintf(stderr, "mcprog: %s, and the rescue copy could not be written either\n", why);
+		if (f)
+			fclose(f);
+		return;
+	}
+	fclose(f);
+	fprintf(stderr, "mcprog: %s\n       the %u bytes read were saved to %s -- nothing was lost\n",
+	        why, (unsigned)len, name);
 }
 
 /* Read the radio into img_bytes.  Returns the length, or -1.  With `ident_only` it stops after the
@@ -259,7 +283,11 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	if (!model) {
-		fprintf(stderr, "mcprog: %s\nuse --model to say which it is\n", note);
+		if (port)
+			rescue((size_t)len, note);
+		else
+			fprintf(stderr, "mcprog: %s\n", note);
+		fprintf(stderr, "       use --model to say which it is\n");
 		return 1;
 	}
 	img.model = model;
@@ -268,10 +296,14 @@ int main(int argc, char **argv)
 	{
 		size_t need = mc_image_check(&img);
 		if (need) {
-			fprintf(stderr,
-			        "mcprog: %s is %ld bytes but model %s addresses %u -- refusing to read past "
-			        "the end of the file\n",
-			        file ? file : "(radio)", len, model->name, (unsigned)need);
+			char why[160];
+			snprintf(why, sizeof why,
+			         "%s is %ld bytes but model %s addresses %u -- refusing to decode past the end",
+			         file ? file : "the radio's reply", len, model->name, (unsigned)need);
+			if (port)
+				rescue((size_t)len, why);
+			else
+				fprintf(stderr, "mcprog: %s\n", why);
 			return 1;
 		}
 	}

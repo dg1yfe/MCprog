@@ -246,6 +246,34 @@ if os.access('build/ptyserv', os.X_OK):
     check('not written' in screen(out), 'W-1: and says so')
     check(not [f for f in os.listdir('.') if f.startswith('mcprog-backup')],
           'W-2: a declined write leaves no backup behind')
+    # --selftest (M6, temporary).  It is the thing that will run against the first real radio, so
+    # it has to work before it gets there; the fake radio cannot answer the P-11 line question, but
+    # everything else runs.
+    import subprocess
+    shutil.copyfile('fixtures/eva9_real.bin', RADIO)
+    srv = subprocess.Popen(['build/ptyserv', RADIO, '120000'], stdout=subprocess.PIPE, text=True)
+    dev = srv.stdout.readline().strip()
+    time.sleep(0.4)
+    r = subprocess.run([BIN, '--port', dev, '--no-line-setup', '--baud', '0', '--enable-write',
+                        '--selftest', '/tmp/mc_selftest.md'],
+                       capture_output=True, text=True, timeout=300)
+    srv.terminate()
+    try:
+        srv.wait(timeout=5)
+    except Exception:
+        srv.kill()
+    rep = open('/tmp/mc_selftest.md').read() if os.path.exists('/tmp/mc_selftest.md') else ''
+    check(r.returncode == 0, 'selftest exits 0 against a reachable radio')
+    check('0 differ, 0 failed' in rep, 'selftest finds nothing wrong with the fake radio')
+    for probe in ('P-20', 'P-21', 'P-22', 'P-24', 'P-41', 'P-25', 'P-42', 'K-20', 'K-2', 'K-10'):
+        check(probe in rep, 'selftest reports %s' % probe)
+    check('pseudo-terminal' in rep,
+          'P-11 is skipped with the reason, not failed, on a port with no control lines')
+    check('recorded' in rep, 'a probe with nothing to compare against is not called "as documented"')
+    check(open(RADIO, 'rb').read() == open('fixtures/eva9_real.bin', 'rb').read(),
+          'the selftest write-back leaves the radio byte-identical')
+    check(os.path.exists('/tmp/mc_selftest.md.trace'), 'selftest writes a wire log')
+    check(os.path.exists('/tmp/mc_selftest.md.dat'), 'selftest saves the codeplug it read')
 else:
     print('SKIP  build/ptyserv is not built -- the radio cycle was not exercised')
 

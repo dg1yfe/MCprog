@@ -195,6 +195,20 @@ static int configure(serial *s, const mc_serial_opts *o, char *err, size_t errsz
 	return 0;
 }
 
+int mc_serial_set_lines(mc_transport *t, int dtr, int rts)
+{
+	serial *s = (serial *)t;
+	int bits = 0;
+
+	if (ioctl(s->fd, TIOCMGET, &bits) != 0)
+		return -1; /* a pty: the ioctl is meaningless there, and that is not an error to report */
+	if (dtr >= 0)
+		bits = dtr ? (bits | TIOCM_DTR) : (bits & ~TIOCM_DTR);
+	if (rts >= 0)
+		bits = rts ? (bits | TIOCM_RTS) : (bits & ~TIOCM_RTS);
+	return ioctl(s->fd, TIOCMSET, &bits) == 0 ? 0 : -1;
+}
+
 static mc_transport *wrap(int fd, int owned, const mc_serial_opts *o, char *err, size_t errsz)
 {
 	serial *s = calloc(1, sizeof *s);

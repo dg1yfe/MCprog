@@ -45,6 +45,30 @@ report wants.
 Nothing here has yet touched a physical radio. Everything is verified against captured hardware
 sessions, against a fake radio on a pty, and against the original software running under emulation.
 
+### First contact with a real radio
+
+If you are the first person to point this at hardware, run the selftest before anything else. It
+answers in one pass the questions that only a radio can settle, and writes a report worth sending
+back:
+
+```
+$ mcprog --port /dev/ttyUSB0 --selftest report.md
+```
+
+It is **read-only**. Add `--enable-write` and it also writes one record back — the radio's *own*
+bytes, unchanged, after saving a copy — which exercises the write framing and the double ACK
+without altering what the radio does.
+
+It produces `report.md`, `report.md.trace` (every byte, timestamped, in the format the conformance
+suite reads) and `report.md.dat` (the codeplug it read). The first probe is the one most likely to
+matter: it tries all four DTR/RTS combinations and reports which the radio answers on. MCprog's
+own choice — DTR de-asserted, RTS asserted — has never been tested against hardware, and if it is
+wrong nothing else would work; the selftest finds that out in ten seconds and carries on using
+whatever did answer, so you still get a full report.
+
+`--selftest` is temporary. It exists for this milestone and will be removed once its answers are
+folded into `spec.md`.
+
 ### Trying it without a radio
 
 `build/ptyserv` is a radio on a pseudo-terminal, so the whole tool — including the write path — can

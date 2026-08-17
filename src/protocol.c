@@ -182,14 +182,18 @@ int mc_read_block(mc_session *s, uint16_t addr, uint8_t out[MC_BLOCK], int chain
 		return -1;
 
 	got = rx(s, reply, 7, MC_T_BYTE);
-	if (got == 1 && reply[0] == 0x15)
-		return 0; /* P-24: the bare NAK form */
+	if (got == 1 && reply[0] == 0x15) {
+		s->last_nak_header = 0; /* P-24: the bare NAK form */
+		return 0;
+	}
 	if (got != 7)
 		return fail(s, "read 0x%04X: wanted a 7-byte header, got %d", addr, got);
 	if (!hdr_matches(reply, "(40", addr))
 		return fail(s, "read 0x%04X: bad reply header", addr);
 	/* P-24: past the end the radio echoes the header and *then* NAKs. */
 	got = rx(s, reply + 7, 1, MC_T_BYTE);
+	if (got == 1 && reply[7] == 0x15)
+		s->last_nak_header = 1;
 	if (got == 1 && reply[7] == 0x15)
 		return 0;
 	if (got != 1)

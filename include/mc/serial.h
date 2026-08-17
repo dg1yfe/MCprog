@@ -48,6 +48,14 @@ void mc_serial_defaults(mc_serial_opts *o);
 mc_transport *mc_serial_open(const char *device, const mc_serial_opts *o, char *err, size_t errsz);
 void mc_serial_close(mc_transport *t);
 
+/* Drive DTR and RTS explicitly: 1 asserts, 0 de-asserts, -1 leaves the line alone.  Returns 0, or
+ * -1 if the platform cannot do it -- a pseudo-terminal has no such lines.
+ *
+ * Neither line is modem control here.  DTR supplies the interface's level shifter and RTS drives
+ * the radio's HUB/PGM input, which selects programming mode; this exists so the selftest can find
+ * out which combination a real radio actually answers on (P-11). */
+int mc_serial_set_lines(mc_transport *t, int dtr, int rts);
+
 #ifndef _WIN32
 /* Wrap a file descriptor that is already open -- used to run the protocol over a pty pair, which
  * is how the transport is tested without a radio. */

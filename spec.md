@@ -61,6 +61,9 @@ clear, `CSTOPB` clear, `CRTSCTS` clear, and `ISTRIP`/`INPCK`/`PARMRK`/`IXON`/`IX
 explicitly. **[S]**
 **P-12** On open: `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms. **[S]**
 
+> `mcprog --port DEV --selftest report.md` settles this empirically: it tries all four DTR/RTS
+> combinations and reports which ones the radio answers on.
+>
 > Neither line is doing modem control, and nothing here is a handshake. In the interface of
 > `doc/ANALYSIS.md` §3, **DTR supplies the level shifter's negative rail** and **RTS drives the
 > radio's HUB/PGM input, which is what puts the radio into programming mode** -- reported by the

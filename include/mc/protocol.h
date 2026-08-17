@@ -57,6 +57,7 @@ typedef struct {
 	mc_transport *t;
 	int pending_ack;       /* a read block is waiting to be acknowledged (see mc_read_block) */
 	unsigned last_burn_ms; /* gap between the two write ACKs, for P-25 diagnostics */
+	int last_nak_header;   /* P-24: 1 = the end-of-memory NAK arrived behind an echoed header */
 	unsigned t_rx;         /* clock reading when the last byte arrived */
 	char err[200];
 	/* Optional wire log, for the U-4 protocol page.  `tx` is 1 for PC->radio. */

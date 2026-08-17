@@ -34,6 +34,7 @@
 #include "mc/codeplug.h"
 #include "mc/serial.h"
 #include "mc/tui.h"
+#include "mc/selftest.h"
 #include "mc/write.h"
 
 static uint8_t img_bytes[MC_IMG_MAX];
@@ -53,6 +54,9 @@ static void usage(FILE *f)
 	        "  mcprog --port DEV --identify     print what the radio says it is\n"
 	        "  mcprog --dump-vec file.DAT       print the conformance decode of a file\n"
 	        "  mcprog --list-models             describe every model this build knows\n"
+	        "\n"
+	        "  mcprog --port DEV --selftest report.md       first contact with a real radio:\n"
+	        "                                              probe, measure, and write a report\n"
 	        "\n"
 	        "  mcprog --port DEV --enable-write            read, edit, then 'w' writes it back\n"
 	        "  mcprog --port DEV --write f.DAT --enable-write   write a file to the radio\n"
@@ -260,7 +264,7 @@ static int do_write(void *ctx, const mc_image *img, char *msg, size_t msgsz)
 int main(int argc, char **argv)
 {
 	const char *port = NULL, *readto = NULL, *want = NULL, *logpath = NULL, *file = NULL;
-	const char *writefrom = NULL;
+	const char *writefrom = NULL, *selftest = NULL;
 	int identify = 0, dumpvec = 0, enable_write = 0, i;
 	mc_serial_opts o;
 	const mc_model *model = NULL;
@@ -286,6 +290,8 @@ int main(int argc, char **argv)
 			identify = 1;
 		else if (!strcmp(argv[i], "--dump-vec"))
 			dumpvec = 1;
+		else if (!strcmp(argv[i], "--selftest") && i + 1 < argc)
+			selftest = argv[++i];
 		else if (!strcmp(argv[i], "--list-models")) {
 			list_models();
 			return 0;
@@ -307,6 +313,27 @@ int main(int argc, char **argv)
 	if (!port && !file) {
 		usage(stderr);
 		return 2;
+	}
+	if (selftest) {
+		mc_selftest_opts so;
+		char trace[300], plug[300];
+		if (!port) {
+			fprintf(stderr, "mcprog: --selftest needs --port\n");
+			return 2;
+		}
+		snprintf(trace, sizeof trace, "%s.trace", selftest);
+		snprintf(plug, sizeof plug, "%s.dat", selftest);
+		memset(&so, 0, sizeof so);
+		so.port = port;
+		so.opts = &o;
+		so.report_path = selftest;
+		so.trace_path = logpath ? logpath : trace;
+		so.codeplug_path = readto ? readto : plug;
+		so.probe_lines = 1;
+		/* The write probe rewrites the radio's own bytes, so nothing about the radio changes --
+		 * but it is still a write, and W-1 says a write needs asking for. */
+		so.write_back = enable_write;
+		return mc_selftest(&so) == 0 ? 0 : 1;
 	}
 	if (writefrom && (!port || !enable_write)) {
 		fprintf(stderr, "mcprog: --write needs --port and --enable-write\n");

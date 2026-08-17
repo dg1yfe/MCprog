@@ -199,4 +199,15 @@ void mc_serial_close(mc_transport *t)
 	CloseHandle(s->h);
 	free(s);
 }
+int mc_serial_set_lines(mc_transport *t, int dtr, int rts)
+{
+	serial *s = (serial *)t;
+	int ok = 1;
+
+	if (dtr >= 0)
+		ok &= EscapeCommFunction(s->h, dtr ? SETDTR : CLRDTR) ? 1 : 0;
+	if (rts >= 0)
+		ok &= EscapeCommFunction(s->h, rts ? SETRTS : CLRRTS) ? 1 : 0;
+	return ok ? 0 : -1;
+}
 #endif /* _WIN32 */

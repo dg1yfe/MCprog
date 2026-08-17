@@ -218,11 +218,15 @@ int mc_channel_set_freq(mc_image *img, int slot0, mc_dir dir, uint32_t hz)
 {
 	unsigned p = mc_band_p(mc_band_index(img));
 	uint8_t *f;
+	mc_channel before;
+	int was_empty;
 
 	if (slot0 < 0 || slot0 >= img->model->nchan)
 		return -1;
 	if (p == 0)
 		return -1; /* K-10: band unprogrammed, nothing is computable */
+	mc_channel_get(img, slot0, p, &before);
+	was_empty = before.state == MC_CH_EMPTY;
 	if (dir == MC_RX) {
 		if (hz < MC_IF_HZ)
 			return -1;
@@ -230,7 +234,17 @@ int mc_channel_set_freq(mc_image *img, int slot0, mc_dir dir, uint32_t hz)
 	}
 	f = half_ptr(img, slot0, dir);
 	/* The existing b0 supplies the flag bits, which this must not disturb (K-22). */
-	return mc_freq_encode(hz, p, mc_step_hz(img), f[0], f);
+	if (mc_freq_encode(hz, p, mc_step_hz(img), f[0], f) != 0)
+		return -1;
+	/* K-24a.  An empty slot's flag bits are leftovers, not settings, and on MCEZ13 clock shift is
+	 * stored inverted -- so a zeroed record reads as clock shift ON.  Programming such a channel
+	 * would silently inherit that.  Default it off; an already-programmed channel is left alone. */
+	if (was_empty) {
+		const mc_flag *cs = mc_flag_by_name(img->model, "clock_shift");
+		if (cs)
+			mc_flag_set(img, slot0, cs, 0);
+	}
+	return 0;
 }
 
 int mc_flag_get(const mc_image *img, int slot0, const mc_flag *fl)

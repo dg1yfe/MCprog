@@ -24,3 +24,4 @@ EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=set_tx slot=1 arg=145
 EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:clock_shift slot=1 arg=1 changed=001:ed:2d|039:40:00
 EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:clock_shift slot=1 arg=0 changed=none
 EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=flag:reserved_b7 slot=1 arg=1 changed=001:ed:6d|039:40:c0
+EDIT img=fixtures/ez13_default_band2.bin model=eza_cspl op=set_tx slot=5 arg=145000000 changed=001:ed:d6|051:00:42|052:00:d5

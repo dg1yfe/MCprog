@@ -262,6 +262,12 @@ def vec_edit():
             if op in ('set_tx', 'set_rx'):
                 hz = arg - (IF_HZ if op == 'set_rx' else 0)
                 half = m['tx'] if op == 'set_tx' else m['rx']
+                # K-24a: an empty slot's flag bits are leftovers.  On MCEZ13 clock shift is stored
+                # inverted, so a zeroed record reads as clock shift ON; programming it would
+                # inherit that silently.  Default it off, leaving programmed channels alone.
+                tx3 = e[o + m['tx']:o + m['tx'] + 3]
+                rx3 = e[o + m['rx']:o + m['rx'] + 3]
+                was_empty = decode(*tx3, P) == 0 and decode(*rx3, P) == 0
                 n, rem = encode(hz, P, step)
                 if n is None:
                     L.append('EDIT img=%s model=%s op=%s slot=%d arg=%d changed=unrepresentable'
@@ -271,6 +277,15 @@ def vec_edit():
                 e[o + half] = (flags & 0xF8) | ((n >> 8) & 3) | (4 if step == 3125 else 0)
                 e[o + half + 1] = n & 0xFF
                 e[o + half + 2] = rem
+                if was_empty:
+                    cs = next((f for f in FLAGS[model] if f[0] == 'clock_shift'), None)
+                    if cs:
+                        _, bit, _h, inv, _p = cs
+                        for hh in _halves(m, cs):
+                            if inv:                      # inverted: bit SET means off
+                                e[o + hh] |= 1 << bit
+                            else:
+                                e[o + hh] &= ~(1 << bit) & 0xFF
             else:
                 name = op.split(':', 1)[1]
                 fl = next(f for f in FLAGS[model] if f[0] == name)
@@ -452,7 +467,10 @@ EDITS = [
       ('flag:power_high', 1, 1)]),
     ('fixtures/ez13_default_band2.bin', 'eza_cspl',
      [('set_tx', 1, 145_000_000), ('flag:clock_shift', 1, 1), ('flag:clock_shift', 1, 0),
-      ('flag:reserved_b7', 1, 1)]),
+      ('flag:reserved_b7', 1, 1),
+      # channel 5's record is zeroed, so its inverted clock-shift bit reads ON; programming it
+      # must leave clock shift OFF (K-24a)
+      ('set_tx', 5, 145_000_000)]),
 ]
 
 SAMPLES = [

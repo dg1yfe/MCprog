@@ -226,6 +226,14 @@ Records past the terminator are stale and **must be written back unchanged**. **
 (valid number, zero frequency), and programmed. Never render an unprogrammed slot as `0.00000 MHz`.
 **[C]**
 
+**K-24a Programming an empty slot defaults clock shift OFF.** An unprogrammed record's flag bits
+are leftovers, not settings. That matters because MCEZ13 stores clock shift **inverted**, so a
+zeroed record reads as clock shift *on*: in the factory default, channels 3–8 appear to have it
+enabled purely because their records are zero, while channels 1–2 — the configured ones — do not.
+Writing a frequency into such a slot would inherit that silently. So setting a frequency on a slot
+whose state is `MC_CH_EMPTY` also clears clock shift; an already-programmed slot is left alone.
+**[C]** for the inversion, **[?]** for the default, which is our choice and not the original's.
+
 **K-30 Preserve verbatim, never compute**: reference dividers, radio type nibble, synthesiser lock
 time, the low nibble of the band byte, write counter, serial number, and every byte no field owns.
 A write must be able to justify each changed byte; refuse on any unexplained change. **[C]**

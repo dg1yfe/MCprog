@@ -24,23 +24,28 @@ CURSES ?= $(shell pkg-config --libs ncursesw 2>/dev/null || echo -lncurses)
 
 all: build/mcprog
 
-build/%.o: src/%.c | build
+HDRS := $(wildcard include/mc/*.h)
+
+# Every object depends on every header.  Coarse, but the alternative is -MMD plumbing for a dozen
+# files, and a stale object compiled against an older struct layout is a genuinely nasty failure --
+# it silently misreads every field past the one that moved.
+build/%.o: src/%.c $(HDRS) | build
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build:
 	@mkdir -p build
 
-build/mcprog: src/main.c src/ui/tui.c $(OBJ) | build
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(CURSES)
+build/mcprog: src/main.c src/ui/tui.c $(OBJ) $(HDRS) | build
+	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(CURSES)
 
-build/test_vectors: tests/test_vectors.c $(OBJ) | build
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+build/test_vectors: tests/test_vectors.c $(OBJ) $(HDRS) | build
+	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS)
 
-build/test_protocol: tests/test_protocol.c $(OBJ) | build
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+build/test_protocol: tests/test_protocol.c $(OBJ) $(HDRS) | build
+	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS)
 
-build/test_serial: tests/test_serial.c $(OBJ) | build
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS) $(LIBUTIL)
+build/test_serial: tests/test_serial.c $(OBJ) $(HDRS) | build
+	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LIBUTIL)
 
 test: build/test_vectors build/test_protocol build/test_serial
 	@./build/test_vectors $(ROOT)

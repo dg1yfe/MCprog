@@ -177,6 +177,17 @@ static void test_codeplug(const char *vecrel)
 	free(want);
 	free(got);
 
+	/* K-2: the covered range is per-model.  MCEZ13 excludes its last two bytes, and no fixture
+	 * exercises that because theirs happen to be zero -- so set one and check it is ignored. */
+	if (model->cksum_len && model->cksum_len < img.len) {
+		uint8_t keep = img.bytes[img.len - 1];
+		uint8_t before = mc_checksum_total(&img);
+		img.bytes[img.len - 1] = (uint8_t)(keep + 0x5A);
+		ok(mc_checksum_total(&img) == before, "K-2",
+		   "bytes past cksum_len are outside the checksum");
+		img.bytes[img.len - 1] = keep;
+	}
+
 	/* K-2: fixing the checksum of a deliberately corrupted copy restores the original byte */
 	{
 		uint8_t saved = img.bytes[model->cksum];

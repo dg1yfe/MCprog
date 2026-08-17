@@ -50,13 +50,15 @@ typedef struct {
 } mc_flag;
 
 /* ---- model descriptor (K-20) ---------------------------------------------------------------
- * These fields genuinely differ between models, so they are data rather than assumptions.  The
- * checksum *rule* is identical everywhere; only the byte carrying it moves.
+ * These fields genuinely differ between models, so they are data rather than assumptions -- the
+ * checksum's extent among them: MCEZ13 covers all but its last two bytes, every other model the
+ * whole device.
  */
 typedef struct {
 	const char *name;
 	uint16_t size;     /* nominal device size, bytes                                   */
 	uint16_t cksum;    /* offset of the checksum byte                                  */
+	uint16_t cksum_len;/* bytes covered by the sum; 0 = the whole device (K-2)         */
 	uint16_t chan;     /* offset of the channel table                                  */
 	uint16_t band;     /* offset of the band byte; index is bits 4-6                   */
 	uint16_t refdiv;   /* offset of the reference divider pair (2 x 16-bit big-endian) */
@@ -95,7 +97,9 @@ typedef struct {
 	size_t len;
 } mc_image;
 
-/* Checksum (K-2): the stored byte is chosen so the whole device sums to 0xFF mod 256. */
+/* Checksum (K-2).  The stored byte is chosen so the covered range sums to 0xFF mod 256.  That
+ * range is the whole device on every model but MCEZ13, which covers all but its last two bytes --
+ * so this is per-model data, not a constant. */
 uint8_t mc_checksum_stored(const mc_image *img);
 uint8_t mc_checksum_total(const mc_image *img);
 int mc_checksum_valid(const mc_image *img);

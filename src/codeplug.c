@@ -34,9 +34,14 @@ uint8_t mc_checksum_stored(const mc_image *img)
 
 uint8_t mc_checksum_total(const mc_image *img)
 {
+	/* K-2: the covered range is per-model.  MCEZ13 sums all but its last two bytes; every other
+	 * model sums the whole device. */
+	size_t n = img->model->cksum_len ? img->model->cksum_len : img->len;
 	uint8_t sum = 0;
 	size_t i;
-	for (i = 0; i < img->len; i++)
+	if (n > img->len)
+		n = img->len;
+	for (i = 0; i < n; i++)
 		sum = (uint8_t)(sum + img->bytes[i]);
 	return sum;
 }

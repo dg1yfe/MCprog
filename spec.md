@@ -134,8 +134,12 @@ frequency** (K-11). Any real mismatch aborts immediately, naming record and offs
 **K-1 Image.** The codeplug is the device's EEPROM verbatim. `.DAT` files are exactly these bytes,
 so old files load unchanged. **[C]**
 
-**K-2 Checksum.** One byte is chosen so that `sum(all N bytes) mod 256 == 0xFF`, N = device size.
-The rule is identical on every model; **only the byte carrying it moves** (K-20). **[C]**
+**K-2 Checksum.** One byte is chosen so that the covered range sums to `0xFF` mod 256. **Both the
+byte and the extent are per-model** (K-20): every model covers the whole device except **MCEZ13**,
+which covers all but its **last two bytes** — 126 of 128. That was measured off the sum loop at
+`CS:0x767E`, whose count comes from a variable, and confirmed by the comparison `cmp ax,0xff` that
+follows it. Summing the whole device on MCEZ13 gives the wrong answer whenever those last two bytes
+are non-zero. **[C]**
 
 **K-10 Frequency.** Each 3-byte field:
 
@@ -190,12 +194,12 @@ or 0 to disable; anything else is refused, never rounded (U-3). **[C]**
 
 **K-20 Model descriptor.** These genuinely vary and must be data, not assumptions:
 
-| model | size | checksum | channels | band | ref dividers |
+| model | size | checksum byte / extent | channels | band | ref dividers |
 |---|---|---|---|---|---|
 | `MCEV_56` 5/6-tone | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEV9` / `MCEV9M` SEL5 EVA | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEZ9` SEL5 EZA | 256 | 0x000 | 0x0C8, 8 × 6 | 0x082 b4-6 | 0x0C4 |
-| `MCEZ13` CS/PL | 128/256/512/1024 | **0x003** | 0x03B, 8 × 6 | 0x039 b4-6 | 0x004 |
+| `MCEZ13` CS/PL | 128/256/512/1024 | **0x001**, covers 126 | 0x039, 8 × 6 | 0x037 b4-6 | 0x002 |
 
 **K-21 Channel record.** EVA: `+0` BCD number, `+1` trakmode, `+2..4` TX, `+5..7` RX. EZA: `+0..2`
 TX, `+3..5` RX, with no number and no trakmode byte. **[C]**

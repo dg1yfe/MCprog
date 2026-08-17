@@ -42,7 +42,8 @@ MODELS = {
                      band=0x0DC, refdiv=0x0D4, numbered=True),
     'eza_sel5': dict(size=256, cksum=0x000, chan=0x0C8, nchan=8, stride=6, tx=0, rx=3,
                      band=0x082, refdiv=0x0C4, numbered=False),
-    'eza_cspl': dict(size=128, cksum=0x001, chan=0x039, nchan=8, stride=6, tx=0, rx=3,
+    # MCEZ13's checksum covers 126 of its 128 bytes, not the whole device
+    'eza_cspl': dict(size=128, cksum=0x001, cklen=126, chan=0x039, nchan=8, stride=6, tx=0, rx=3,
                      band=0x037, refdiv=0x002, numbered=False),
 }
 # --- per-model channel flag bits, spec K-22 ----------------------------------------------------
@@ -132,7 +133,8 @@ def vec_codeplug(path, model, band_hint=None):
          'IMG    %s' % path,
          'MODEL  %s size=%d' % (model, len(e)),
          'SUM    stored=0x%02x total=0x%02x valid=%d'
-         % (e[m['cksum']], sum(e) & 0xFF, 1 if sum(e) & 0xFF == 0xFF else 0)]
+         % (e[m['cksum']], sum(e[:m.get('cklen') or len(e)]) & 0xFF,
+            1 if sum(e[:m.get('cklen') or len(e)]) & 0xFF == 0xFF else 0)]
     band = (e[m['band']] >> 4) & 7
     P = P_BY_BAND.get(band)
     L.append('BAND   index=%d p=%s raster=%d' % (band, P if P else 'none', (e[m['band']] >> 7) & 1))

@@ -10,7 +10,7 @@ radio; none contains Motorola code.
 | `eva9_ident.bin` | the **41-byte** ident the radio returns to the **`*`** command: `EV9.01.00.11 455M11-3     5/6 Tone radio` + 0x1A | same capture, nibble-decoded |
 | `ev9_default.bin` | **the factory default codeplug for the SEL5 EVA family** — what `MCEV9R`'s `INITIALIZE` writes to a blank radio | reconstructed from `MCEV9R_rt.bin`, see below |
 | `eza9_default_band[1-4].bin` | **factory default codeplugs for the SEL5 EZA 9**, 256 bytes each, one per RF range | captured from `MCEZ9R`'s `INITIALIZE`, see below |
-| `ez13_default_band[1-4].bin` | **factory default codeplugs for the CS/PL EZA 1/3**, 128 bytes each (the `1 x 128` EEPROM configuration) | captured from `MCEZ13R`'s `INITIALIZE` |
+| `ez13_default_band[1-4].bin` | **factory default codeplugs for the CS/PL EZA 1/3**, 128 bytes each (the `1 x 128` EEPROM configuration) | captured from `MCEZ13R`'s `INITIALIZE`, **re-aligned** — see below |
 
 ## `ev9_default.bin`
 
@@ -98,3 +98,22 @@ slot count, and the band and reference-divider offsets.
 Channel 1 reads `de2000` / `5e6220` → 136.000000 MHz and an LO of 152.600000 MHz, which is
 174.000000 − 21.4 MHz. The `0x80` difference between the two `b0` bytes is the clock-shift bit,
 answered `N` here, consistent with its documented position at bit 7 of the RX half on this model.
+
+
+## The MCEZ13 fixtures are re-aligned (2026-08)
+
+These four were captured verbatim from what `MCEZ13R` puts on the wire, and that turned out to be
+**two bytes longer at the front than the codeplug proper**. The editor emits a two-byte header
+before the 126 codeplug bytes; its own reader expects the codeplug at offset 0 and looks for the
+reference dividers at `0x002`. Served verbatim, every read failed with `UNIT NOT IDENTIFIED`.
+
+Dropping those two bytes (and padding two at the end, to keep the 128-byte device size) makes the
+same image read `EEPROM WITH 128 BYTE / READING OK` **with the editor's own checksum byte
+untouched**, and puts `1681 1201` where the `REF_DIV.001` lookup expects them. `tools/eza.py` now
+strips the prefix at capture time.
+
+The likeliest reading, and the radio owner's: **the radio swallows those two bytes** — they are
+consumed by the device or are a short message to the firmware — which would make write and read
+consistent on real hardware and inconsistent only against a simulator that stores everything it is
+sent. Answering `)02` with a header distinct from the codeplug does make writes succeed, which
+supports it. It remains a hypothesis until a radio settles it.

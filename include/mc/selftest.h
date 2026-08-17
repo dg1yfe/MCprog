@@ -23,22 +23,29 @@
  */
 /* First contact with a real radio -- M6.
  *
- * TEMPORARY.  This exists to answer, in one run, the questions that only hardware can settle, and
- * to produce a report someone can paste into an issue.  Once the answers are in spec.md it should
- * be deleted: it is one .c, one .h, and one `--selftest` branch in main.c, deliberately touching
- * nothing else so that removing it is a clean subtraction.
+ * This exists to answer, in one run, the questions that only hardware can settle, and to produce a
+ * report someone can paste into an issue.  It is one .c, one .h, and one `--selftest` branch in
+ * main.c, deliberately touching nothing else, so that deleting it stays a clean subtraction
+ * whenever it has served its purpose.
+ *
+ * The first radio through it -- an EZA 9, 17 Aug 2026 -- corrected four things (see spec.md P-20,
+ * P-22, P-23, P-24) and found two defects in this file.  Radios are scarce enough that it earns its
+ * place until several more have been through it.
  *
  * What it is for, in order of how much is riding on it:
  *
- *   1. P-11/P-12, the control lines.  MCprog leaves DTR de-asserted and asserts RTS, on the reading
- *      that a de-asserted line sits at its negative level and that is what the interface's level
- *      shifter draws from, while RTS drives the radio's HUB/PGM input.  Nothing has ever tested it.
- *      The selftest tries all four combinations and reports which ones the radio answers.  If the
- *      answer is not the one MCprog uses, everything else fails and this says why in ten seconds
- *      instead of an evening.
- *   2. P-24, which of the two end-of-memory NAK forms this radio uses.
- *   3. P-20, whether the ident really is answered more than once per power-up.
- *   4. `)02`, which appears in neither capture and whose reply is therefore unknown.
+ *   1. P-11/P-12, the control lines.  MCprog leaves DTR de-asserted and asserts RTS.  The first
+ *      radio answered on that combination and on DTR asserted, and was silent whenever RTS was
+ *      de-asserted -- so RTS is what selects programming mode, and it has never come back within a
+ *      session once dropped.
+ *      The selftest therefore tries combinations in turn and STOPS at the first that answers,
+ *      keeping that port open for the rest of the run.  If the working combination is not the one
+ *      MCprog uses by default, everything else would fail; this says so in ten seconds rather than
+ *      costing an evening.
+ *   2. P-24, which of the two end-of-memory NAK forms this radio uses -- both are real: the EVA
+ *      captures echo the header first, the EZA 9 NAKs bare.
+ *   3. P-20, the ident: its length is per-model, and whether it is answered more than once.
+ *   4. `)02`, measured at last on the EZA 9 as a plain two-byte read.
  *   5. P-25's burn delay and P-30's byte timeout, measured rather than assumed.
  *
  * Read-only unless `write_back` is set, and even then the only thing written is the codeplug the

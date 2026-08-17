@@ -4,8 +4,9 @@
 # AAKBAD ms=<n>               outside 16-1984: refused, never clamped (U-3)
 # AAKMAP model=<m> off=<off>  0 where the field is not established for that model
 #
-# The seven ms values below are the ones driven through MCEZ9R and read back off the
-# wire; the counts are what the 1987 software actually stored.
+# 16/32/208/500/1000/1500/1984 ms were driven through MCEZ9R and read back off the wire;
+# the counts are what the 1987 software actually stored.  203 is the factory default,
+# which is what the editor shows for the count it ships with.
 AAKENC ms=16 count=1
 AAKENC ms=32 count=2
 AAKENC ms=203 count=13

@@ -148,6 +148,8 @@ DEC raw=d64444 p=80 hz=145212500 canon=1
 DEC raw=d80000 p=80 hz=0 canon=1
 DEC raw=de2000 p=80 hz=136000000 canon=1
 DEC raw=5e6220 p=80 hz=152600000 canon=1
+DEC raw=de5720 p=80 hz=149850000 canon=1
+DEC raw=5e1410 p=80 hz=133050000 canon=1
 DEC raw=400000 p=80 hz=0 canon=1
 DEC raw=000000 p=80 hz=0 canon=1
 ENC hz=145000000 p=80 step=3125 flags=96 want=964400

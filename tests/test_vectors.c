@@ -590,6 +590,7 @@ int main(int argc, char **argv)
 		"testdata/codeplug/ev9_default.vec",
 		"testdata/codeplug/eza9_default_band2.vec",
 		"testdata/codeplug/eza9_programmed.vec",
+		"testdata/codeplug/eza9_radio.vec",
 		"testdata/codeplug/ez13_default_band2.vec",
 	};
 	size_t i;

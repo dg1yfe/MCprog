@@ -9,6 +9,7 @@ radio; none contains Motorola code.
 | `eva9_real.bin` | 512-byte codeplug of a real MC micro EVA 9 (SEL5), VHF band 2, 24 channels programmed, test channel 145.175 MHz | reconstructed from the hardware read session `captures/mcm_read_eva9_*.txt` |
 | `eva9_ident.bin` | the **41-byte** ident the radio returns to the **`*`** command: `EV9.01.00.11 455M11-3     5/6 Tone radio` + 0x1A | same capture, nibble-decoded |
 | `ev9_default.bin` | **the factory default codeplug for the SEL5 EVA family** — what `MCEV9R`'s `INITIALIZE` writes to a blank radio | reconstructed from `MCEV9R_rt.bin`, see below |
+| `eza9_radio.bin` | **256-byte codeplug read off a real EZA 9**, VHF band 2, 8 channels all TX 149.85000 / RX 154.45000 MHz | `mcprog --selftest`, 17 Aug 2026 — the only fixture here that came from hardware rather than from the 1987 software |
 | `eza9_default_band[1-4].bin` | **factory default codeplugs for the SEL5 EZA 9**, 256 bytes each, one per RF range | captured from `MCEZ9R`'s `INITIALIZE`, see below |
 | `ez13_default_band[1-4].bin` | **factory default codeplugs for the CS/PL EZA 1/3**, 128 bytes each (the `1 x 128` EEPROM configuration) | captured from `MCEZ13R`'s `INITIALIZE`, **re-aligned** — see below |
 
@@ -117,3 +118,24 @@ consumed by the device or are a short message to the firmware — which would ma
 consistent on real hardware and inconsistent only against a simulator that stores everything it is
 sent. Answering `)02` with a header distinct from the codeplug does make writes succeed, which
 supports it. It remains a hypothesis until a radio settles it.
+
+## `eza9_radio.bin` — the first real EZA 9 (2026-08)
+
+Every other EZA fixture was synthesised by driving the 1987 software under emulation. This one was
+read out of a radio by `mcprog --selftest` over the hand-built interface, and it is what confirmed
+the map:
+
+| claim, derived without ever having the radio | what came back |
+|---|---|
+| 256 bytes, 4 records then a NAK | 4 records, bare NAK at `0x0100` |
+| checksum sums to `0xFF` (K-2) | stored `0xFB`, total `0xFF` |
+| reference dividers `16 81 12 01` at `0x0C4` | `1681 1201` |
+| band index in `0x082` bits 4-6 | 2, raster bit set |
+| 8 channels x 6 bytes at `0x0C8` | 8 programmed, all TX 149.85000 / RX 154.45000 |
+| auto-ack delay at `0x076` (K-15) | `0x0D` = 203 ms, the factory default |
+
+Its ident is 37 bytes — `EZ9.00.02.03 Copr,1987 Motorola GmbH` + `0x1A` — four shorter than the
+EVA's, which is why `P-20` now says the length is per-model and `0x1A` is the terminator to trust.
+
+All eight channels carry the same pair, so this fixture exercises a fully programmed table with no
+terminator; `eza9_programmed.bin` remains the one with distinct frequencies per slot.

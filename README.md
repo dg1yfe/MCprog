@@ -37,13 +37,14 @@ report wants.
 | codeplug library | five models, decode and edit |
 | protocol library | replays all three hardware captures byte for byte |
 | TUI | channel list, per-channel editor, save with checksum |
-| serial transport | POSIX (tested) and Win32 (compiles, **never run on hardware**) |
+| serial transport | POSIX — **read from a real radio, 17 Aug 2026** — and Win32 (compiles, never run on hardware) |
 | writing | gated, backed up and verified; W-5 (write counter) deliberately omitted |
-| reading a real radio | **untested** — needs the interface cable |
-| writing a real radio | **untested** — same |
+| reading a real radio | **done** — an EZA 9, 256 bytes, every mapped field as predicted |
+| writing a real radio | **untested** |
 
-Nothing here has yet touched a physical radio. Everything is verified against captured hardware
-sessions, against a fake radio on a pty, and against the original software running under emulation.
+One radio has been read end to end, and `fixtures/eza9_radio.bin` is what came back. Everything
+else is verified against captured hardware sessions, against a fake radio on a pty, and against the
+original software running under emulation. **Nothing has ever been written to a real radio.**
 
 ### First contact with a real radio
 
@@ -69,8 +70,9 @@ own choice — DTR de-asserted, RTS asserted — has never been tested against h
 wrong nothing else would work; the selftest finds that out in ten seconds and carries on using
 whatever did answer, so you still get a full report.
 
-`--selftest` is temporary. It exists for this milestone and will be removed once its answers are
-folded into `spec.md`.
+The first radio through it — an EZA 9, 17 Aug 2026 — corrected four clauses of the spec and found
+two bugs in the selftest itself. Please keep the report and its wire log; if you have a model that
+has never been read, that run is worth more than anything the emulator can produce.
 
 ### Trying it without a radio
 

@@ -519,6 +519,7 @@ SAMPLES = [
     ('fixtures/eva9_real.bin', 'eva_sel5'), ('fixtures/ev9_default.bin', 'eva_sel5'),
     ('fixtures/eza9_default_band2.bin', 'eza_sel5'),
     ('fixtures/eza9_programmed.bin', 'eza_sel5'),
+    ('fixtures/eza9_radio.bin', 'eza_sel5'),   # the only fixture read off real hardware
     ('fixtures/ez13_default_band2.bin', 'eza_cspl'),
 ]
 

@@ -13,14 +13,26 @@ CFLAGS  ?= -O2 -g
 CFLAGS  += -std=c99 -Wall -Wextra -Wshadow -Wconversion -Iinclude
 LDFLAGS ?=
 
+# glibc hides POSIX and BSD declarations when __STRICT_ANSI__ is set, which -std=c99 does, so on
+# Linux ask for the default feature set explicitly.  Without it strtok_r, cfmakeraw, openpty,
+# nanosleep and clock_gettime are all implicitly declared -- a hard error on GCC 14 and later.
+# Darwin must NOT be given _POSIX_C_SOURCE: there it would hide cfmakeraw and openpty instead.
+UNAME   := $(shell uname -s)
+ifeq ($(UNAME),Linux)
+CFLAGS  += -D_DEFAULT_SOURCE
+endif
+
 # serial_win32.c self-excludes with #ifdef _WIN32, so it can sit in SRC on every platform.
 SRC   := src/codeplug.c src/model.c src/dump.c src/protocol.c src/replay.c \
          src/fakeradio.c src/serial_posix.c src/serial_win32.c
 OBJ   := $(SRC:src/%.c=build/%.o)
 ROOT  ?= .
 
-LIBUTIL ?= $(shell uname -s | grep -q Linux && echo -lutil)
-CURSES ?= $(shell pkg-config --libs ncursesw 2>/dev/null || echo -lncurses)
+# openpty lives in libutil on glibc; it is in libc on Darwin.
+LIBUTIL ?= $(if $(filter Linux,$(UNAME)),-lutil,)
+# --cflags matters: a distro shipping only ncursesw puts its header under /usr/include/ncursesw.
+CURSES  ?= $(shell pkg-config --libs ncursesw 2>/dev/null || echo -lncurses)
+CURSESI ?= $(shell pkg-config --cflags ncursesw 2>/dev/null)
 
 all: build/mcprog
 
@@ -36,7 +48,7 @@ build:
 	@mkdir -p build
 
 build/mcprog: src/main.c src/ui/tui.c $(OBJ) $(HDRS) | build
-	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(CURSES)
+	$(CC) $(CFLAGS) $(CURSESI) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(CURSES)
 
 build/test_vectors: tests/test_vectors.c $(OBJ) $(HDRS) | build
 	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS)

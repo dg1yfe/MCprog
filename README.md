@@ -56,8 +56,19 @@ make          # build mcprog
 make check    # conformance suite, pty smoke test, Windows cross-compile
 ```
 
-Windows via MSYS2/mingw-w64. `make win-check` cross-compiles the portable core and the Win32
-transport from a Unix host; the TUI needs curses, so it is built under MSYS2.
+| host | needs | notes |
+|---|---|---|
+| Linux | `build-essential`, `libncurses-dev`, `pkg-config` | the Makefile adds `-D_DEFAULT_SOURCE` and links `-lutil` there |
+| macOS | Xcode command line tools | ncurses ships with the SDK |
+| Windows | MSYS2 / mingw-w64 | `make win-check` cross-compiles the portable core and the Win32 transport from a Unix host; the TUI needs curses, so build it under MSYS2 |
+
+The Linux flags are not cosmetic. `-std=c99` defines `__STRICT_ANSI__`, and glibc then hides
+`strtok_r`, `cfmakeraw`, `openpty`, `nanosleep` and `clock_gettime` — implicit declarations, which
+GCC 14 treats as errors. Darwin must *not* be given `_POSIX_C_SOURCE`, where it would hide
+`cfmakeraw` and `openpty` instead, so the define is conditioned on `uname`.
+
+> **Tested on macOS only.** The Linux and Windows paths are reasoned and, for Windows,
+> cross-compiled — but neither has been built and run on its own host. Reports welcome.
 
 ## How it is verified
 

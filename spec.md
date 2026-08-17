@@ -207,6 +207,20 @@ radio). The low nibble of the mode byte and of the count byte are not understood
 preserved (K-30) — the count's low nibble is a selectable-lockout marker. Range is 67.0–250.3 Hz,
 or 0 to disable; anything else is refused, never rounded (U-3). **[C]**
 
+**K-15 Auto-acknowledge delay.** One byte, `round(ms / 15.625)` — a count of 1/64 second — range
+1–127, i.e. 16–1984 ms. Radio-wide. Only the EZA 9 map has it, at `0x076`. Bit 7 is never set by
+the original software and its meaning is unknown, so it is preserved (K-30) and the value is the
+low seven bits. Values outside 16–1984 ms are refused, never clamped (U-3). **[C]**
+
+> Measured in both directions against `MCEZ9R`: seven values written and read back through the
+> radio, six planted and displayed, exact at every point including the software's own stated bounds
+> of 16 and 1984 ms; 2000 ms is refused and writes nothing. See `../doc/EEPROM_MAP_EZA.md`.
+>
+> **Only the repair build exposes this field.** The standard and master builds never ask for it,
+> which is why it went unmapped for so long — and why "the editor never mentions that byte" is
+> evidence about the *build*, not about the byte (`../doc/BUILD_VARIANTS.md`). What the radio's
+> firmware does with `0x076` is inferred, not shown: the firmware is internal mask ROM. **[?]**
+
 > **MCEZ13 is deliberately absent.** Its PL decoder and encoder tables at `0x010` and `0x024` are
 > known, but whether they are indexed per channel is not established, and the model's read is still
 > blocked (see `../doc/EEPROM_MAP_EZA.md`). A programmer that guessed here could write a codeplug

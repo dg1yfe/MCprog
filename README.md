@@ -96,7 +96,7 @@ shifter and RTS drives the radio's HUB/PGM input, which is what selects programm
 |---|---|---|---|
 | `eva_56` | 512 B | 32 | MCEV 5/6-tone |
 | `eva_sel5` | 512 B | 32 | MCEV9 / MCEV9M, SEL5 |
-| `eza_sel5` | 256 B | 8 | MCEZ9, SEL5 |
+| `eza_sel5` | 256 B | 8 | MCEZ9, SEL5 — also the auto-acknowledge delay (`o`), which only the 1987 *repair* build ever exposed |
 | `eza_cspl` | 128 B | 8 | MCEZ13, carrier squelch / PL |
 
 ## Build

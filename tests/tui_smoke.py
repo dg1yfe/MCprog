@@ -141,6 +141,27 @@ check('encode' in out and 'decode' in out,
       'MCEZ13 PL page shows both an encoder and a decoder list')
 check('67.0 Hz' in out, 'and the factory default reads 67.0 Hz, not a "no decode" sentinel')
 
+# K-15: the auto-acknowledge delay, on the one model whose offset is measured.
+_, _, out = drive([b' ', b'o'], 'fixtures/eza9_default_band2.bin')
+check('auto-acknowledge delay' in out, 'the options page shows the auto-acknowledge delay')
+check('203 ms' in out, 'and the factory default reads 203 ms')
+
+before, after, out = drive([b' ', b'o', CR, b'1000', CR, ESC, b's', b' ', b'q'],
+                           'fixtures/eza9_default_band2.bin')
+diff = {i for i in range(len(before)) if before[i] != after[i]}
+check(diff == {0x000, 0x076}, 'editing it moves only 0x076 and the checksum, got %s'
+      % sorted(map(hex, diff)))
+check(after[0x076] == 64, 'and 1000 ms is stored as a count of 64')
+check(sum(after) & 0xFF == 0xFF, 'checksum valid after the edit')
+
+before, after, out = drive([b' ', b'o', CR, b'2000', CR], 'fixtures/eza9_default_band2.bin')
+check(before == after, 'U-3: 2000 ms is out of range and nothing is written')
+check('refused' in out, 'U-3: and the refusal says so')
+
+# A model with no measured offset must say so rather than offer a field it cannot place.
+_, _, out = drive([b' ', b'o'], 'fixtures/eva9_real.bin')
+check('no radio-wide options' in out, 'a model without the field says so instead of guessing')
+
 # The EZA models have different flags entirely (K-22).
 _, _, out = drive([b' ', CR], 'fixtures/ez13_default_band2.bin')
 check('clock_shift' in out, 'MCEZ13 exposes clock_shift')

@@ -396,6 +396,112 @@ static void test_pl(void)
 
 /* ---- edits (K-11, K-22, K-30, U-3) ---------------------------------------------------------- */
 
+/* K-15, the auto-acknowledge delay.  Only the repair build of the 1987 software exposes it, so
+ * every number here traces back to driving that build; see ../doc/BUILD_VARIANTS.md. */
+static void test_aak(void)
+{
+	char *vec = slurp("testdata/aak/aak.vec", NULL), *line, *save;
+	if (!vec)
+		return;
+	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+		char mname[64];
+		unsigned ms, count, off;
+
+		if (sscanf(line, "AAKENC ms=%u count=%u", &ms, &count) == 2) {
+			ok(mc_aak_encode_ms(ms) == count, "K-15", "encode round(ms / 15.625)");
+		} else if (sscanf(line, "AAKDEC count=%u ms=%u", &count, &ms) == 2) {
+			ok(mc_aak_decode_count(count) == ms, "K-15", "decode round(count x 15.625)");
+		} else if (sscanf(line, "AAKBAD ms=%u", &ms) == 1) {
+			size_t len = 0;
+			uint8_t *b = (uint8_t *)slurp("fixtures/eza9_default_band2.bin", &len);
+			if (b) {
+				mc_image im;
+				uint8_t was;
+				im.model = mc_model_by_name("eza_sel5");
+				im.bytes = b;
+				im.len = len;
+				was = b[im.model->aak];
+				ok(mc_aak_set_ms(&im, ms) != 0, "U-3", "an out-of-range delay is refused");
+				ok(b[im.model->aak] == was, "U-3", "and nothing is written when it is");
+				free(b);
+			}
+		} else if (sscanf(line, "AAKMAP model=%63s off=%x", mname, &off) == 2) {
+			const mc_model *m = mc_model_by_name(mname);
+			if (!m) {
+				failf("K-15", "unknown model %s", mname);
+				continue;
+			}
+			ok(m->aak == off, "K-15", "the per-model offset matches");
+			ok(mc_aak_supported(m) == (off != 0), "K-15",
+			   "and a model without a measured offset reports no support");
+		}
+	}
+	free(vec);
+
+	/* Through a real image: set it, read it back, and check that nothing else moved -- including
+	 * bit 7, which the original never sets and whose meaning is unknown (K-30). */
+	{
+		size_t len = 0;
+		uint8_t *b = (uint8_t *)slurp("fixtures/eza9_default_band2.bin", &len);
+		if (b) {
+			mc_image im;
+			uint8_t before[256];
+			size_t i, moved = 0;
+			im.model = mc_model_by_name("eza_sel5");
+			im.bytes = b;
+			im.len = len;
+			memcpy(before, b, len);
+
+			ok(mc_aak_get_ms(&im) == 203, "K-15", "the factory default reads 203 ms");
+			ok(mc_aak_set_ms(&im, 500) == 0, "K-15", "500 ms is accepted");
+			ok(mc_aak_get_ms(&im) == 500, "K-15", "and reads back as 500 ms");
+			ok(b[im.model->aak] == 32, "K-15", "stored as a count of 32");
+			for (i = 0; i < len; i++)
+				moved += b[i] != before[i];
+			ok(moved == 1, "K-30", "and only that one byte moved");
+
+			/* bit 7 is preserved, not overwritten */
+			b[im.model->aak] |= 0x80;
+			ok(mc_aak_get_ms(&im) == 500, "K-15", "bit 7 is not part of the value");
+			ok(mc_aak_set_ms(&im, 1000) == 0, "K-15", "a further edit is accepted");
+			ok((b[im.model->aak] & 0x80) != 0, "K-30",
+			   "and leaves bit 7 exactly as it found it");
+			ok((b[im.model->aak] & 0x7F) == 64, "K-15", "while storing the new count");
+
+			ok(mc_aak_set_ms(&im, MC_AAK_MIN_MS) == 0, "K-15", "the bottom of the range works");
+			ok(mc_aak_get_ms(&im) == MC_AAK_MIN_MS, "K-15", "and round-trips");
+			ok(mc_aak_set_ms(&im, MC_AAK_MAX_MS) == 0, "K-15", "so does the top");
+			ok(mc_aak_get_ms(&im) == MC_AAK_MAX_MS, "K-15", "and round-trips");
+
+			/* a count of 0 means "nothing here", not 0 ms */
+			b[im.model->aak] = 0;
+			ok(mc_aak_get_ms(&im) == 0, "K-15", "a stored count of 0 reads as unset");
+			free(b);
+		}
+	}
+	/* A model without the field must refuse rather than write at some guessed offset. */
+	{
+		size_t len = 0;
+		uint8_t *b = (uint8_t *)slurp("fixtures/eva9_real.bin", &len);
+		if (b) {
+			mc_image im;
+			uint8_t before[512];
+			size_t i, moved = 0;
+			im.model = mc_model_by_name("eva_sel5");
+			im.bytes = b;
+			im.len = len;
+			memcpy(before, b, len);
+			ok(!mc_aak_supported(im.model), "K-15", "the EVA has no measured AAK offset");
+			ok(mc_aak_get_ms(&im) == 0, "K-15", "so it reports nothing");
+			ok(mc_aak_set_ms(&im, 500) != 0, "K-15", "and refuses to set it");
+			for (i = 0; i < len; i++)
+				moved += b[i] != before[i];
+			ok(moved == 0, "K-30", "writing not one byte in the attempt");
+			free(b);
+		}
+	}
+}
+
 static void test_edits(void)
 {
 	char *vec = slurp("testdata/edit/edits.vec", NULL), *line, *save;
@@ -495,6 +601,7 @@ int main(int argc, char **argv)
 	test_freq();
 	test_edits();
 	test_pl();
+	test_aak();
 	test_parity();
 
 	printf("\n%d passed, %d FAILED\n", pass, fail);

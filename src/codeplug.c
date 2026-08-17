@@ -342,6 +342,52 @@ unsigned mc_pl_decode(uint16_t word)
 	return ((unsigned)word * 10000u + 3992u) / 7984u;
 }
 
+/* ---- auto-acknowledge delay, K-15 ------------------------------------------------------------
+ * The count is 1/64 s.  Integer arithmetic throughout, with the halves added by hand, so that the
+ * result does not depend on a floating-point mode: 15.625 = 15625/1000, and 1/64 s exactly.
+ */
+int mc_aak_supported(const mc_model *m)
+{
+	return m->aak != 0;
+}
+
+unsigned mc_aak_encode_ms(unsigned ms)
+{
+	return (ms * 64u + 500u) / 1000u; /* round(ms / 15.625) */
+}
+
+unsigned mc_aak_decode_count(unsigned count)
+{
+	return (count * 15625u + 500u) / 1000u; /* round(count x 15.625) */
+}
+
+unsigned mc_aak_get_ms(const mc_image *img)
+{
+	unsigned count;
+
+	if (!mc_aak_supported(img->model) || img->len <= img->model->aak)
+		return 0;
+	count = img->bytes[img->model->aak] & 0x7Fu; /* bit 7 is not part of the value */
+	return count ? mc_aak_decode_count(count) : 0;
+}
+
+int mc_aak_set_ms(mc_image *img, unsigned ms)
+{
+	unsigned count;
+	uint8_t *b;
+
+	if (!mc_aak_supported(img->model) || img->len <= img->model->aak)
+		return -1;
+	if (ms < MC_AAK_MIN_MS || ms > MC_AAK_MAX_MS)
+		return -1; /* U-3: refuse, never clamp */
+	count = mc_aak_encode_ms(ms);
+	if (count < 1 || count > 127)
+		return -1; /* unreachable from the range check above; kept so the law is enforced here */
+	b = &img->bytes[img->model->aak];
+	*b = (uint8_t)((*b & 0x80u) | count); /* K-30: bit 7 belongs to whoever set it */
+	return 0;
+}
+
 int mc_pl_supported(const mc_model *m)
 {
 	return m->pl_list != 0;

@@ -1,0 +1,33 @@
+# Auto-acknowledge delay, spec K-15
+# AAKENC ms=<n> count=<n>     round(ms / 15.625), the count is 1/64 s
+# AAKDEC count=<n> ms=<n>
+# AAKBAD ms=<n>               outside 16-1984: refused, never clamped (U-3)
+# AAKMAP model=<m> off=<off>  0 where the field is not established for that model
+#
+# The seven ms values below are the ones driven through MCEZ9R and read back off the
+# wire; the counts are what the 1987 software actually stored.
+AAKENC ms=16 count=1
+AAKENC ms=32 count=2
+AAKENC ms=203 count=13
+AAKENC ms=208 count=13
+AAKENC ms=500 count=32
+AAKENC ms=1000 count=64
+AAKENC ms=1500 count=96
+AAKENC ms=1984 count=127
+AAKDEC count=1 ms=16
+AAKDEC count=2 ms=31
+AAKDEC count=13 ms=203
+AAKDEC count=32 ms=500
+AAKDEC count=64 ms=1000
+AAKDEC count=96 ms=1500
+AAKDEC count=127 ms=1984
+AAKBAD ms=0
+AAKBAD ms=1
+AAKBAD ms=15
+AAKBAD ms=1985
+AAKBAD ms=2000
+AAKBAD ms=65535
+AAKMAP model=eva_56 off=000
+AAKMAP model=eva_sel5 off=000
+AAKMAP model=eza_cspl off=000
+AAKMAP model=eza_sel5 off=076

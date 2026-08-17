@@ -196,6 +196,11 @@ def vec_codeplug(path, model, band_hint=None):
             L.append('PL     mode=selectable count=%d' % n)
             L.append('PLLIST %s' % ' '.join('%.1f' % (pl_decode(w) / 10) if w else '-'
                                             for w in tones))
+    if model in AAK:
+        # bit 7 is not part of the value; count 0 means "nothing here", not 0 ms
+        count = e[AAK[model]] & 0x7F
+        L.append('AAK    %s' % ('none' if count == 0 else
+                                'ms=%d count=%d' % (aak_decode(count), count)))
     open(os.path.join(OUT, 'codeplug', os.path.basename(path).split('.')[0].lower() + '.vec'),
          'w').write('\n'.join(L) + '\n')
     return len(L)
@@ -302,6 +307,42 @@ def vec_edit():
             L.append('EDIT img=%s model=%s op=%s slot=%d arg=%d changed=%s'
                      % (path, model, op, slot, arg, chg or 'none'))
     open(os.path.join(OUT, 'edit', 'edits.vec'), 'w').write('\n'.join(L) + '\n')
+    return len(L)
+
+
+AAK = {'eza_sel5': 0x076}   # K-15: measured on the EZA 9 only
+AAK_MIN_MS, AAK_MAX_MS = 16, 1984
+
+
+def aak_encode(ms):
+    """round(ms / 15.625) -- a count of 1/64 s."""
+    return (ms * 64 + 500) // 1000
+
+
+def aak_decode(count):
+    return (count * 15625 + 500) // 1000
+
+
+def vec_aak():
+    """The auto-acknowledge delay codec, spec K-15."""
+    L = ['# Auto-acknowledge delay, spec K-15',
+         '# AAKENC ms=<n> count=<n>     round(ms / 15.625), the count is 1/64 s',
+         '# AAKDEC count=<n> ms=<n>',
+         '# AAKBAD ms=<n>               outside 16-1984: refused, never clamped (U-3)',
+         '# AAKMAP model=<m> off=<off>  0 where the field is not established for that model',
+         '#',
+         '# 16/32/208/500/1000/1500/1984 ms were driven through MCEZ9R and read back off the wire;',
+         '# the counts are what the 1987 software actually stored.  203 is the factory default,',
+         '# which is what the editor shows for the count it ships with.']
+    for ms in (16, 32, 203, 208, 500, 1000, 1500, 1984):
+        L.append('AAKENC ms=%d count=%d' % (ms, aak_encode(ms)))
+    for c in (1, 2, 13, 32, 64, 96, 127):
+        L.append('AAKDEC count=%d ms=%d' % (c, aak_decode(c)))
+    for ms in (0, 1, 15, 1985, 2000, 65535):
+        L.append('AAKBAD ms=%d' % ms)
+    for m in sorted(MODELS):
+        L.append('AAKMAP model=%s off=%03x' % (m, AAK.get(m, 0)))
+    open(os.path.join(OUT, 'aak', 'aak.vec'), 'w').write('\n'.join(L) + '\n')
     return len(L)
 
 
@@ -482,7 +523,7 @@ SAMPLES = [
 ]
 
 if __name__ == '__main__':
-    for d in ('codeplug', 'edit', 'freq', 'parity', 'pl', 'proto', 'traces'):
+    for d in ('aak', 'codeplug', 'edit', 'freq', 'parity', 'pl', 'proto', 'traces'):
         os.makedirs(os.path.join(OUT, d), exist_ok=True)
     for path, model in SAMPLES:
         n = vec_codeplug(path, model)
@@ -490,6 +531,7 @@ if __name__ == '__main__':
     print('  freq/roundtrip.vec        %d lines' % vec_freq())
     print('  edit/edits.vec            %d lines' % vec_edit())
     print('  pl/pl.vec                 %d lines' % vec_pl())
+    print('  aak/aak.vec               %d lines' % vec_aak())
     print('  proto/header.vec          %d lines' % vec_header())
     print('  parity/parity.vec         %d lines' % vec_parity())
     for src, name, note in [

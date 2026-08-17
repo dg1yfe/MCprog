@@ -52,6 +52,8 @@ static int ours(const mc_model *m, size_t off)
 		return 1;
 	if (m->pl_count && off == m->pl_count)
 		return 1;
+	if (m->aak && off == m->aak)
+		return 1;
 	if (m->pl_mode && off == m->pl_mode)
 		return 1;
 	return 0;

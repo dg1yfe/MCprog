@@ -200,7 +200,9 @@ static void draw_list(int sel, int top)
 	}
 	status(opening_note ? opening_note
 	                    : mc_pl_supported(img.model)
-	                          ? "j/k move  enter edit  p PL/CTCSS  s save  w write radio  q quit"
+	                          ? (mc_aak_supported(img.model)
+	                                 ? "j/k move  enter edit  p PL  o options  s save  w write  q quit"
+	                                 : "j/k move  enter edit  p PL/CTCSS  s save  w write radio  q quit")
 	                          : "j/k move  enter edit  s save  w write radio  q quit");
 	refresh();
 }
@@ -521,6 +523,60 @@ static void edit_pl(void)
 	}
 }
 
+/* Radio-wide settings that are not PL.  One row today; the page exists rather than a bare key so
+ * that the next radio-wide field has an obvious home. */
+static void edit_options(void)
+{
+	if (!mc_aak_supported(img.model)) {
+		status("this model has no radio-wide options MCprog can edit");
+		getch();
+		return;
+	}
+	for (;;) {
+		unsigned ms = mc_aak_get_ms(&img);
+		char buf[64], line[256];
+		int ch;
+
+		erase();
+		attron(A_BOLD);
+		mvprintw(0, 0, "radio options -- %s", path[0] ? path : "(read from radio)");
+		attroff(A_BOLD);
+		mvprintw(1, 0, "model %s   shared by the whole radio", img.model->name);
+
+		attron(A_REVERSE);
+		if (ms)
+			mvprintw(3, 0, "  auto-acknowledge delay   %4u ms   (stored as %u x 1/64 s)", ms,
+			         mc_aak_encode_ms(ms));
+		else
+			mvprintw(3, 0, "  auto-acknowledge delay   not set");
+		attroff(A_REVERSE);
+
+		mvprintw(5, 0, "How long the radio waits before sending its automatic acknowledgement.");
+		mvprintw(6, 0, "Range %u-%u ms, stored as a count of 1/64 s, so the value is rounded to",
+		         MC_AAK_MIN_MS, MC_AAK_MAX_MS);
+		mvprintw(7, 0, "the nearest 15.625 ms.");
+		mvprintw(9, 0, "Only the repair build of the 1987 software ever exposed this field.");
+
+		status("enter edit   esc back");
+		ch = getch();
+		if (ch == 27 || ch == 'q')
+			return;
+		if (ch != '\n' && ch != KEY_ENTER)
+			continue;
+		snprintf(line, sizeof line, "delay in ms (%u-%u): ", MC_AAK_MIN_MS, MC_AAK_MAX_MS);
+		if (prompt(line, buf, sizeof buf) != 0 || !buf[0])
+			continue;
+		if (mc_aak_set_ms(&img, (unsigned)atoi(buf)) != 0) {
+			snprintf(line, sizeof line, "%s is outside %u-%u ms -- refused, not clamped", buf,
+			         MC_AAK_MIN_MS, MC_AAK_MAX_MS);
+			status(line);
+			getch();
+			continue;
+		}
+		dirty = 1;
+	}
+}
+
 /* ---- entry point ----------------------------------------------------------------------------- */
 
 /* W-1.  With no writer the key still responds, and says why it will not do anything -- a disabled
@@ -591,6 +647,8 @@ int mc_tui_run(mc_image *image, const char *filepath, const char *note,
 			edit_channel(sel);
 		else if (ch == 'p')
 			edit_pl();
+		else if (ch == 'o')
+			edit_options();
 		else if (ch == 's')
 			save_file();
 		else if (ch == 'w')

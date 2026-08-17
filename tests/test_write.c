@@ -411,6 +411,39 @@ static void test_write_through(void)
 	free(real);
 }
 
+/* K-15 through the write path: an edited auto-acknowledge delay must be recognised as a byte
+ * MCprog writes (K-30), or W-3 would refuse the write it just asked the user to confirm. */
+static void test_write_aak(void)
+{
+	uint8_t *eza;
+	size_t elen;
+	const mc_model *m = mc_model_by_name("eza_sel5");
+	mc_write_report rep;
+	mc_image img;
+	uint8_t buf[256];
+	int rc, untouched;
+
+	eza = slurp("fixtures/eza9_default_band2.bin", &elen);
+	if (!eza || elen != 256)
+		return;
+	memcpy(buf, eza, elen);
+	img.model = m;
+	img.bytes = buf;
+	img.len = elen;
+
+	ok(mc_aak_set_ms(&img, 1000) == 0, "K-15", "the delay is editable on this model");
+	fixsum(&img);
+	rc = attempt(&img, eza, elen, &rep, &untouched);
+	ok(rc == 0, "K-30", "and writing the result is not refused as unaccountable");
+	if (rc != 0)
+		printf("       (%s)\n", rep.err);
+	else
+		ok(rep.changed == 2, "W-3", "exactly the delay byte and the checksum changed");
+	if (rep.backup[0])
+		remove(rep.backup);
+	free(eza);
+}
+
 /* W-2: if the backup cannot be written, nothing is written to the radio either. */
 static void test_backup_required(void)
 {
@@ -574,6 +607,7 @@ int main(int argc, char **argv)
 	printf("write (spec.md section 8)\n");
 	test_gates();
 	test_write_through();
+	test_write_aak();
 	test_backup_required();
 	test_verify_rule();
 	test_explain();

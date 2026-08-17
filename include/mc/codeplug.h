@@ -76,6 +76,7 @@ typedef struct {
 	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable; 0 = model has none  */
 	uint16_t pl_dec;   /* PL DECODER table base (MCEZ13 only); 0 = model cannot decode */
 	uint8_t pl_max;    /* entries in the list                                          */
+	uint16_t aak;      /* auto-acknowledge delay byte (K-15); 0 = not established here */
 	const char *about; /* which radios this describes, for --list-models               */
 } mc_model;
 
@@ -193,6 +194,24 @@ void mc_flag_set(mc_image *img, int slot0, const mc_flag *f, int on);
 #define MC_PL_MAX 10
 
 /* MC_PL_TABLE is for models with no mode byte at all -- MCEZ13 simply carries its tables. */
+/* ---- auto-acknowledge delay (K-15) ----------------------------------------------------------
+ * One byte, a count of 1/64 s.  Only the repair build of the original software ever asks for it,
+ * which is why it went unmapped for years; see ../doc/BUILD_VARIANTS.md.
+ */
+#define MC_AAK_MIN_MS 16   /* count 1   */
+#define MC_AAK_MAX_MS 1984 /* count 127 */
+
+int mc_aak_supported(const mc_model *m);
+/* The raw count <-> milliseconds, exposed because they are the law and are tested directly. */
+unsigned mc_aak_encode_ms(unsigned ms);
+unsigned mc_aak_decode_count(unsigned count);
+/* 0 when the model has no such field, or when the stored count is 0 -- which the original never
+ * writes, and which therefore means "nothing here", not "0 ms". */
+unsigned mc_aak_get_ms(const mc_image *img);
+/* Returns 0, or -1 if `ms` is outside 16..1984 -- refused, never clamped (U-3).  Bit 7 of the byte
+ * is left exactly as found: the original never sets it and its meaning is unknown (K-30). */
+int mc_aak_set_ms(mc_image *img, unsigned ms);
+
 typedef enum { MC_PL_OFF = 0, MC_PL_SINGLE, MC_PL_SELECTABLE, MC_PL_TABLE } mc_pl_mode;
 
 /* The standard list, index 0 = 0 meaning no PL.  Returns tenths of a Hz. */

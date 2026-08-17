@@ -76,6 +76,15 @@ void mc_dump_vec(FILE *f, const mc_image *img, const char *path)
 	else
 		dump_channels(f, img, p, live, term);
 	dump_pl(f, img);
+	if (mc_aak_supported(m)) {
+		/* K-15.  A count of 0 is not "0 ms": the original never writes one, so it means the field
+		 * carries nothing. */
+		unsigned ms = mc_aak_get_ms(img);
+		if (ms)
+			fprintf(f, "AAK    ms=%u count=%u\n", ms, mc_aak_encode_ms(ms));
+		else
+			fprintf(f, "AAK    none\n");
+	}
 }
 
 /* K-14.  With PL off the count and list bytes hold unrelated data, so rendering them as tones

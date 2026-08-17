@@ -79,10 +79,22 @@ def drive(keys, src, model=None, settle=0.30):
 
 
 def screen(out):
+    """Render the stream through a simplified terminal.
+
+    Use this only where LAYOUT matters.  For "did the program display X", assert against the raw
+    stream instead: ncurses redraws partially and differently per implementation -- Apple's ncurses
+    and Linux ncursesw emit different sequences for the same screen -- and ansi.py does not model
+    every one, so a correctly drawn field can be missing from the render.
+    """
     sys.path.insert(0, 'tests')
     from ansi import Screen
     return Screen(100, 40).feed(out.encode('latin1')).text()
 
+
+# The very first keypress must do its job, not be swallowed dismissing the model-detection note.
+_, _, out = drive([CR], 'samples/MCMICR70.DAT')
+check('TX frequency' in out, 'Enter as the first key opens the channel editor')
+check('models fit' in out or 'detected' in out, 'and the detection note is still shown')
 
 # M3's done-criterion: an edit-and-save changes only the edited field and the checksum.
 before, after, _ = drive([b' ', CR, CR, b'145.0000', CR, ESC, b's', b' ', b'q'],
@@ -102,10 +114,9 @@ check('not representable' in out, 'U-3: the refusal says why')
 
 # U-1 / K-24: neither unprogrammed nor stale rows may render as 0.00000.
 _, _, out = drive([b' '], 'fixtures/eva9_real.bin')
-txt = screen(out)
-check('171.23750' in txt and '166.43750' in txt, 'channel 1 shows its golden TX/RX')
-check('terminator' in txt, 'the end of the channel table is marked')
-check('0.00000' not in txt, 'K-24: no row renders as 0.00000 MHz')
+check('171.23750' in out and '166.43750' in out, 'channel 1 shows its golden TX/RX')
+check('terminator' in out, 'the end of the channel table is marked')
+check('0.00000' not in out, 'K-24: no row is ever written as 0.00000 MHz')
 
 # K-14: the PL page must write the tone and the mode byte, and nothing else.
 # eva9_real starts in selectable, so mode cycles selectable -> off -> single; then down to the
@@ -132,10 +143,10 @@ check('67.0 Hz' in out, 'and the factory default reads 67.0 Hz, not a "no decode
 
 # The EZA models have different flags entirely (K-22).
 _, _, out = drive([b' ', CR], 'fixtures/ez13_default_band2.bin')
-txt = screen(out)
-check('clock_shift' in txt, 'MCEZ13 exposes clock_shift')
-check('decode' not in txt.split('clock_shift')[1][:200],
-      'K-22: MCEZ13 has no per-channel decode flag')
+check('clock_shift' in out, 'MCEZ13 exposes clock_shift')
+check('reserved_b7' in out, 'and the bit it preserves but never exposes')
+check('decode' not in out and 'encode' not in out,
+      'K-22: MCEZ13 has no per-channel encode/decode flags')
 
 print('\n%d passed, %d FAILED' % (ok, bad))
 sys.exit(1 if bad else 0)

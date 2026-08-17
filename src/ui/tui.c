@@ -39,6 +39,8 @@
 #include "mc/tui.h"
 
 static uint8_t orig_bytes[MC_IMG_MAX];
+/* Shown on the status line until the first keypress -- which is then acted on, not swallowed. */
+static const char *opening_note;
 static mc_image img;
 static char path[512];
 static int dirty;
@@ -196,9 +198,10 @@ static void draw_list(int sel, int top)
 		if (slot0 == sel)
 			attroff(A_REVERSE);
 	}
-	status(mc_pl_supported(img.model)
-	           ? "up/down or j/k   enter edit   p PL/CTCSS   s save   q quit"
-	           : "up/down or j/k   enter edit   s save   q quit");
+	status(opening_note ? opening_note
+	                    : mc_pl_supported(img.model)
+	                          ? "up/down or j/k   enter edit   p PL/CTCSS   s save   q quit"
+	                          : "up/down or j/k   enter edit   s save   q quit");
 	refresh();
 }
 
@@ -350,7 +353,7 @@ static void save_file(void)
 	mc_checksum_fix(&img);
 	f = fopen(path, "wb");
 	if (!f) {
-		snprintf(msg, sizeof msg, "cannot write %s", path);
+		snprintf(msg, sizeof msg, "cannot write %.200s", path);
 		status(msg);
 		getch();
 		return;
@@ -367,8 +370,8 @@ static void save_file(void)
 		for (i = 0; i < img.len; i++)
 			if (orig_bytes[i] != img.bytes[i])
 				n++;
-		snprintf(msg, sizeof msg, "saved %s -- %u byte%s changed (checksum %02X -> %02X)", path,
-		         (unsigned)n, n == 1 ? "" : "s", before, mc_checksum_stored(&img));
+		snprintf(msg, sizeof msg, "saved %.180s -- %u byte%s changed (checksum %02X -> %02X)",
+		         path, (unsigned)n, n == 1 ? "" : "s", before, mc_checksum_stored(&img));
 	}
 	memcpy(orig_bytes, img.bytes, img.len);
 	dirty = 0;
@@ -534,16 +537,13 @@ int mc_tui_run(mc_image *image, const char *filepath, const char *note)
 	noecho();
 	keypad(stdscr, TRUE);
 	curs_set(0);
-	draw_list(sel, top);
-	if (note && *note) {
-		status(note);
-		getch();
-	}
+	opening_note = (note && *note) ? note : NULL;
 
 	for (;;) {
 		int ch, rows = LINES - 5;
 		draw_list(sel, top);
 		ch = getch();
+		opening_note = NULL; /* the first key dismisses the note AND does its job */
 		if (ch == 'q') {
 			if (dirty) {
 				char buf[8];

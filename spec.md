@@ -61,8 +61,19 @@ clear, `CSTOPB` clear, `CRTSCTS` clear, and `ISTRIP`/`INPCK`/`PARMRK`/`IXON`/`IX
 explicitly. **[S]**
 **P-12** On open: `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms. **[S]**
 
-> `mcprog --port DEV --selftest report.md` settles this empirically: it tries all four DTR/RTS
-> combinations and reports which ones the radio answers on.
+> **First hardware run, 17 Aug 2026 [C].** A real radio answered on `DTR=0 RTS=1` *and* on
+> `DTR=1 RTS=1`, and was silent on both combinations with RTS de-asserted. So **RTS asserted is
+> what matters** — consistent with it driving HUB/PGM — and the DTR polarity did not decide
+> whether the radio replied. Two cables were tried; one worked, one was silent throughout.
+>
+> The same run showed something sharper: after the probe de-asserted RTS, **the radio never spoke
+> again** — not to the remaining probe, and not to the session that followed, which re-asserted RTS
+> and waited the full 1.8 s. Whatever the mechanism, taking RTS away appears to end the programming
+> session for good. The selftest therefore stops at the first combination that answers and keeps
+> that port open. **If a radio goes quiet, power-cycle it before retrying.** The mechanism itself is
+> not established — one run, one radio. **[?]**
+>
+> `mcprog --port DEV --selftest report.md` is what produced this.
 >
 > Neither line is doing modem control, and nothing here is a handshake. In the interface of
 > `doc/ANALYSIS.md` §3, **DTR supplies the level shifter's negative rail** and **RTS drives the

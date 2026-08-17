@@ -55,6 +55,9 @@ back:
 $ mcprog --port /dev/ttyUSB0 --selftest report.md
 ```
 
+**Power-cycle the radio before each run.** On the first hardware run the radio stopped answering
+after its programming mode was interrupted, and did not come back within that session.
+
 It is **read-only**. Add `--enable-write` and it also writes one record back — the radio's *own*
 bytes, unchanged, after saving a copy — which exercises the write framing and the double ACK
 without altering what the radio does.

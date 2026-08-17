@@ -3,3 +3,9 @@ build/
 *.exe
 __pycache__/
 *.pyc
+
+# Hardware run records: kept locally, never committed
+reports/
+
+# macOS directory metadata
+.DS_Store

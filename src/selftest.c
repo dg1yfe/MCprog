@@ -144,10 +144,11 @@ static void nap(mc_transport *t, unsigned ms)
 		t->recv(t, junk, sizeof junk, 50); /* drains as it waits, so stale bytes do not confuse */
 }
 
-/* Try one combination.  Returns the ident length, 0 if the radio said nothing, or -1 if this port
- * has no control lines at all -- which is not a failure, it is a pseudo-terminal. */
+/* Try one combination.  On success the port is left OPEN and returned through `keep`, because
+ * closing it drops RTS -- see the note above.  Returns the ident length, 0 if the radio said
+ * nothing, or -1 if this port has no control lines at all (a pseudo-terminal). */
 static int try_lines(const mc_selftest_opts *o, const struct linecase *lc, char *ident,
-                     size_t identsz)
+                     size_t identsz, mc_transport **keep)
 {
 	mc_transport *t;
 	mc_serial_opts so = *o->opts;
@@ -155,6 +156,7 @@ static int try_lines(const mc_selftest_opts *o, const struct linecase *lc, char 
 	char err[160];
 	size_t len = 0;
 
+	*keep = NULL;
 	so.line_setup = 0; /* the selftest drives the lines itself */
 	t = mc_serial_open(o->port, &so, err, sizeof err);
 	if (!t)
@@ -170,23 +172,33 @@ static int try_lines(const mc_selftest_opts *o, const struct linecase *lc, char 
 	mc_session_init(&s, t);
 	if (mc_identify(&s, ident, identsz, &len) != 0)
 		len = 0;
-	mc_serial_close(t);
+	if (len)
+		*keep = t; /* hold it open; the rest of the session runs on this very port */
+	else
+		mc_serial_close(t);
 	return (int)len;
 }
 
 /* Returns the index of the first combination the radio answered on, or -1 if none did (or if the
- * port has no control lines).  The caller uses it for the rest of the session, so a radio that
- * wants something other than P-12 still produces a full report instead of one failure. */
-static int probe_lines(const mc_selftest_opts *o)
+ * port has no control lines), and hands back that still-open port through `keep`.
+ *
+ * It STOPS at the first success, and that is not an optimisation.  The first hardware run showed
+ * why: two combinations answered, the probe went on to try the two with RTS de-asserted, and from
+ * that moment the radio never spoke again -- not to the remaining probe, not to the session that
+ * followed, which re-asserted RTS and still got nothing.  Dropping RTS takes the radio out of
+ * programming mode and it does not come back without a power cycle.  So: once it answers, stop
+ * asking, and keep the port open, because closing it drops RTS too. */
+static int probe_lines(const mc_selftest_opts *o, mc_transport **keep)
 {
 	char ident[MC_IDENT_MAX], obs[400] = "";
 	size_t i, k = 0;
 	int len, winner = -1, unsupported = 0;
 
+	*keep = NULL;
 	for (i = 0; i < sizeof LINES / sizeof LINES[0]; i++) {
 		printf("      trying %s ... ", LINES[i].name);
 		fflush(stdout);
-		len = try_lines(o, &LINES[i], ident, sizeof ident);
+		len = try_lines(o, &LINES[i], ident, sizeof ident, keep);
 		if (len < 0) {
 			unsupported++;
 			printf("no control lines on this port\n");
@@ -195,8 +207,16 @@ static int probe_lines(const mc_selftest_opts *o)
 		printf("%s\n", len ? "answered" : "silent");
 		k += (size_t)snprintf(obs + k, sizeof obs - k, "%sDTR=%d RTS=%d: %s", k ? "; " : "",
 		                      LINES[i].dtr, LINES[i].rts, len ? "answered" : "silent");
-		if (len && winner < 0)
+		if (len) {
 			winner = (int)i;
+			if (i + 1 < sizeof LINES / sizeof LINES[0])
+				k += (size_t)snprintf(obs + k, sizeof obs - k,
+				                      "; stopped there -- the remaining %u combination(s) were "
+				                      "NOT tried, because de-asserting RTS takes the radio out "
+				                      "of programming mode",
+				                      (unsigned)(sizeof LINES / sizeof LINES[0] - i - 1));
+			break;
+		}
 	}
 	if (unsupported) {
 		note("P-11", "control lines: DTR down, RTS up", R_SKIP,
@@ -218,8 +238,9 @@ static int probe_lines(const mc_selftest_opts *o)
 	else
 		note("P-11", "control lines: DTR down, RTS up", R_FAIL,
 		     "the radio answers with DTR de-asserted and RTS asserted",
-		     "no combination answered. %s -- suspect the cable, the port, or that the radio is "
-		     "not powered, before suspecting the line polarity",
+		     "no combination answered. %s -- check the cable first, then POWER-CYCLE THE RADIO "
+		     "and try again: once RTS has been de-asserted the radio leaves programming mode and "
+		     "has been observed not to return without a power cycle",
 		     obs);
 	return winner;
 }
@@ -232,7 +253,9 @@ static void probe_ident(void)
 	size_t la = 0, lb = 0;
 
 	if (mc_identify(&R.s, a, sizeof a, &la) != 0) {
-		note("P-20", "ident (`*`)", R_FAIL, "41 bytes, 0x1A-terminated", "%s", R.s.err);
+		note("P-20", "ident (`*`)", R_FAIL, "41 bytes, 0x1A-terminated",
+		     "%s -- if the line probe above said a combination answered, the radio has since gone "
+		     "quiet: power-cycle it and run again", R.s.err);
 		return;
 	}
 	printable(pr, sizeof pr, (const uint8_t *)a, la);
@@ -467,7 +490,7 @@ static void write_report(const mc_selftest_opts *o, const char *ident, size_t le
 int mc_selftest(const mc_selftest_opts *o)
 {
 	static uint8_t img[MC_IMG_MAX];
-	mc_transport *t;
+	mc_transport *t = NULL;
 	mc_serial_opts so;
 	char err[160], ident[MC_IDENT_MAX], pr[300] = "", det[160] = "";
 	const mc_model *model = NULL;
@@ -479,23 +502,21 @@ int mc_selftest(const mc_selftest_opts *o)
 
 	if (o->probe_lines) {
 		printf("  P-11: which control-line combination does this radio answer on?\n");
-		winner = probe_lines(o);
+		winner = probe_lines(o, &t);
+		if (winner >= 0 && t)
+			printf("      -- keeping that port open for the rest of the run\n");
 		printf("\n");
 	}
 
-	so = *o->opts;
-	if (winner > 0)
-		so.line_setup = 0; /* a combination other than P-12's answered; drive the lines by hand */
-	t = mc_serial_open(o->port, &so, err, sizeof err);
+	/* Reuse the port the probe left open.  Opening a fresh one would close this one first, and
+	 * closing drops RTS -- which is what silenced the radio on the first hardware run. */
 	if (!t) {
-		fprintf(stderr, "mcprog: %s\n", err);
-		return -1;
-	}
-	if (winner > 0) {
-		mc_serial_set_lines(t, LINES[winner].dtr, LINES[winner].rts);
-		nap(t, 500);
-		mc_serial_set_lines(t, LINES[winner].dtr, LINES[winner].rts);
-		nap(t, 1300);
+		so = *o->opts;
+		t = mc_serial_open(o->port, &so, err, sizeof err);
+		if (!t) {
+			fprintf(stderr, "mcprog: %s\n", err);
+			return -1;
+		}
 	}
 	mc_session_init(&R.s, t);
 	if (o->trace_path) {

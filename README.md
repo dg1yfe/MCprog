@@ -83,7 +83,8 @@ make check    # conformance suite, pty smoke test, Windows cross-compile
 
 | host | needs | notes |
 |---|---|---|
-| Linux | `build-essential`, `libncurses-dev`, `pkg-config` | the Makefile adds `-D_DEFAULT_SOURCE` and links `-lutil` there |
+| Linux | `build-essential`, `libncurses-dev` | that is the whole list to build and run; the Makefile adds `-D_DEFAULT_SOURCE` and links `-lutil` there |
+| Linux, `make check` | `python3` for the TUI smoke test, `mingw-w64` for the Windows cross-compile | both optional — each target says so and skips if the tool is absent |
 | macOS | Xcode command line tools | ncurses ships with the SDK |
 | Windows | MSYS2 / mingw-w64 | `make win-check` cross-compiles the portable core and the Win32 transport from a Unix host; the TUI needs curses, so build it under MSYS2 |
 
@@ -92,8 +93,18 @@ The Linux flags are not cosmetic. `-std=c99` defines `__STRICT_ANSI__`, and glib
 GCC 14 treats as errors. Darwin must *not* be given `_POSIX_C_SOURCE`, where it would hide
 `cfmakeraw` and `openpty` instead, so the define is conditioned on `uname`.
 
-> **Tested on macOS only.** The Linux and Windows paths are reasoned and, for Windows,
-> cross-compiled — but neither has been built and run on its own host. Reports welcome.
+`pkg-config` is used if present, to find a distro that ships only `ncursesw` with its header under
+`/usr/include/ncursesw`; without it the build falls back to `-lncurses`, which is what
+`libncurses-dev` provides. It is not a requirement.
+
+```
+# Debian / Ubuntu, everything including the full suite
+sudo apt install build-essential libncurses-dev python3 mingw-w64
+```
+
+> **Built and tested on macOS, Debian 13 (GCC 14.2 / glibc 2.41) and Ubuntu 24.04.** The Windows
+> path is cross-compiled from a Unix host and has **never been built or run on Windows itself**.
+> Reports welcome.
 
 ## How it is verified
 

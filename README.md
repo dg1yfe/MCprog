@@ -53,8 +53,14 @@ answers in one pass the questions that only a radio can settle, and writes a rep
 back:
 
 ```
-$ mcprog --port /dev/ttyUSB0 --selftest report.md
+$ mcprog --selftest report.md
 ```
+
+It finds the radio itself — no `--port` needed. It enumerates the likely devices (USB adapters
+first, then motherboard ports), tries each, and uses the one that answers. If none does, or if the
+radio has dropped out of programming mode, it prints a clearly marked **ACTION REQUIRED** block
+saying exactly what to do, then waits up to a minute for the radio to come back and carries on by
+itself — no keypress.
 
 **Power-cycle the radio before each run.** On the first hardware run the radio stopped answering
 after its programming mode was interrupted, and did not come back within that session.

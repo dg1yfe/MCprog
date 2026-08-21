@@ -48,6 +48,10 @@ void mc_serial_defaults(mc_serial_opts *o);
 mc_transport *mc_serial_open(const char *device, const mc_serial_opts *o, char *err, size_t errsz);
 void mc_serial_close(mc_transport *t);
 
+/* List candidate serial devices, most-likely first, for when the user has not named one.
+ * Fills `out` with up to `max` NUL-terminated paths and returns how many. */
+int mc_serial_enumerate(char out[][64], int max);
+
 /* Drive DTR and RTS explicitly: 1 asserts, 0 de-asserts, -1 leaves the line alone.  Returns 0, or
  * -1 if the platform cannot do it -- a pseudo-terminal has no such lines.
  *

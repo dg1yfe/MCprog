@@ -122,6 +122,19 @@ static void wirelog(void *ctx, int tx, const uint8_t *buf, size_t n)
 	fflush(R.trace);
 }
 
+/* The selftest should need nobody watching it.  When that is impossible -- no cable, or a radio
+ * that has dropped out of programming mode and can only be revived by hand -- say so in a way
+ * that cannot be missed in a wall of probe output. */
+static void action_required(const char *what, const char *why)
+{
+	printf("\n");
+	printf("  ============================================================\n");
+	printf("   ACTION REQUIRED: %s\n", what);
+	printf("   %s\n", why);
+	printf("  ============================================================\n\n");
+	fflush(stdout);
+}
+
 /* ---- 1. the control lines (P-11) -------------------------------------------------------------
  * The one experiment that cannot be done any other way, and the one most likely to be wrong.
  */
@@ -177,6 +190,28 @@ static int try_lines(const mc_selftest_opts *o, const struct linecase *lc, char 
 	else
 		mc_serial_close(t);
 	return (int)len;
+}
+
+/* Wait for a radio to start answering again, so a power cycle needs no keypress afterwards.
+ * Returns 1 if it came back. */
+static int wait_for_radio(const mc_selftest_opts *o, const struct linecase *lc, unsigned seconds)
+{
+	char ident[MC_IDENT_MAX];
+	mc_transport *keep = NULL;
+	unsigned i;
+
+	for (i = 0; i < seconds; i++) {
+		if (try_lines(o, lc, ident, sizeof ident, &keep) > 0) {
+			if (keep)
+				mc_serial_close(keep);
+			printf("   radio is answering again -- carrying on\n");
+			return 1;
+		}
+		printf("   waiting for the radio ... %us\r", seconds - i);
+		fflush(stdout);
+	}
+	printf("\n");
+	return 0;
 }
 
 /* Returns the index of the first combination the radio answered on, or -1 if none did (or if the
@@ -235,14 +270,66 @@ static int probe_lines(const mc_selftest_opts *o, mc_transport **keep)
 		     "P-11/P-12 are wrong and mcprog will not talk to this radio until they are fixed. "
 		     "The rest of this report was gathered using the combination that worked",
 		     LINES[winner].dtr, LINES[winner].rts, obs);
-	else
+	else {
+		/* The one thing no program can do for itself.  Ask once, plainly, then watch for the
+		 * radio to come back so the run continues without anybody pressing a key. */
+		action_required("power-cycle the radio",
+		                "no line combination answered.  A radio that has left programming mode "
+		                "only returns after its power is cycled; check the cable too if this "
+		                "repeats.");
+		if (wait_for_radio(o, &LINES[0], 60)) {
+			char id2[MC_IDENT_MAX];
+			if (try_lines(o, &LINES[0], id2, sizeof id2, keep) > 0) {
+				note("P-11", "control lines: DTR down, RTS up", R_PASS,
+				     "the radio answers with DTR de-asserted and RTS asserted",
+				     "silent at first; answered on DTR=0 RTS=1 after a power cycle. %s", obs);
+				return 0;
+			}
+		}
 		note("P-11", "control lines: DTR down, RTS up", R_FAIL,
 		     "the radio answers with DTR de-asserted and RTS asserted",
-		     "no combination answered. %s -- check the cable first, then POWER-CYCLE THE RADIO "
-		     "and try again: once RTS has been de-asserted the radio leaves programming mode and "
-		     "has been observed not to return without a power cycle",
-		     obs);
+		     "no combination answered, and it did not return within 60 s of waiting. %s", obs);
+	}
 	return winner;
+}
+
+/* Find a radio without being told where to look.  Tries each candidate device with the line
+ * combination MCprog uses; the first that answers wins.  This is the difference between "run
+ * mcprog --selftest" and "work out what your serial port is called first". */
+static int find_port(const mc_selftest_opts *o, char *out, size_t outsz)
+{
+	char devs[16][64], ident[MC_IDENT_MAX];
+	int n, i;
+
+	n = mc_serial_enumerate(devs, 16);
+	if (n == 0) {
+		action_required("connect the interface",
+		                "no serial devices were found at all -- is the USB adapter plugged in?");
+		return 0;
+	}
+	printf("  looking for a radio on %d port%s\n", n, n == 1 ? "" : "s");
+	for (i = 0; i < n; i++) {
+		mc_selftest_opts cand = *o;
+		mc_transport *keep = NULL;
+		int len;
+
+		cand.port = devs[i];
+		printf("      %-22s ... ", devs[i]);
+		fflush(stdout);
+		len = try_lines(&cand, &LINES[0], ident, sizeof ident, &keep);
+		if (keep)
+			mc_serial_close(keep);
+		if (len > 0) {
+			printf("a radio answered\n");
+			snprintf(out, outsz, "%s", devs[i]);
+			return 1;
+		}
+		printf("%s\n", len < 0 ? "no control lines" : "silent");
+	}
+	action_required("check the cable, and power-cycle the radio",
+	                "every port was silent.  RTS must reach the radio's HUB/PGM line, and a radio "
+	                "that has left programming mode needs a power cycle to return.");
+	return 0;
 }
 
 /* ---- 2. ident (P-20) -------------------------------------------------------------------------- */
@@ -254,8 +341,7 @@ static void probe_ident(void)
 
 	if (mc_identify(&R.s, a, sizeof a, &la) != 0) {
 		note("P-20", "ident (`*`)", R_FAIL, "41 bytes, 0x1A-terminated",
-		     "%s -- if the line probe above said a combination answered, the radio has since gone "
-		     "quiet: power-cycle it and run again", R.s.err);
+		     "%s -- the radio answered the line probe and has since gone quiet", R.s.err);
 		return;
 	}
 	printable(pr, sizeof pr, (const uint8_t *)a, la);
@@ -501,8 +587,19 @@ int mc_selftest(const mc_selftest_opts *o)
 	const mc_model *model = NULL;
 	size_t ilen = 0, len = 0;
 	int winner = -1;
+	mc_selftest_opts eff;
+	char found[64];
 
 	memset(&R, 0, sizeof R);
+	if (!o->port) {
+		/* `eff` and `found` are function-scoped deliberately: `o` points at them for the rest of
+		 * the run, so neither may be block-local. */
+		if (!find_port(o, found, sizeof found))
+			return -1;
+		eff = *o;
+		eff.port = found;
+		o = &eff;
+	}
 	printf("MCprog selftest on %s\n\n", o->port);
 
 	if (o->probe_lines) {

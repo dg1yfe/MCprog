@@ -55,8 +55,8 @@ static void usage(FILE *f)
 	        "  mcprog --dump-vec file.DAT       print the conformance decode of a file\n"
 	        "  mcprog --list-models             describe every model this build knows\n"
 	        "\n"
-	        "  mcprog --port DEV --selftest report.md       first contact with a real radio:\n"
-	        "                                              probe, measure, and write a report\n"
+	        "  mcprog --selftest report.md      first contact with a real radio: finds the port\n"
+	        "                                   itself, probes, measures, and writes a report\n"
 	        "\n"
 	        "  mcprog --port DEV --enable-write            read, edit, then 'w' writes it back\n"
 	        "  mcprog --port DEV --write f.DAT --enable-write   write a file to the radio\n"
@@ -317,14 +317,11 @@ int main(int argc, char **argv)
 	if (selftest) {
 		mc_selftest_opts so;
 		char trace[300], plug[300];
-		if (!port) {
-			fprintf(stderr, "mcprog: --selftest needs --port\n");
-			return 2;
-		}
+		/* No --port: the selftest finds the radio itself. */
 		snprintf(trace, sizeof trace, "%s.trace", selftest);
 		snprintf(plug, sizeof plug, "%s.dat", selftest);
 		memset(&so, 0, sizeof so);
-		so.port = port;
+		so.port = port;      /* NULL is fine -- the selftest will go looking */
 		so.opts = &o;
 		so.report_path = selftest;
 		so.trace_path = logpath ? logpath : trace;

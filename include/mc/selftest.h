@@ -48,6 +48,10 @@
  *   4. `)02`, measured at last on the EZA 9 as a plain two-byte read.
  *   5. P-25's burn delay and P-30's byte timeout, measured rather than assumed.
  *
+ * It should need nobody watching it: with no `port` set it goes looking for the radio, and when a
+ * person really is unavoidable -- no cable, or a radio that only a power cycle will revive -- it
+ * says so in a block that cannot be missed, then waits for the radio to return.
+ *
  * Read-only unless `write_back` is set, and even then the only thing written is the codeplug the
  * radio already holds -- byte for byte, after a backup -- so the write path is exercised without
  * changing what the radio does.

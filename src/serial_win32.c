@@ -199,6 +199,14 @@ void mc_serial_close(mc_transport *t)
 	CloseHandle(s->h);
 	free(s);
 }
+int mc_serial_enumerate(char out[][64], int max)
+{
+	int n = 0, i;
+	for (i = 1; i <= 8 && n < max; i++)
+		n += snprintf(out[n], 64, "COM%d", i) > 0 ? 1 : 0;
+	return n;
+}
+
 int mc_serial_set_lines(mc_transport *t, int dtr, int rts)
 {
 	serial *s = (serial *)t;

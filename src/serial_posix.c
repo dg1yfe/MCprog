@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <dirent.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -193,6 +194,40 @@ static int configure(serial *s, const mc_serial_opts *o, char *err, size_t errsz
 		}
 	}
 	return 0;
+}
+
+/* USB adapters first: a real radio is almost always on one, and /dev/ttyS* on a modern machine is
+ * usually a motherboard port with nothing attached.  macOS needs cu.* rather than tty.*, which
+ * block on carrier detect. */
+static const char *const PREFIXES[] = {
+	"cu.usbserial", "cu.usbmodem", "cu.SLAB", "cu.wchusb", "cu.PL2303",
+	"ttyUSB", "ttyACM", "ttyS",
+};
+
+int mc_serial_enumerate(char out[][64], int max)
+{
+	DIR *d = opendir("/dev");
+	struct dirent *e;
+	size_t p;
+	int n = 0;
+
+	if (!d)
+		return 0;
+	for (p = 0; p < sizeof PREFIXES / sizeof PREFIXES[0] && n < max; p++) {
+		rewinddir(d);
+		while ((e = readdir(d)) != NULL && n < max) {
+			if (strncmp(e->d_name, PREFIXES[p], strlen(PREFIXES[p])) != 0)
+				continue;
+			/* ttyS0-3 only: higher ones are almost never real */
+			if (strncmp(e->d_name, "ttyS", 4) == 0 &&
+			    (e->d_name[4] < '0' || e->d_name[4] > '3' || e->d_name[5] != 0))
+				continue;
+			snprintf(out[n], 64, "/dev/%s", e->d_name);
+			n++;
+		}
+	}
+	closedir(d);
+	return n;
 }
 
 int mc_serial_set_lines(mc_transport *t, int dtr, int rts)

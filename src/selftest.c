@@ -410,7 +410,7 @@ static void probe_02(void)
 /* ---- 4. the full read, its timing, and the end-of-memory form (P-24, P-41) --------------------- */
 
 static size_t probe_read(uint8_t *img, size_t max, const mc_model **model, char *note_out,
-                         size_t notesz)
+                         size_t notesz, const char *ident, size_t ilen)
 {
 	unsigned t_start = R.s.t->now_ms(R.s.t), dt;
 	size_t len = 0;
@@ -430,7 +430,9 @@ static size_t probe_read(uint8_t *img, size_t max, const mc_model **model, char 
 	     "this radio %s", R.s.last_nak_header ? "echoes the header, THEN NAKs"
 	                                          : "sends a bare NAK");
 
-	*model = mc_model_detect(img, len, note_out, notesz);
+	/* The ident is in hand here, and on a 512-byte radio it is the only thing that separates the
+	 * two EVA models -- so use it rather than falling back on the table's preference. */
+	*model = mc_model_detect_ident(img, len, ilen ? ident : NULL, ilen, note_out, notesz);
 	return len;
 }
 
@@ -644,7 +646,7 @@ int mc_selftest(const mc_selftest_opts *o)
 		printable(pr, sizeof pr, (const uint8_t *)ident, ilen ? ilen - 1 : 0);
 	probe_single();
 	probe_02();
-	len = probe_read(img, sizeof img, &model, det, sizeof det);
+	len = probe_read(img, sizeof img, &model, det, sizeof det, ident, ilen);
 	if (len)
 		probe_decode(img, len, model, det);
 

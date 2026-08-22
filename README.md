@@ -60,15 +60,11 @@ Power-cycle before retrying. One run, one radio; the mechanism is not establishe
 | `eza_sel5` | 256 B | 8 | MCEZ9 + R/M builds | auto-ack delay `0x076`; write counter `0x09E` |
 | `eza_cspl` | 128 B | 8 | MCEZ13 | PL scale 7.9844, not 7.984; no write counter |
 
-The two 512-byte models are the **same hardware** — EVA 9 — differing only in which signalling the
-set is fitted with. Nothing in a 512-byte file distinguishes them: same size, same checksum rule,
-same channel layout. Detection reports the ambiguity and assumes `eva_sel5`; that is a preference,
-not a determination. Override with `--model`.
+Both 512-byte models are EVA 9 hardware differing only in signalling; nothing in a file separates
+them. Detection assumes `eva_sel5` — a preference, not a determination. Override with `--model`.
 
-**Reading from a radio removes the guess.** The ident names the signalling — the one real EVA ident
-on record is `EV9.01.00.11 455M11-3     5/6 Tone radio` — so a radio read that sees `5/6 Tone`
-selects `eva_56` and says the ident decided. There is no SEL5 marker on record, so its absence
-proves nothing and falls back to the preference.
+From a radio the ident decides: `5/6 Tone` in it selects `eva_56`. No SEL5 marker exists, so its
+absence falls back to the preference rather than concluding anything.
 
 ## Build
 

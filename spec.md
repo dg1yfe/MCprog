@@ -321,9 +321,12 @@ came from. A value the law cannot spell is refused, never rounded (U-3).
 |---|---|---|---|---|---|
 | `MCEV_56` 5/6-tone | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 
-> The two 512-byte models cannot be told apart by size or checksum. Detection reports the
-> ambiguity and prefers **`eva_sel5`** (MCEV9): `eva_56` is the trunking variant and is unlikely
-> to be in amateur service without a firmware conversion.
+> The two 512-byte models are the same hardware — EVA 9 — differing only in signalling, and nothing
+> in the image separates them. Detection reports the ambiguity and prefers `eva_sel5`; that is a
+> preference, not a determination. **The radio's ident settles it**: a real EVA names its
+> signalling (`... 5/6 Tone radio`), so `mc_model_detect_ident()` selects `eva_56` on that marker.
+> No SEL5 marker has ever been captured, so its absence concludes nothing. **[C]** for the marker,
+> **[?]** for anything the absence might mean.
 | `MCEV9` / `MCEV9M` SEL5 EVA | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEZ9` SEL5 EZA | 256 | 0x000 | 0x0C8, 8 × 6 | 0x082 b4-6 | 0x0C4 |
 | `MCEZ13` CS/PL | 128/256/512/1024 | **0x003**, whole device | 0x03B, 8 × 6 | 0x039 b4-6 | 0x004 |

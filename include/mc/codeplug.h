@@ -96,6 +96,11 @@ const mc_model *mc_model_by_index(size_t i); /* NULL past the end; for enumerati
  * indistinguishable by layout -- `note` says so when more than one fits.  Returns NULL if nothing
  * does. */
 const mc_model *mc_model_detect(const uint8_t *bytes, size_t len, char *note, size_t notesz);
+/* As above, but allowed to use the radio's ident to settle what size and checksum cannot: the two
+ * 512-byte models are identical in both, and a real EVA's ident names its signalling.  Pass the
+ * ident only when it came from the radio this image came from; NULL behaves as mc_model_detect. */
+const mc_model *mc_model_detect_ident(const uint8_t *bytes, size_t len, const char *ident,
+                                      size_t ilen, char *note, size_t notesz);
 
 /* ---- image ---------------------------------------------------------------------------------- */
 typedef struct {

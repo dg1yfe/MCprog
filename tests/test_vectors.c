@@ -58,6 +58,8 @@ static void failf(const char *req, const char *fmt, ...)
 	putchar('\n');
 }
 
+static void test_detect_ident(void);
+
 static char *slurp(const char *rel, size_t *len)
 {
 	char path[512];
@@ -87,6 +89,46 @@ static char *slurp(const char *rel, size_t *len)
 		*len = (size_t)n;
 	return buf;
 }
+
+/* K-20: size and checksum cannot separate the two 512-byte models; the radio's ident can.
+ *
+ * Both are EVA 9 hardware differing only in signalling, so a bare file is genuinely ambiguous and
+ * the table order is a preference.  The one real EVA ident on record says "5/6 Tone radio", and
+ * that is the only marker there is -- no SEL5 ident has ever been captured, so its ABSENCE must
+ * not be treated as evidence.  These check both halves. */
+static void test_detect_ident(void)
+{
+	uint8_t *img;
+	size_t len;
+	char note[256];
+	const mc_model *m;
+	static const char REAL[] = "EV9.01.00.11 455M11-3     5/6 Tone radio";
+	static const char SILENT[] = "EV9.01.00.11 455M11-3     no idea";
+
+	img = (uint8_t *)slurp("fixtures/eva9_real.bin", &len);
+	if (!img)
+		return;
+	m = mc_model_detect(img, len, note, sizeof note);
+	ok(m && strcmp(m->name, "eva_sel5") == 0, "K-20",
+	   "with no ident the 512-byte preference is eva_sel5");
+	ok(strstr(note, "models fit") != NULL, "K-20", "and the ambiguity is reported, not hidden");
+
+	m = mc_model_detect_ident(img, len, REAL, sizeof REAL - 1, note, sizeof note);
+	ok(m && strcmp(m->name, "eva_56") == 0, "K-20",
+	   "an ident saying 5/6 Tone settles it on eva_56");
+	ok(strstr(note, "ident") != NULL && strstr(note, "models fit") == NULL, "K-20",
+	   "and the note says the ident decided, not that it guessed");
+
+	m = mc_model_detect_ident(img, len, SILENT, sizeof SILENT - 1, note, sizeof note);
+	ok(m && strcmp(m->name, "eva_sel5") == 0, "K-20",
+	   "an ident without the marker falls back to the preference, concluding nothing");
+	ok(strstr(note, "models fit") != NULL, "K-20", "and says so");
+
+	m = mc_model_detect_ident(img, len, NULL, 0, note, sizeof note);
+	ok(m && strcmp(m->name, "eva_sel5") == 0, "K-20", "a NULL ident behaves as mc_model_detect");
+	free(img);
+}
+
 
 /* ---- codeplug golden decodes (K-2, K-10, K-20, K-21, K-23, K-24) ---------------------------- */
 
@@ -674,6 +716,7 @@ int main(int argc, char **argv)
 		ROOT = argv[1];
 	for (i = 0; i < sizeof CODEPLUGS / sizeof CODEPLUGS[0]; i++)
 		test_codeplug(CODEPLUGS[i]);
+	test_detect_ident();
 	test_freq();
 	test_edits();
 	test_pl();

@@ -55,15 +55,20 @@ Power-cycle before retrying. One run, one radio; the mechanism is not establishe
 
 | model | size | channels | radios | notes |
 |---|---|---|---|---|
-| `eva_56` | 512 B | 32 | MCEV 5/6-tone | twelve radio-wide timers (`o`); no write counter |
-| `eva_sel5` | 512 B | 32 | MCEV9, MCEV9M | same timer table; write counter `0x0AF` |
+| `eva_56` | 512 B | 32 | EVA 9, 5/6-tone signalling | twelve radio-wide timers (`o`); no write counter — `0x0AF` is a programming date |
+| `eva_sel5` | 512 B | 32 | EVA 9, SEL5 signalling | same timer table; write counter `0x0AF` |
 | `eza_sel5` | 256 B | 8 | MCEZ9 + R/M builds | auto-ack delay `0x076`; write counter `0x09E` |
 | `eza_cspl` | 128 B | 8 | MCEZ13 | PL scale 7.9844, not 7.984; no write counter |
 
-The two 512-byte models are indistinguishable by size and checksum. Detection reports the ambiguity
-and assumes **`eva_sel5`**: `eva_56` is the trunking variant, unlikely to be in amateur service
-without a firmware conversion, so a bare 512-byte image is far more likely to be an MCEV9. Use
-`--model` to force the other.
+The two 512-byte models are the **same hardware** — EVA 9 — differing only in which signalling the
+set is fitted with. Nothing in a 512-byte file distinguishes them: same size, same checksum rule,
+same channel layout. Detection reports the ambiguity and assumes `eva_sel5`; that is a preference,
+not a determination. Override with `--model`.
+
+**Reading from a radio removes the guess.** The ident names the signalling — the one real EVA ident
+on record is `EV9.01.00.11 455M11-3     5/6 Tone radio` — so a radio read that sees `5/6 Tone`
+selects `eva_56` and says the ident decided. There is no SEL5 marker on record, so its absence
+proves nothing and falls back to the preference.
 
 ## Build
 

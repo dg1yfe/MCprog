@@ -87,11 +87,19 @@ static const mc_timer TIMERS_EVA[] = {
 
 #define NT(x) (x), (uint8_t)(sizeof (x) / sizeof (x)[0])
 
-/* Order matters: mc_model_detect() takes the FIRST entry that fits, so this is the preference
- * order when more than one model matches.  The two 512-byte models cannot be told apart by size or
- * checksum, and `eva_sel5' leads deliberately -- `eva_56' is the trunking variant, which is
- * unlikely to be in service as an amateur set without a firmware conversion, so a bare 512-byte
- * image is far more likely to be an MCEV9. */
+/* Order matters: mc_model_detect() takes the FIRST entry that fits, so this is the preference order
+ * when more than one model matches.
+ *
+ * The two 512-byte models are the SAME hardware -- EVA 9 -- differing only in which signalling the
+ * set is fitted with, and nothing in a 512-byte image distinguishes them: same size, same checksum
+ * rule, same channel layout.  `eva_sel5' leading is a **preference, not a determination**, and the
+ * note says as much so nobody mistakes it for detection.
+ *
+ * When the image came from a radio there is no need to guess: the ident names the signalling.  See
+ * mc_model_detect_ident().
+ *
+ * (For the avoidance of doubt: `eva_56' is not a trunking radio.  Trunking is the EVA 5 / RN43P
+ * MPT1327 system -- different hardware, different reference crystal, its own 1998 software.) */
 static const mc_model MODELS[] = {
 	/* name       size cksum cklen  chan   band  refdiv nch str tx rx num  flags          PL: tone  list count mode   dec  max  k             timers          AAK    wcount/clr */
 	{ "eva_sel5",  512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10,  MC_PL_K_EVA, NT(TIMERS_EVA), 0, 0x0AF, 0x00,
@@ -141,6 +149,38 @@ const mc_flag *mc_flag_by_name(const mc_model *m, const char *name)
 		if (strcmp(m->flags[i].name, name) == 0)
 			return &m->flags[i];
 	return NULL;
+}
+
+/* The signalling marker a real EVA puts in its ident.  Observed once, in the 2009 capture:
+ * "EV9.01.00.11 455M11-3     5/6 Tone radio".  There is no SEL5 counterpart on record, so this
+ * can only ever CONFIRM 5/6-tone -- its absence proves nothing and falls back to the table order. */
+static const char TONE56[] = "5/6 Tone";
+
+static int ident_has(const char *ident, size_t ilen, const char *needle)
+{
+	size_t n = strlen(needle), i;
+	if (!ident || ilen < n)
+		return 0;
+	for (i = 0; i + n <= ilen; i++)
+		if (memcmp(ident + i, needle, n) == 0)
+			return 1;
+	return 0;
+}
+
+const mc_model *mc_model_detect_ident(const uint8_t *bytes, size_t len, const char *ident,
+                                      size_t ilen, char *note, size_t notesz)
+{
+	const mc_model *m = mc_model_detect(bytes, len, note, notesz);
+
+	/* Only ever narrows an ambiguity the bytes could not settle. */
+	if (m && strstr(note, "models fit") && ident_has(ident, ilen, TONE56)) {
+		const mc_model *t = mc_model_by_name("eva_56");
+		if (t && t->size == len) {
+			snprintf(note, notesz, "the radio's ident says \"%s\"; using %s", TONE56, t->name);
+			return t;
+		}
+	}
+	return m;
 }
 
 const mc_model *mc_model_detect(const uint8_t *bytes, size_t len, char *note, size_t notesz)

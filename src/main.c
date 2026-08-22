@@ -38,6 +38,10 @@
 #include "mc/write.h"
 
 static uint8_t img_bytes[MC_IMG_MAX];
+/* Kept from the read so detection can use it: a real EVA's ident names its signalling, which is
+ * the only thing that separates the two 512-byte models. */
+static char radio_ident[MC_IDENT_MAX];
+static size_t radio_ident_len;
 static FILE *tracef;
 static int logseq;
 
@@ -213,6 +217,8 @@ static long read_radio(const char *port, const mc_serial_opts *o, const char *lo
 		return -1;
 	}
 	printf("ident: %.*s\n", (int)(ilen ? ilen - 1 : 0), ident); /* without the 0x1A terminator */
+	memcpy(radio_ident, ident, ilen > sizeof radio_ident ? sizeof radio_ident : ilen);
+	radio_ident_len = ilen > sizeof radio_ident ? sizeof radio_ident : ilen;
 	if (ident_only) {
 		if (tracef)
 			fclose(tracef);
@@ -374,7 +380,8 @@ int main(int argc, char **argv)
 		}
 		snprintf(note, sizeof note, "model %s given on the command line", want);
 	} else {
-		model = mc_model_detect(img_bytes, (size_t)len, note, sizeof note);
+		model = mc_model_detect_ident(img_bytes, (size_t)len, radio_ident_len ? radio_ident : NULL,
+		                              radio_ident_len, note, sizeof note);
 	}
 
 	/* A read is worth keeping even when nothing recognises it -- P-41 says report and hand the

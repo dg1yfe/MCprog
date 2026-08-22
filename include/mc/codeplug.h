@@ -51,8 +51,8 @@ typedef struct {
 
 /* ---- model descriptor (K-20) ---------------------------------------------------------------
  * These fields genuinely differ between models, so they are data rather than assumptions -- the
- * checksum's extent among them: MCEZ13 covers all but its last two bytes, every other model the
- * whole device.
+ * checksum BYTE among them.  The extent is the whole device on every model, MCEZ13 included; the
+ * `cklen' field exists for a shorter range but no model currently needs one.
  */
 typedef struct {
 	const char *name;
@@ -113,9 +113,9 @@ typedef struct {
  */
 size_t mc_image_check(const mc_image *img);
 
-/* Checksum (K-2).  The stored byte is chosen so the covered range sums to 0xFF mod 256.  That
- * range is the whole device on every model but MCEZ13, which covers all but its last two bytes --
- * so this is per-model data, not a constant. */
+/* Checksum (K-2).  The stored byte is chosen so the covered range sums to 0xFF mod 256.  The range
+ * is the whole device on every model; the BYTE is per-model data -- 0x000 on the EVA and EZA 9,
+ * 0x003 on MCEZ13. */
 uint8_t mc_checksum_stored(const mc_image *img);
 uint8_t mc_checksum_total(const mc_image *img);
 int mc_checksum_valid(const mc_image *img);

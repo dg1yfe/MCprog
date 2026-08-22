@@ -1,202 +1,191 @@
 # MCprog
 
-A modern programmer for the **Motorola MC micro** land-mobile radio family (EVA and EZA), reading
-and writing the same `.DAT` codeplugs as the original 1987 Radio Service Software.
+Programmer for the **Motorola MC micro** land-mobile family (EVA and EZA). Reads and writes the
+same `.DAT` codeplugs, over the same wire protocol, as the 1987 DOS Radio Service Software.
 
-The MC micro is still in wide amateur use, and the only way to configure one has been a DOS program
-that fails on any PC built after about 1994. MCprog replaces it: same codeplug format, same wire
-protocol, no DOS.
+One binary. A file and a radio are two sources of the same object and both open the same editor;
+naming an output file makes the run non-interactive.
+
+## Synopsis
 
 ```
-$ mcprog samples/MCMICR70.DAT            # edit a codeplug file
-$ mcprog --port /dev/ttyUSB0             # read the radio, then edit it
-$ mcprog --port /dev/ttyUSB0 --identify
-ident: EV9.01.00.11 455M11-3     5/6 Tone radio
-$ mcprog --port /dev/ttyUSB0 --read mine.dat --log session.trace
-ident: EV9.01.00.11 455M11-3     5/6 Tone radio
-read 512 bytes (8 records)
-2 models fit (eva_56, eva_sel5); assuming eva_56 -- use --model to choose
-checksum valid
-wrote mine.dat
-$ mcprog --list-models                     # what this build knows
-$ mcprog --port /dev/ttyUSB0 --enable-write   # read, edit, then 'w' writes it back
+mcprog file.DAT                                 edit a codeplug file
+mcprog --port DEV                               read the radio, then edit it
+mcprog --port DEV --read f.DAT                  read to a file and exit
+mcprog --port DEV --identify                    print the radio's ident
+mcprog --port DEV --enable-write                read, edit, 'w' writes back
+mcprog --port DEV --write f.DAT --enable-write  write a file to the radio
+mcprog --selftest report.md                     hardware bring-up; finds the port itself
+mcprog --dump-vec file.DAT                      conformance decode of a file
+mcprog --list-models                            models compiled into this build
 ```
 
-Reading a radio, editing it and writing it back needs no file at any stage. Writing is off unless
-you ask for it, always backs the radio up first, refuses any change it cannot account for, and
-reads every record back to check it.
-
-One binary. A radio and a file are two sources of the same thing, so either leads to the same
-editor; naming an output file makes it non-interactive instead, which is what a script or a bug
-report wants.
-
-## Status
-
-| | |
+| option | effect |
 |---|---|
-| codeplug library | four models, decode and edit |
-| protocol library | replays all three hardware captures byte for byte |
-| TUI | channel list, per-channel editor, save with checksum |
-| serial transport | POSIX — **read from a real radio, 17 Aug 2026** — and Win32 (compiles, never run on hardware) |
-| writing | gated, backed up and verified; W-5 (write counter) deliberately omitted |
-| reading a real radio | **done** — an EZA 9, 256 bytes, every mapped field as predicted |
-| writing a real radio | **untested** |
+| `--model NAME` | override model detection |
+| `--log FILE` | record the wire in `.trace` format (with `--port`) |
+| `--baud N` | default 1200; `0` leaves the port speed alone |
+| `--no-line-setup` | skip the 1.8 s DTR/RTS opening sequence |
+| `--enable-write` | permit writing; without it no write path exists (W-1) |
 
-One radio has been read end to end, and `fixtures/eza9_radio.bin` is what came back. Everything
-else is verified against captured hardware sessions, against a fake radio on a pty, and against the
-original software running under emulation. **Nothing has ever been written to a real radio.**
+DTR supplies the interface's level shifter; RTS drives the radio's HUB/PGM input, which selects
+programming mode. A real radio needs both left alone.
 
-### First contact with a real radio
+## Models
 
-If you are the first person to point this at hardware, run the selftest before anything else. It
-answers in one pass the questions that only a radio can settle, and writes a report worth sending
-back:
+| model | size | channels | radios | notes |
+|---|---|---|---|---|
+| `eva_56` | 512 B | 32 | MCEV 5/6-tone | twelve radio-wide timers (`o`); no write counter |
+| `eva_sel5` | 512 B | 32 | MCEV9, MCEV9M | same timer table; write counter `0x0AF` |
+| `eza_sel5` | 256 B | 8 | MCEZ9 + R/M builds | auto-ack delay `0x076`; write counter `0x09E` |
+| `eza_cspl` | 128 B | 8 | MCEZ13 | PL scale 7.9844, not 7.984; no write counter |
 
-```
-$ mcprog --selftest report.md
-```
-
-It finds the radio itself — no `--port` needed. It enumerates the likely devices (USB adapters
-first, then motherboard ports), tries each, and uses the one that answers. If none does, or if the
-radio has dropped out of programming mode, it prints a clearly marked **ACTION REQUIRED** block
-saying exactly what to do, then waits up to a minute for the radio to come back and carries on by
-itself — no keypress.
-
-**Power-cycle the radio before each run.** On the first hardware run the radio stopped answering
-after its programming mode was interrupted, and did not come back within that session.
-
-It is **read-only**. Add `--enable-write` and it also writes one record back — the radio's *own*
-bytes, unchanged, after saving a copy — which exercises the write framing and the double ACK
-without altering what the radio does.
-
-It produces `report.md`, `report.md.trace` (every byte, timestamped, in the format the conformance
-suite reads) and `report.md.dat` (the codeplug it read). The first probe is the one most likely to
-matter: it tries all four DTR/RTS combinations and reports which the radio answers on. MCprog's
-own choice — DTR de-asserted, RTS asserted — has never been tested against hardware, and if it is
-wrong nothing else would work; the selftest finds that out in ten seconds and carries on using
-whatever did answer, so you still get a full report.
-
-The first radio through it — an EZA 9, 17 Aug 2026 — corrected four clauses of the spec and found
-two bugs in the selftest itself. Please keep the report and its wire log; if you have a model that
-has never been read, that run is worth more than anything the emulator can produce.
-
-### Trying it without a radio
-
-`build/ptyserv` is a radio on a pseudo-terminal, so the whole tool — including the write path — can
-be exercised with no hardware:
-
-```
-$ make build/ptyserv
-$ ./build/ptyserv fixtures/eva9_real.bin
-/dev/ttys004
-$ ./build/mcprog --port /dev/ttys004 --no-line-setup --baud 0 --enable-write
-```
-
-`--baud 0` and `--no-line-setup` are wanted because a pseudo-terminal has neither a line speed nor
-the control lines. Against a real radio, leave both alone: DTR supplies the interface's level
-shifter and RTS drives the radio's HUB/PGM input, which is what selects programming mode.
-
-## Supported models
-
-`mcprog --list-models` prints this table from the binary itself.
-
-| model | size | channels | notes |
-|---|---|---|---|
-| `eva_56` | 512 B | 32 | MCEV 5/6-tone — also the twelve radio-wide timers (`o`) |
-| `eva_sel5` | 512 B | 32 | MCEV9 / MCEV9M, SEL5 — the timers too; both families carry the same table |
-| `eza_sel5` | 256 B | 8 | MCEZ9, SEL5 — also the auto-acknowledge delay (`o`), which only the 1987 *repair* build ever exposed |
-| `eza_cspl` | 128 B | 8 | MCEZ13, carrier squelch / PL — the one model whose PL scale is 7.9844, not 7.984 |
+The two 512-byte models are indistinguishable by size; detection reports the ambiguity and assumes
+`eva_56`. Use `--model` to force.
 
 ## Build
 
-C99, no dependencies except ncurses for the TUI.
+C99. No dependencies except ncurses for the TUI.
 
 ```
-make          # build mcprog
-make check    # conformance suite, pty smoke test, Windows cross-compile
+make            # build
+make check      # conformance suite, pty smoke test, Windows cross-compile
 ```
 
-| host | needs | notes |
+| host | packages | notes |
 |---|---|---|
-| Linux | `build-essential`, `libncurses-dev` | that is the whole list to build and run; the Makefile adds `-D_DEFAULT_SOURCE` and links `-lutil` there |
-| Linux, `make check` | `python3` for the TUI smoke test, `mingw-w64` for the Windows cross-compile | both optional — each target says so and skips if the tool is absent |
-| macOS | Xcode command line tools | ncurses ships with the SDK |
-| Windows | MSYS2 / mingw-w64 | `make win-check` cross-compiles the portable core and the Win32 transport from a Unix host; the TUI needs curses, so build it under MSYS2 |
-
-The Linux flags are not cosmetic. `-std=c99` defines `__STRICT_ANSI__`, and glibc then hides
-`strtok_r`, `cfmakeraw`, `openpty`, `nanosleep` and `clock_gettime` — implicit declarations, which
-GCC 14 treats as errors. Darwin must *not* be given `_POSIX_C_SOURCE`, where it would hide
-`cfmakeraw` and `openpty` instead, so the define is conditioned on `uname`.
-
-`pkg-config` is used if present, to find a distro that ships only `ncursesw` with its header under
-`/usr/include/ncursesw`; without it the build falls back to `-lncurses`, which is what
-`libncurses-dev` provides. It is not a requirement.
+| Linux | `build-essential`, `libncurses-dev` | Makefile adds `-D_DEFAULT_SOURCE`, links `-lutil` |
+| Linux, `make check` | `python3`, `mingw-w64` | optional; each target skips if absent |
+| macOS | Xcode CLT | ncurses ships with the SDK |
+| Windows | MSYS2 / mingw-w64 | `make win-check` cross-compiles core + Win32 transport |
 
 ```
-# Debian / Ubuntu, everything including the full suite
 sudo apt install build-essential libncurses-dev python3 mingw-w64
 ```
 
-> **Built and tested on macOS, Debian 13 (GCC 14.2 / glibc 2.41) and Ubuntu 24.04.** The Windows
-> path is cross-compiled from a Unix host and has **never been built or run on Windows itself**.
-> Reports welcome.
+`-std=c99` defines `__STRICT_ANSI__`; glibc then hides `strtok_r`, `cfmakeraw`, `openpty`,
+`nanosleep` and `clock_gettime`, and GCC 14 treats the implicit declarations as errors — hence
+`-D_DEFAULT_SOURCE`. Darwin must **not** get `_POSIX_C_SOURCE`, which hides `cfmakeraw` and
+`openpty` there, so the define is conditioned on `uname`. `pkg-config` is used when present to
+locate an `ncursesw`-only distro's headers; without it the build falls back to `-lncurses`.
 
-## How it is verified
+Built and tested on macOS, Debian 13 (GCC 14.2 / glibc 2.41) and Ubuntu 24.04. The Windows path is
+cross-compiled from a Unix host and has never been built or run on Windows.
 
-The reverse engineering behind this is not in this repository — what is here is the *evidence*, in a
-form that can be re-run.
+## Status
 
-* **`spec.md`** is the normative contract. Requirements are numbered (`P-n` protocol, `K-n`
-  codeplug, `U-n` interface, `W-n` write safety) and every statement carries its provenance:
-  **[C]** measured, **[S]** from the disassembly, **[?]** assumed. Tests cite the numbers.
-* **`testdata/`** is language-neutral: line-oriented, integer hertz and milliseconds, lowercase
-  hex, parseable with `fgets`+`strtok` or `bufio.Scanner` with no dependency either side. No
-  expected value is written in the test source, so a second implementation runs the identical
-  suite and any disagreement localises to one vector. `testdata/gen.py` regenerates it all;
-  the output is committed and regeneration is byte-identical.
-* **`--log`** writes the wire in exactly the `.trace` format `testdata/` consumes, so a session
-  with a real radio drops straight into the conformance suite. If you are testing this against
-  hardware, that log is the single most useful thing to send back.
-* **`captures/`** holds two independent recordings of the original software talking to a real
-  radio, from 2009 and 2011. `traces/read_eva9_2009.trace` replayed through the protocol library
-  reconstructs `fixtures/eva9_real.bin` byte for byte.
-* **Mutation testing.** Every law is deliberately broken to confirm the suite notices. That found
-  four real holes that green tests had hidden: the EZA record layout (both EZA fixtures are factory
-  defaults whose channels are all zero, so TX@+0 and RX@+3 were indistinguishable), the address
-  nibbles (every address in every capture is 64-byte aligned and below 0x1000, leaving two nibbles
-  constant), channel state (the vector format recorded none), and `CS8` (a pty is 8-bit clean
-  whatever `CSIZE` says, so the loopback cannot see a port that would strip the parity bit).
+| component | state |
+|---|---|
+| codeplug library | four models; decode, edit, checksum |
+| protocol library | replays all three hardware captures byte for byte |
+| TUI | channel list, per-channel editor, PL, options, timers, save |
+| serial transport | POSIX — used against a real radio 17 Aug 2026; Win32 compiles, never run |
+| write path | gated, backed up, verified per record (W-1..W-6) |
+| read from a real radio | **done** — one EZA 9, 256 bytes, every mapped field as predicted |
+| write to a real radio | **never attempted** — nothing has ever been written to a radio |
 
-## The traps
+Everything not marked above is verified against captured hardware sessions, a fake radio on a pty,
+and the original software under emulation.
 
-Reading the spec is worth it before changing anything, but these are the ones that bite:
+## Hardware bring-up
 
-* **The write handshake sends two ACKs.** The first means "accepted", the second, ~710 ms later,
-  means "burned". Proceeding on the first desynchronises the radio on the very next record.
-* **Frequency encoding is not canonical.** `b2` is a full byte but `P` ≤ 254, so `b2 >= P` is a
-  legal alternate spelling — and the original emits some. Encode canonically, decode permissively,
-  and **verify by decoded frequency, never by bytes**.
-* **The channel table is terminated, not sparse.** Stop at the first record whose `+0` is `0xFF`.
-  Records past it are stale and must be written back untouched.
-* **Channel flag bits are not portable between models.** Bit 3 is clock shift on the EVA and
-  auto-acknowledge on the EZA 9; the EZA 9 splits bit 7 by half; the EZA 1/3 clock shift is stored
-  *inverted*.
-* **The timers round, they do not truncate,** and four of the twelve are narrower than the word
-  they sit in. Both facts come from the table the original itself walks, not from fitting: a
-  two-point fit of the synthesiser lock time is off by a millisecond, and the sample codeplug has
-  zeroes exactly where the mask bits would have shown.
-* **A fixture can be wrong in a way every test agrees with.** MCEZ13's map was two bytes low
-  everywhere -- model offsets, golden vectors and fixtures all consistent with each other, and all
-  consistent with a capture that had been stripped of two leading bytes to work around a malformed
-  ident. Self-consistency is not correctness; only the radio's own software settles it.
-* **The write counter is four bits, not eight.** `0x1F` becomes `0x10`, not `0x20`: the low nibble
-  counts and bit 4 is *set* on wrap. Adding one to the whole byte corrupts whatever bits 5-7 hold,
-  and on the 5/6-tone build that offset is not a counter at all -- it is the programming date.
-* **The PL tone scale is not one constant.** Every EVA and EZ9 build carries 7.984, every MCEZ13
-  build 7.9844 — and exactly one of the 39 EIA tones, 118.8 Hz, tells them apart. The scale is a
-  per-model field, not a `#define`.
-* **The ident comes from `*`, not `)01`.** `)01` returns a single codeplug byte. Getting this
-  backwards yields a tool that cannot identify a radio.
+Run the selftest before anything else and keep its output.
+
+```
+mcprog --selftest report.md
+```
+
+- Finds the port itself: enumerates USB adapters first, then motherboard ports, uses whichever
+  answers. On failure it prints an **ACTION REQUIRED** block, waits up to 60 s, and retries.
+- Read-only. `--enable-write` additionally writes one record back — the radio's *own* bytes,
+  unchanged, after saving a copy — exercising write framing and the double ACK without altering
+  radio behaviour.
+- Emits `report.md`, `report.md.trace` (timestamped wire log in conformance format) and
+  `report.md.dat` (the codeplug read).
+- First probe tries all four DTR/RTS combinations. MCprog's own choice (DTR de-asserted, RTS
+  asserted) has never been confirmed on hardware; if it is wrong, nothing else works. The selftest
+  determines this in ~10 s and continues on whichever combination answered.
+
+**Power-cycle the radio before each run.** On the first hardware run the radio stopped answering
+after its programming mode was interrupted and did not recover within that session.
+
+The first radio through it corrected four clauses of `spec.md` and exposed two selftest bugs. If
+you have a model that has never been read, that report and its wire log are worth more than any
+amount of emulation.
+
+### Without hardware
+
+`build/ptyserv` presents a radio on a pseudo-terminal; the whole tool including the write path runs
+against it.
+
+```
+make build/ptyserv
+./build/ptyserv fixtures/eva9_real.bin      # prints e.g. /dev/ttys004
+./build/mcprog --port /dev/ttys004 --no-line-setup --baud 0 --enable-write
+```
+
+`--baud 0` and `--no-line-setup` are required only because a pty has neither a line speed nor
+control lines.
+
+## Verification
+
+The reverse engineering is not in this repository; the *evidence* is, in re-runnable form.
+
+| artefact | purpose |
+|---|---|
+| `spec.md` | Normative contract. Numbered requirements — `P-n` protocol, `K-n` codeplug, `U-n` interface, `W-n` write safety — each carrying provenance: **[C]** measured, **[S]** disassembly, **[?]** assumed. Tests cite the numbers. |
+| `testdata/` | Language-neutral vectors: line-oriented, integer Hz and ms, lowercase hex. No expected value appears in test source, so a second implementation runs the identical suite and any disagreement localises to one vector. `testdata/gen.py` regenerates byte-identically. |
+| `captures/` | Two independent recordings of the original software against a real radio, 2009 and 2011. `traces/read_eva9_2009.trace` replayed through the protocol library reconstructs `fixtures/eva9_real.bin` exactly. |
+| `--log` | Writes the wire in the `.trace` format `testdata/` consumes, so a real session drops straight into the conformance suite. |
+
+**Mutation testing.** Every law is deliberately broken to confirm the suite notices. That found four
+holes green tests had hidden:
+
+- EZA record layout — both EZA fixtures are factory defaults with all-zero channels, so TX@+0 and
+  RX@+3 were indistinguishable;
+- address nibbles — every address in every capture is 64-byte aligned and below `0x1000`, leaving
+  two nibbles constant;
+- channel state — the vector format recorded none;
+- `CS8` — a pty is 8-bit clean whatever `CSIZE` says, so loopback cannot detect a port that would
+  strip the parity bit.
+
+## Implementation notes
+
+Read `spec.md` before changing anything. These are the parts that bite.
+
+**Write handshake sends two ACKs.** First means accepted, second (~710 ms later) means burned.
+Proceeding on the first desynchronises the radio on the next record.
+
+**Frequency encoding is not canonical.** `b2` is a full byte but `P` ≤ 254, so `b2 >= P` is a legal
+alternate spelling and the original emits some. Encode canonically, decode permissively, verify by
+decoded frequency — never by bytes.
+
+**The channel table is terminated, not sparse.** Stop at the first record whose `+0` is `0xFF`.
+Records past it are stale and must be written back untouched.
+
+**Channel flag bits are not portable between models.** Bit 3 is clock shift on the EVA and
+auto-acknowledge on the EZA 9; the EZA 9 splits bit 7 by half; the EZA 1/3 clock shift is stored
+inverted.
+
+**Timers round, they do not truncate,** and four of the twelve are narrower than the word they
+occupy. Both facts come from the table the original itself walks. A two-point fit of the
+synthesiser lock time is off by 1 ms, and the sample codeplug holds zeros exactly where the mask
+bits would show.
+
+**The write counter is four bits.** `0x1F` → `0x10`, not `0x20`: the low nibble counts, bit 4 is
+*set* on wrap. Incrementing the whole byte corrupts bits 5–7. On `eva_56` that offset is not a
+counter at all — it is the programming date.
+
+**The PL tone scale is per-model.** EVA and EZ9 builds carry 7.984, MCEZ13 carries 7.9844. Exactly
+one of the 39 EIA tones — 118.8 Hz — distinguishes them. Model field, not a `#define`.
+
+**The ident comes from `*`, not `)01`.** `)01` returns a single codeplug byte. Reversing these
+yields a tool that cannot identify a radio.
+
+**Self-consistency is not correctness.** MCEZ13's map was two bytes low everywhere — model offsets,
+golden vectors and fixtures all agreeing with each other, all derived from a capture that had been
+stripped of two leading bytes to work around a malformed ident. Only the radio's own software
+settled it.
 
 ## Licence
 
@@ -204,8 +193,8 @@ GPL-3.0-or-later. See [COPYING](COPYING).
 
 ## Provenance
 
-MCprog is an independent implementation. It contains no Motorola code.
+Independent implementation. Contains no Motorola code.
 
-`captures/` are recordings of a protocol session; `samples/` are user codeplug files; `fixtures/`
-are codeplug images, most of them factory defaults recovered by driving the original software's own
-initialise-to-default function under emulation. `fixtures/README.md` gives the provenance of each.
+`captures/` are protocol recordings; `samples/` are user codeplug files; `fixtures/` are codeplug
+images, most of them factory defaults recovered by driving the original software's initialise
+function under emulation. `fixtures/README.md` gives per-file provenance.

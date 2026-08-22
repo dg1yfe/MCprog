@@ -564,9 +564,10 @@ static void write_report(const mc_selftest_opts *o, const char *ident, size_t le
 	           "channel-to-tone mapping, so if the radio does it, firmware decides. Program "
 	           "several distinct tones through the original software, then key up on each channel "
 	           "and listen.\n");
-	fprintf(f, "- **The MCEZ13 two-byte write header.** The 1987 editor emits two leading bytes "
-	           "its own reader does not expect. If the radio swallows them, a read-back after a "
-	           "write by the original software will show it.\n");
+	fprintf(f, "- **What a real MCEZ13 returns to `*`.** MCprog's understanding of that model was "
+	           "built against a synthetic ident. It is now the right shape -- it satisfies every "
+	           "check the 1987 software makes -- but no MCEZ13 has been read, so the ident and the "
+	           "two bytes at 0x000-0x001 are the parts most worth capturing.\n");
 	if (model && model->wcount)
 		fprintf(f, "- **The write counter (W-5).** MCprog bumps `0x%03X` in the bytes it sends "
 		           "and recomputes the checksum; your file is not modified. Bits 0-3 count and "

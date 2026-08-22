@@ -125,7 +125,6 @@ mc_replay *mc_replay_open(const char *path, char *err, size_t errsz);
 mc_transport *mc_replay_transport(mc_replay *r);
 /* 0 if the whole capture was consumed; otherwise the index of the first unconsumed event. */
 int mc_replay_exhausted(mc_replay *r);
-const char *mc_replay_name(mc_replay *r);
 void mc_replay_close(mc_replay *r);
 
 #endif /* MC_PROTOCOL_H */

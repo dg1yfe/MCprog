@@ -11,7 +11,7 @@ radio; none contains Motorola code.
 | `ev9_default.bin` | **the factory default codeplug for the SEL5 EVA family** — what `MCEV9R`'s `INITIALIZE` writes to a blank radio | reconstructed from `MCEV9R_rt.bin`, see below |
 | `eza9_radio.bin` | **256-byte codeplug read off a real EZA 9**, VHF band 2, 8 channels all TX 149.85000 / RX 154.45000 MHz | `mcprog --selftest`, 17 Aug 2026 — the only fixture here that came from hardware rather than from the 1987 software |
 | `eza9_default_band[1-4].bin` | **factory default codeplugs for the SEL5 EZA 9**, 256 bytes each, one per RF range | captured from `MCEZ9R`'s `INITIALIZE`, see below |
-| `ez13_default_band[1-4].bin` | **factory default codeplugs for the CS/PL EZA 1/3**, 128 bytes each (the `1 x 128` EEPROM configuration) | captured from `MCEZ13R`'s `INITIALIZE`, **re-aligned** — see below |
+| `ez13_default_band[1-4].bin` | **factory default codeplugs for the CS/PL EZA 1/3**, 128 bytes each (the `1 x 128` EEPROM configuration) | captured verbatim from `MCEZ13R`'s `INITIALIZE` — see below |
 
 ## `ev9_default.bin`
 
@@ -101,23 +101,32 @@ Channel 1 reads `de2000` / `5e6220` → 136.000000 MHz and an LO of 152.600000 M
 answered `N` here, consistent with its documented position at bit 7 of the RX half on this model.
 
 
-## The MCEZ13 fixtures are re-aligned (2026-08)
+## The MCEZ13 fixtures are verbatim again (2026-08)
 
-These four were captured verbatim from what `MCEZ13R` puts on the wire, and that turned out to be
-**two bytes longer at the front than the codeplug proper**. The editor emits a two-byte header
-before the 126 codeplug bytes; its own reader expects the codeplug at offset 0 and looks for the
-reference dividers at `0x002`. Served verbatim, every read failed with `UNIT NOT IDENTIFIED`.
+These four are exactly what `MCEZ13R`'s `INITIALIZE` puts on the wire: 128 bytes beginning
+`00 00 81 ED 16 81 12 01`. Served verbatim they read `READING OK` and write `WRITING OK`, on all
+four bands, with the editor's own checksum byte untouched and the whole 128 bytes summing to
+`0xFF`.
 
-Dropping those two bytes (and padding two at the end, to keep the 128-byte device size) makes the
-same image read `EEPROM WITH 128 BYTE / READING OK` **with the editor's own checksum byte
-untouched**, and puts `1681 1201` where the `REF_DIV.001` lookup expects them. `tools/eza.py` now
-strips the prefix at capture time.
+**They were re-aligned for a while, and that was a mistake.** An earlier revision of this file
+recorded that the editor "emits a two-byte header before the 126 codeplug bytes" which "its own
+reader does not expect", that serving the capture verbatim always gave `UNIT NOT IDENTIFIED`, and
+that dropping the two leading bytes fixed it. The symptom was real; the cause was not. The ident
+being served was malformed — with a leading NUL, the build's type check
+(`Copy(ident,1,7) = 'EZ3.00.'`) is never reached and it branches around identification entirely.
+With an ident of the right shape nothing needs dropping.
 
-The likeliest reading, and the radio owner's: **the radio swallows those two bytes** — they are
-consumed by the device or are a short message to the firmware — which would make write and read
-consistent on real hardware and inconsistent only against a simulator that stores everything it is
-sent. Answering `)02` with a header distinct from the codeplug does make writes succeed, which
-supports it. It remains a hypothesis until a radio settles it.
+The cost of getting that wrong was that every MCEZ13 offset in this project sat two bytes low —
+these fixtures, the golden vectors generated from them, and the model offsets read off those, all
+self-consistent and all wrong. The reference dividers are at `0x004`, not `0x002`; the checksum
+byte is `0x003` and covers all 128 bytes, not 126.
+
+The hypothesis that "the radio swallows those two bytes" is **withdrawn**. There is nothing to
+swallow: the editor reads back exactly what it writes.
+
+What is still open: the MCEZ13 ident remains **synthetic**. It is the right shape — it satisfies
+every check the 1987 software makes — but no MCEZ13 radio has ever been read, so the two bytes at
+`0x000:0x001` are among the most useful things a real one could settle.
 
 ## `eza9_radio.bin` — the first real EZA 9 (2026-08)
 

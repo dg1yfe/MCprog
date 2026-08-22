@@ -28,8 +28,27 @@ mcprog --list-models                            models compiled into this build
 | `--no-line-setup` | skip the 1.8 s DTR/RTS opening sequence |
 | `--enable-write` | permit writing; without it no write path exists (W-1) |
 
-DTR supplies the interface's level shifter; RTS drives the radio's HUB/PGM input, which selects
-programming mode. A real radio needs both left alone.
+### Control lines
+
+Neither line is modem control and there is no handshake. Required states, and why:
+
+| line | required state | RS-232 level | reason |
+|---|---|---|---|
+| DTR | **de-asserted** | negative | supplies the interface's level shifter. DTR drives a BC557 (PNP) through 27 k, which conducts only with its base pulled negative. |
+| RTS | **asserted** | positive | wired straight through to the radio's HUB/PGM input. A positive level there selects programming mode. |
+
+A control line sits at its negative level when de-asserted, so `MCR=0` is what puts negative on DTR.
+The opening sequence (P-12) is `MCR=0`, 500 ms, assert RTS, 1300 ms — total 1.8 s, which
+`--no-line-setup` skips.
+
+Measured on hardware, 17 Aug 2026: **RTS asserted is what decides whether the radio answers.** It
+replied on `DTR=0 RTS=1` *and* `DTR=1 RTS=1`, and was silent on both combinations with RTS
+de-asserted, so the DTR polarity was not what settled it — the negative-rail reading is from the
+schematic and the interface builder, not from a measurement at the shifter.
+
+**De-asserting RTS ends the session.** After a probe dropped RTS, that radio never spoke again —
+not to the following probe, nor to a fresh session that re-asserted RTS and waited the full 1.8 s.
+Power-cycle before retrying. One run, one radio; the mechanism is not established.
 
 ## Models
 
@@ -77,7 +96,7 @@ cross-compiled from a Unix host and has never been built or run on Windows.
 | component | state |
 |---|---|
 | codeplug library | four models; decode, edit, checksum |
-| protocol library | replays all three hardware captures byte for byte |
+| protocol library | replays all three recorded hardware sessions byte for byte (four files: the 2009 read is a PC/TRX pair) |
 | TUI | channel list, per-channel editor, PL, options, timers, save |
 | serial transport | POSIX — used against a real radio 17 Aug 2026; Win32 compiles, never run |
 | write path | gated, backed up, verified per record (W-1..W-6) |
@@ -102,9 +121,9 @@ mcprog --selftest report.md
   radio behaviour.
 - Emits `report.md`, `report.md.trace` (timestamped wire log in conformance format) and
   `report.md.dat` (the codeplug read).
-- First probe tries all four DTR/RTS combinations. MCprog's own choice (DTR de-asserted, RTS
-  asserted) has never been confirmed on hardware; if it is wrong, nothing else works. The selftest
-  determines this in ~10 s and continues on whichever combination answered.
+- First probe tries all four DTR/RTS combinations and reports which the radio answers on.
+  Because dropping RTS can end the session, it stops at the first that answers and keeps that port
+  open.
 
 **Power-cycle the radio before each run.** On the first hardware run the radio stopped answering
 after its programming mode was interrupted and did not recover within that session.

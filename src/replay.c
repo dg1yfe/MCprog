@@ -177,11 +177,6 @@ int mc_replay_exhausted(mc_replay *r)
 	return r->pos >= r->n ? 0 : (int)r->pos;
 }
 
-const char *mc_replay_name(mc_replay *r)
-{
-	return r->name;
-}
-
 void mc_replay_close(mc_replay *r)
 {
 	free(r->val);

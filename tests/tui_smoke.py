@@ -26,12 +26,17 @@ library underneath it.  Run from the repository root after `make`:
 
     python3 tests/tui_smoke.py
 """
-import os, pty, select, shutil, signal, sys, time
+import atexit, os, pty, select, shutil, signal, sys, time
 
 BIN = os.path.abspath('build/mcprog')
 if not os.access(BIN, os.X_OK):
     sys.exit('%s is not built -- run `make` first' % BIN)
-TMP = '/tmp/mc_tui_smoke.DAT'
+TMP = '/tmp/mc_tui_smoke.%d.DAT' % os.getpid()
+atexit.register(lambda: os.path.exists(TMP) and os.unlink(TMP))
+
+# NOT safe to run concurrently with itself: the radio half writes W-2 backups into the working
+# directory under a per-second timestamp, and two runs then find each other's.  `make check' runs
+# it once; if you are parallelising, give each run its own directory.
 ESC, CR = b'\x1b', b'\r'
 ok = bad = 0
 
@@ -45,7 +50,7 @@ def check(cond, what):
         print('FAIL  %s' % what)
 
 
-def drive(keys, src, model=None, settle=0.30):
+def drive(keys, src, model=None, settle=2.0):
     shutil.copyfile(src, TMP)
     before = open(TMP, 'rb').read()
     argv = [BIN] + (['--model', model] if model else []) + [TMP]
@@ -56,15 +61,30 @@ def drive(keys, src, model=None, settle=0.30):
         os._exit(1)
     out = b''
 
-    def pump(t):
+    def pump(t, quiet=0.08):
+        """Read until the stream has been silent for `quiet` seconds, or `t` elapses.
+
+        A fixed sleep here is a race: under load the program may not have finished drawing when the
+        next key is sent, and the first keypress then lands on the model-detection note instead of
+        the channel list.  That failed twice during full `make check' runs and never once in ten
+        isolated runs, which is exactly the signature.  Waiting for quiet is both faster when idle
+        and correct when not.
+        """
         nonlocal out
         end = time.time() + t
+        last = time.time()
         while time.time() < end:
-            if select.select([fd], [], [], 0.05)[0]:
+            if select.select([fd], [], [], 0.02)[0]:
                 try:
-                    out += os.read(fd, 65536)
+                    d = os.read(fd, 65536)
                 except OSError:
                     return
+                if not d:
+                    return
+                out += d
+                last = time.time()
+            elif time.time() - last >= quiet:
+                return
     pump(settle)
     for k in keys:
         os.write(fd, k)

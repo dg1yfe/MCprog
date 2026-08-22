@@ -346,9 +346,10 @@ and diffing what it wrote (`../doc/EEPROM_MAP_EV9.md`, `../doc/EEPROM_MAP_EZA.md
 
 Three traps in one table: bit 3 means different things on the two families, EZA 9 splits bit 7 by
 half, and the EZA 1/3 clock shift is stored **inverted** — the bit is *set* when the screen shows
-`N`. The EVA row is pinned on the SEL5 build. `MCEV_56`'s own per-channel screen has
-since been found and driven, and it exposes only TX frequency, RX frequency and clock shift — so
-it corroborates bit 3 and says nothing about the rest. It also shows that the two builds differ in
+`N`. The EVA row is pinned on the SEL5 build **and independently reproduced on the
+5/6-tone one**: driving `MCEV_56`'s editor and diffing what the radio received moves bit 3 for
+clock shift, 4 for decode, 5 for TX inhibit, 6 for encode and 7 for RF power — every one in **both
+halves** of the record, and only in the channel addressed. It also shows that the two builds differ in
 *which half they read*: `MCEV9M` writes clock shift into bit 3 of both halves, `MCEV_56` displays
 the TX half's bit 3 alone. Write both halves and the difference cannot bite you
 (`../doc/EEPROM_MAP.md`). **[C]** MCEZ13 has no per-channel encode/decode/TX-inhibit at all; its PL lives in tables and TX

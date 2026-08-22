@@ -23,12 +23,11 @@
  */
 /* Writing a codeplug to a radio -- spec.md section 8.
  *
- * W-5, the write counter, is deliberately not implemented.  The counter's offset differs by model
- * and is only partly measured -- 0x0AF on the SEL5 EVA, 0x09E on the EZA 9, and on the 5/6-tone
- * build a write moves 0x0B0 and 0x0B1 together, of which only one is plausibly a counter.  Guessing
- * would mean writing a byte we cannot account for into somebody's radio, which is exactly what W-3
- * exists to prevent.  Not incrementing it costs only that the radio does not record having been
- * reprogrammed.  It stays unimplemented until the offsets are measured per model.
+ * W-5, the write counter, IS implemented, and only for radio writes: the bytes handed to the radio
+ * carry a bumped counter and a recomputed checksum, while the caller's image is left exactly as it
+ * was, so saving a file never advances it.  The law is not an eight-bit increment -- see
+ * mc_write_counter_next in codeplug.c.  Models with no measured counter (the 5/6-tone build, which
+ * keeps a date there instead, and MCEZ13) are written unchanged.
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -55,6 +54,8 @@ static int ours(const mc_model *m, size_t off)
 	if (m->aak && off == m->aak)
 		return 1;
 	if (m->pl_mode && off == m->pl_mode)
+		return 1;
+	if (m->wcount && off == m->wcount)   /* W-5: we are about to bump it anyway */
 		return 1;
 	return 0;
 }
@@ -162,7 +163,8 @@ static int refuse(mc_write_report *rep, const char *fmt, ...)
 
 int mc_write_radio(mc_session *s, const mc_image *img, mc_write_report *rep)
 {
-	static uint8_t radio[MC_IMG_MAX];
+	static uint8_t radio[MC_IMG_MAX], out[MC_IMG_MAX];
+	mc_image sent;
 	size_t rlen = 0;
 	struct vctx v;
 	FILE *f;
@@ -218,11 +220,21 @@ int mc_write_radio(mc_session *s, const mc_image *img, mc_write_report *rep)
 		return refuse(rep, "the radio already holds exactly this codeplug");
 	}
 
+	/* W-5: the radio's copy records having been reprogrammed; the caller's image does not.  The
+	 * bump happens after every gate has passed, so a refused write never advances it. */
+	memcpy(out, img->bytes, img->len);
+	sent = *img;
+	sent.bytes = out;
+	if (mc_write_counter_bump(&sent) == 0) {
+		mc_checksum_fix(&sent);
+		rep->counter = 1;
+	}
+
 	/* W-4, W-6: every record in order, each read back and compared. */
-	v.img = img;
+	v.img = &sent;
 	v.p = mc_band_p(mc_band_index(img));
 	v.err[0] = 0;
-	if (mc_write_all(s, img->bytes, img->len, verify_record, &v) != 0) {
+	if (mc_write_all(s, sent.bytes, sent.len, verify_record, &v) != 0) {
 		/* The backup path leads, because after a half-written EEPROM it is the only thing the user
 		 * strictly needs from this sentence. */
 		snprintf(rep->err, sizeof rep->err,

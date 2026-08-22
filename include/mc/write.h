@@ -41,6 +41,7 @@ typedef struct {
 	int records;        /* records written and verified */
 	int changed;        /* bytes that differ from what the radio held */
 	size_t radio_len;   /* what the pre-write read returned */
+	int counter;      /* W-5: 1 if the counter was bumped for this write, 0 if the model has none */
 } mc_write_report;
 
 /* Compare `img` against what the radio holds and report how many bytes differ, or -1 with `why`
@@ -73,7 +74,9 @@ int mc_write_verify_record(const mc_image *img, unsigned p, uint16_t addr, const
  *        never by bytes (K-11)
  *   W-6  records in order 0..N, as the original writes them
  *
- * W-5 (the write counter) is deliberately NOT implemented -- see the note in write.c.
+ *   W-5  the write counter is bumped in the bytes sent to the radio, and the checksum
+ *        recomputed -- the caller's image is not touched, so a file save never advances it.
+ *        Models with no measured counter are sent unchanged; `rep->counter` says which happened
  *
  * Returns 0 on success, -1 with rep->err set otherwise.
  */

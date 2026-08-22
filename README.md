@@ -185,6 +185,9 @@ Reading the spec is worth it before changing anything, but these are the ones th
   they sit in. Both facts come from the table the original itself walks, not from fitting: a
   two-point fit of the synthesiser lock time is off by a millisecond, and the sample codeplug has
   zeroes exactly where the mask bits would have shown.
+* **The write counter is four bits, not eight.** `0x1F` becomes `0x10`, not `0x20`: the low nibble
+  counts and bit 4 is *set* on wrap. Adding one to the whole byte corrupts whatever bits 5-7 hold,
+  and on the 5/6-tone build that offset is not a counter at all -- it is the programming date.
 * **The PL tone scale is not one constant.** Every EVA and EZ9 build carries 7.984, every MCEZ13
   build 7.9844 — and exactly one of the 39 EIA tones, 118.8 Hz, tells them apart. The scale is a
   per-model field, not a `#define`.

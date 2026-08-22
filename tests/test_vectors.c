@@ -308,7 +308,8 @@ static void test_parity(void)
 
 static void test_pl(void)
 {
-	static const char *FILES[] = { "testdata/pl/pl.vec", "testdata/timers/timers.vec" };
+	static const char *FILES[] = { "testdata/pl/pl.vec", "testdata/timers/timers.vec",
+	                               "testdata/wcount/wcount.vec" };
 	size_t vi;
 
 	for (vi = 0; vi < sizeof FILES / sizeof FILES[0]; vi++) {
@@ -396,6 +397,14 @@ static void test_pl(void)
 			memset(buf, 0x5A, sizeof buf);
 			ok(mc_timer_set_ms(&scratch, idx, dhz) != 0 && buf[0xB3] == 0x5A, "K-16",
 			   "U-3: a value the timer law cannot spell is refused and writes nothing");
+		} else if (sscanf(line, "WCOUNT %63s %x %x", mname, &off, &mask) == 3) {
+			const mc_model *m = mc_model_by_name(mname);
+			ok(m && m->wcount == off && m->wcount_clr == mask, "W-5",
+			   "the model carries the write counter that was measured for it");
+		} else if (sscanf(line, "WCNEXT %63s %x %x", mname, &word, &dhz) == 3) {
+			const mc_model *m = mc_model_by_name(mname);
+			ok(m && mc_write_counter_next(m, (uint8_t)word) == (uint8_t)dhz, "W-5",
+			   "one write advances the counter exactly as the radio saw it");
 		} else if (sscanf(line, "PLMODELK model=%63s k=%u", mname, &cnt) == 2) {
 			const mc_model *m = mc_model_by_name(mname);
 			if (!m) {

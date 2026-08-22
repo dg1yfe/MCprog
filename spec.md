@@ -390,14 +390,41 @@ would change nothing is refused rather than performed.
 **W-4** Verify every record after writing (P-42). Abort on mismatch, naming the record, the offset
 and the backup path.
 **W-5** Increment the write counter on radio writes only, never on file saves, then recompute the
-checksum.
+checksum. **Implemented**, per model, from measurement.
 
-> **Not implemented, deliberately.** The counter's offset differs per model and is only partly
-> measured -- 0x0AF on the SEL5 EVA, 0x09E on the EZA 9, and on the 5/6-tone build a write moves
-> 0x0B0 and 0x0B1 together, of which only one is plausibly a counter. Implementing it from a guess
-> would write a byte MCprog cannot account for into somebody's radio, which is what W-3 exists to
-> prevent. The cost of omitting it is that the radio does not record having been reprogrammed.
-> **[?]**
+| model | counter | on write |
+|---|---|---|
+| `eva_sel5` | `0x0AF` | bits 0-3 count; bit 4 **set** on wrap; bits 5-7 preserved |
+| `eza_sel5` | `0x09E` | the same, **and bit 7 cleared** |
+| `eva_56` | — | keeps its programming *date* at `0x0AF`-`0x0B1`; no counter |
+| `eza_cspl` | — | not measured; that build refuses to write under emulation |
+
+> Measured by chaining read-write cycles against the 1987 software and the simulated radio
+> (`../tools/wcounter.py`). A read followed by a write with **no edit in between** moves exactly
+> two bytes — this one and the checksum compensating for it (K-2) — and repeating with the
+> emulated clock moved gives the identical diff, which is what separates a counter from a date.
+>
+> **It is not an eight-bit increment, and that matters.** `0x1F` becomes `0x10`, not `0x20`: on
+> wrap the low nibble resets and bit 4 is *set*, so bit 4 reads as a sticky "reprogrammed more than
+> fifteen times" flag rather than a fifth counter bit. Seventeen planted values pin it on the EVA
+> and twelve on the EZA (`testdata/wcount/wcount.vec`). A programmer that adds one to the whole
+> byte corrupts whatever bits 5-7 hold.
+>
+> The bump lands only in the bytes handed to the radio: `mc_write_radio` copies the image, bumps
+> the copy and fixes its checksum, so the caller's codeplug — and therefore any file it saves — is
+> byte-for-byte unchanged. It happens after every W-3 gate has passed, so a refused write never
+> advances it.
+>
+> **`eva_56` is the trap.** `0x0AF` is a write counter on the SEL5 EVA and the *year* of the
+> programming date on the 5/6-tone build — same offset, two 512-byte models MCprog cannot tell
+> apart by size. Moving the emulator's clock proves it: 1987-03-15 writes `87 03 15`, 2026-12-31
+> writes `C6 12 31`, the year being `((y-1900) div 10)*16 + ((y-1900) mod 10)`. MCprog writes
+> neither on that model. **[C]**
+>
+> **MCEZ13 stays empty.** It reaches `WRITING` and stops with `ERROR : UNITS EXCHANGED`, one of a
+> family of write guards in the build. The session identifies the radio exactly once, so it is not
+> comparing two idents; the likely cause is that the MCEZ13 ident MCprog's emulation uses is
+> synthetic. Settling it needs a real radio. **[?]**
 **W-6** Record order 0..N faithful to the original. `--checksum-last` may be offered, but the
 faithful order is the only one known to work on hardware.
 

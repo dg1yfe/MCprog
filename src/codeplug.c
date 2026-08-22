@@ -594,3 +594,24 @@ int mc_timer_set_ms(mc_image *img, size_t i, unsigned ms)
 	}
 	return 0;
 }
+
+/* ---- the write counter (W-5) ---------------------------------------------------------------- */
+
+uint8_t mc_write_counter_next(const mc_model *m, uint8_t cur)
+{
+	unsigned lo = (unsigned)(cur & 0x0Fu) + 1u;
+	uint8_t v = lo > 0x0Fu ? (uint8_t)((cur | 0x10u) & 0xF0u)   /* wrap: clear the count, SET b4 */
+	                       : (uint8_t)((cur & 0xF0u) | lo);
+	return (uint8_t)(v & ~m->wcount_clr);
+}
+
+int mc_write_counter_bump(mc_image *img)
+{
+	const mc_model *m = img->model;
+
+	if (!m->wcount || (size_t)m->wcount >= img->len)
+		return -1;
+	img->bytes[m->wcount] = mc_write_counter_next(m, img->bytes[m->wcount]);
+	return 0;
+}
+

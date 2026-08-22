@@ -1,0 +1,46 @@
+# W-5, the write counter.  Every row was measured by planting the value in a codeplug, letting the
+# 1987 software read it and write it back to the simulated radio, and reading off what arrived
+# (../../../tools/wcounter.py; doc/EEPROM_MAP_EV9.md, doc/EEPROM_MAP_EZA.md).
+#
+# It is NOT an eight-bit increment.  Bits 0-3 count; on wrap they reset and bit 4 is SET, not
+# carried into -- 0x1F gives 0x10, not 0x20.  Bits 5-7 are preserved, except that the EZA 9
+# clears bit 7 and the EVA does not.
+#
+# WCOUNT model offset clearmask
+WCOUNT eva_sel5 0af 00
+WCOUNT eza_sel5 09e 80
+# eva_56 keeps its programming DATE at 0x0AF-0x0B1 and has no counter; MCEZ13 has none measured.
+WCOUNT eva_56 000 00
+WCOUNT eza_cspl 000 00
+#
+# WCNEXT model before after  -- one write
+WCNEXT eva_sel5 00 01
+WCNEXT eva_sel5 09 0a
+WCNEXT eva_sel5 39 3a
+WCNEXT eva_sel5 a3 a4
+WCNEXT eva_sel5 fe ff
+WCNEXT eva_sel5 0f 10
+WCNEXT eva_sel5 1f 10
+WCNEXT eva_sel5 2f 30
+WCNEXT eva_sel5 3f 30
+WCNEXT eva_sel5 4f 50
+WCNEXT eva_sel5 5f 50
+WCNEXT eva_sel5 6f 70
+WCNEXT eva_sel5 7f 70
+WCNEXT eva_sel5 8f 90
+WCNEXT eva_sel5 9f 90
+WCNEXT eva_sel5 bf b0
+WCNEXT eva_sel5 ff f0
+# the EZA clears bit 7 as well
+WCNEXT eza_sel5 00 01
+WCNEXT eza_sel5 09 0a
+WCNEXT eza_sel5 40 41
+WCNEXT eza_sel5 0f 10
+WCNEXT eza_sel5 2f 30
+WCNEXT eza_sel5 4f 50
+WCNEXT eza_sel5 7f 70
+WCNEXT eza_sel5 80 01
+WCNEXT eza_sel5 8f 10
+WCNEXT eza_sel5 af 30
+WCNEXT eza_sel5 c0 41
+WCNEXT eza_sel5 ff 70

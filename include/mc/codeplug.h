@@ -80,6 +80,8 @@ typedef struct {
 	const struct mc_timer *timers; /* K-16, NULL where the block is not measured        */
 	uint8_t ntimers;
 	uint16_t aak;      /* auto-acknowledge delay byte (K-15); 0 = not established here */
+	uint16_t wcount;   /* W-5 write counter byte; 0 = this model has no measured one    */
+	uint8_t wcount_clr;/* bits the original clears when it writes (EZA 9 clears bit 7)  */
 	const char *about; /* which radios this describes, for --list-models               */
 } mc_model;
 
@@ -253,6 +255,26 @@ unsigned mc_timer_decode(const mc_timer *t, unsigned raw);
 unsigned mc_timer_get_ms(const mc_image *img, size_t i);
 /* 0, or -1 if `ms` is not representable under that timer's law. */
 int mc_timer_set_ms(mc_image *img, size_t i, unsigned ms);
+
+/* ---- the write counter (W-5) ------------------------------------------------------------------
+ * Measured by chaining read-write cycles against the 1987 software and the simulated radio
+ * (../tools/wcounter.py, ../doc/EEPROM_MAP_EV9.md, ../doc/EEPROM_MAP_EZA.md).  A read followed by
+ * a write with no edit in between moves exactly two bytes: this one and the checksum.
+ *
+ * It is NOT an eight-bit count.  Bits 0-3 count; on wrap they reset to zero and bit 4 is **set**,
+ * not carried into -- 0x1F becomes 0x10, not 0x20 -- so bit 4 reads as a sticky "reprogrammed more
+ * than fifteen times" flag.  Bits 5-7 are left alone, except that the EZA 9 clears bit 7 and the
+ * EVA does not.
+ *
+ * Only radio writes bump it, never file saves (W-5).  `MCEV_56' has none: the bytes at the same
+ * offset are its programming date, and a second write on the same day changes nothing.  MCEZ13 has
+ * none measured -- that build refuses to write under emulation with ERROR : UNITS EXCHANGED, and
+ * settling it needs a real radio's ident.
+ */
+uint8_t mc_write_counter_next(const mc_model *m, uint8_t cur);
+/* Advance the counter in place.  0, or -1 if this model has no measured counter (nothing written).
+ * The caller must recompute the checksum afterwards. */
+int mc_write_counter_bump(mc_image *img);
 
 #define MC_PL_K_EVA   79840u  /* 7.9840 -- every EVA and EZ9 build */
 #define MC_PL_K_EZ13  79844u  /* 7.9844 -- every MCEZ13 build      */

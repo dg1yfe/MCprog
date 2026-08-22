@@ -411,6 +411,81 @@ static void test_write_through(void)
 	free(real);
 }
 
+/* W-5: the radio records having been reprogrammed; the caller's image does not.
+ *
+ * The counter is not an eight-bit increment -- bits 0-3 count and bit 4 is SET on wrap -- so this
+ * checks the value the radio ends up with against mc_write_counter_next, and checks that the
+ * image the caller handed in is byte-for-byte what it was.  Saving that image to a file must not
+ * advance anything. */
+static void test_write_counter(void)
+{
+	static const char *NAMES[] = { "eva_sel5", "eza_sel5" };
+	static const char *FIX[] = { "fixtures/eva9_real.bin", "fixtures/eza9_programmed.bin" };
+	size_t k;
+
+	for (k = 0; k < sizeof NAMES / sizeof NAMES[0]; k++) {
+		const mc_model *m = mc_model_by_name(NAMES[k]);
+		uint8_t *real, *after = NULL, buf[512], before[512];
+		size_t rlen, blen = 0;
+		mc_write_report rep;
+		mc_image img;
+		struct radio r;
+		int rc;
+		uint8_t want;
+
+		real = slurp(FIX[k], &rlen);
+		if (!real)
+			continue;
+		if (!m || !m->wcount || rlen > sizeof buf) {
+			failf("W-5", "%s: no counter or fixture too large", NAMES[k]);
+			free(real);
+			continue;
+		}
+		memcpy(buf, real, rlen);
+		img.model = m;
+		img.bytes = buf;
+		img.len = rlen;
+		bump_tx(&img);                   /* something to write, so W-3 does not refuse */
+		fixsum(&img);
+		memcpy(before, buf, rlen);
+		want = mc_write_counter_next(m, buf[m->wcount]);
+
+		if (start_radio(&r, real, rlen) != 0) {
+			failf("W-5", "%s: could not start the fake radio", NAMES[k]);
+			free(real);
+			continue;
+		}
+		rc = mc_write_radio(&r.s, &img, &rep);
+		after = stop_radio(&r, &blen);
+
+		ok(rc == 0, "W-5", "the write succeeds");
+		if (rc != 0)
+			printf("       (%s)\n", rep.err);
+		ok(rep.counter == 1, "W-5", "and it reports having bumped the counter");
+		ok(memcmp(buf, before, rlen) == 0, "W-5",
+		   "the caller's image is untouched -- a file save never advances the counter");
+		if (after && blen == rlen) {
+			mc_image w;
+			size_t i, extra = 0;
+			w.model = m;
+			w.bytes = after;
+			w.len = blen;
+			ok(after[m->wcount] == want, "W-5",
+			   "the radio's copy carries the counter the measured law gives");
+			ok(mc_checksum_valid(&w), "W-5", "and a checksum recomputed over it");
+			for (i = 0; i < rlen; i++)
+				if (after[i] != buf[i] && i != m->wcount && i != m->cksum)
+					extra++;
+			ok(extra == 0, "W-5",
+			   "nothing beyond the counter and the checksum differs from what was asked for");
+		} else {
+			failf("W-5", "%s: the radio returned %u bytes", NAMES[k], (unsigned)blen);
+		}
+		free(after);
+		free(real);
+	}
+}
+
 /* K-15 through the write path: an edited auto-acknowledge delay must be recognised as a byte
  * MCprog writes (K-30), or W-3 would refuse the write it just asked the user to confirm. */
 static void test_write_aak(void)
@@ -607,6 +682,7 @@ int main(int argc, char **argv)
 	printf("write (spec.md section 8)\n");
 	test_gates();
 	test_write_through();
+	test_write_counter();
 	test_write_aak();
 	test_backup_required();
 	test_verify_rule();

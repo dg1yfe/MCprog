@@ -288,8 +288,12 @@ if os.access('build/ptyserv', os.X_OK):
     # and verified", ncurses redrew only the tail after the shared "writ", and the full phrase
     # therefore appears contiguously in neither the stream nor ansi.py's render of it.
     check('and verified: 8 records' in out, 'W-4: the TUI writes the radio and says it verified')
-    check(diff and diff <= {0x000, 0x0E2, 0x0E3, 0x0E4},
-          'W-3: only the edited TX field and the checksum changed, got %s' % sorted(map(hex, diff)))
+    # 0x0AF is the write counter (W-5): a 512-byte image detects as eva_sel5, which has one, so a
+    # radio write moves it as well as the edited field and the checksum.
+    check(diff and diff <= {0x000, 0x0AF, 0x0E2, 0x0E3, 0x0E4},
+          'W-3: only the edited TX field, the checksum and the write counter changed, got %s'
+          % sorted(map(hex, diff)))
+    check(0x0AF in diff, 'W-5: and the write counter was bumped')
     check(sum(after) & 0xFF == 0xFF, 'K-2: the radio ends up with a valid checksum')
     dec = lambda t, P: ((((t[0] & 3) << 8) | t[1]) * P + t[2]) * (3125 if t[0] & 4 else 2500)
     check(dec(after[0xE2:0xE5], 80) == 171_262_500,

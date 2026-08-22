@@ -15,7 +15,7 @@ mcprog --port DEV --read f.DAT                  read to a file and exit
 mcprog --port DEV --identify                    print the radio's ident
 mcprog --port DEV --enable-write                read, edit, 'w' writes back
 mcprog --port DEV --write f.DAT --enable-write  write a file to the radio
-mcprog --selftest report.md                     hardware bring-up; finds the port itself
+mcprog --selftest report.md                     probe a real radio and write a report (dev aid)
 mcprog --dump-vec file.DAT                      conformance decode of a file
 mcprog --list-models                            models compiled into this build
 ```
@@ -24,6 +24,7 @@ mcprog --list-models                            models compiled into this build
 |---|---|
 | `--model NAME` | override model detection |
 | `--log FILE` | record the wire in `.trace` format (with `--port`) |
+| `--backup FILE` | name the pre-write backup; default is a timestamped file in the working directory, never overwritten (W-2) |
 | `--baud N` | default 1200; `0` leaves the port speed alone |
 | `--no-line-setup` | skip the 1.8 s DTR/RTS opening sequence |
 | `--enable-write` | permit writing; without it no write path exists (W-1) |
@@ -59,8 +60,10 @@ Power-cycle before retrying. One run, one radio; the mechanism is not establishe
 | `eza_sel5` | 256 B | 8 | MCEZ9 + R/M builds | auto-ack delay `0x076`; write counter `0x09E` |
 | `eza_cspl` | 128 B | 8 | MCEZ13 | PL scale 7.9844, not 7.984; no write counter |
 
-The two 512-byte models are indistinguishable by size; detection reports the ambiguity and assumes
-`eva_56`. Use `--model` to force.
+The two 512-byte models are indistinguishable by size and checksum. Detection reports the ambiguity
+and assumes **`eva_sel5`**: `eva_56` is the trunking variant, unlikely to be in amateur service
+without a firmware conversion, so a bare 512-byte image is far more likely to be an MCEV9. Use
+`--model` to force the other.
 
 ## Build
 
@@ -106,33 +109,7 @@ cross-compiled from a Unix host and has never been built or run on Windows.
 Everything not marked above is verified against captured hardware sessions, a fake radio on a pty,
 and the original software under emulation.
 
-## Hardware bring-up
-
-Run the selftest before anything else and keep its output.
-
-```
-mcprog --selftest report.md
-```
-
-- Finds the port itself: enumerates USB adapters first, then motherboard ports, uses whichever
-  answers. On failure it prints an **ACTION REQUIRED** block, waits up to 60 s, and retries.
-- Read-only. `--enable-write` additionally writes one record back — the radio's *own* bytes,
-  unchanged, after saving a copy — exercising write framing and the double ACK without altering
-  radio behaviour.
-- Emits `report.md`, `report.md.trace` (timestamped wire log in conformance format) and
-  `report.md.dat` (the codeplug read).
-- First probe tries all four DTR/RTS combinations and reports which the radio answers on.
-  Because dropping RTS can end the session, it stops at the first that answers and keeps that port
-  open.
-
-**Power-cycle the radio before each run.** On the first hardware run the radio stopped answering
-after its programming mode was interrupted and did not recover within that session.
-
-The first radio through it corrected four clauses of `spec.md` and exposed two selftest bugs. If
-you have a model that has never been read, that report and its wire log are worth more than any
-amount of emulation.
-
-### Without hardware
+## Running without a radio
 
 `build/ptyserv` presents a radio on a pseudo-terminal; the whole tool including the write path runs
 against it.
@@ -205,6 +182,36 @@ yields a tool that cannot identify a radio.
 golden vectors and fixtures all agreeing with each other, all derived from a capture that had been
 stripped of two leading bytes to work around a malformed ident. Only the radio's own software
 settled it.
+
+## Selftest — for developing the tool against real hardware
+
+`--selftest` is a development aid, not part of normal use. Editing a codeplug needs none of it.
+It exists so that someone with a radio can answer questions the emulator cannot, and send back a
+report: it probes the interface, measures timings, records what the radio does, and writes
+everything down in a form this project can consume.
+
+If you have a model that has never been read, this is the single most useful thing you can run.
+
+```
+mcprog --selftest report.md
+```
+
+- Finds the port itself: enumerates USB adapters first, then motherboard ports, uses whichever
+  answers. On failure it prints an **ACTION REQUIRED** block, waits up to 60 s, and retries.
+- Read-only. `--enable-write` additionally writes one record back — the radio's *own* bytes,
+  unchanged, after saving a copy — exercising write framing and the double ACK without altering
+  radio behaviour.
+- Emits `report.md`, `report.md.trace` (timestamped wire log in conformance format) and
+  `report.md.dat` (the codeplug read).
+- First probe tries all four DTR/RTS combinations and reports which the radio answers on.
+  Because dropping RTS can end the session, it stops at the first that answers and keeps that port
+  open.
+
+**Power-cycle the radio before each run.** On the first hardware run the radio stopped answering
+after its programming mode was interrupted and did not recover within that session.
+
+The first radio through it corrected four clauses of `spec.md` and exposed two bugs in the
+selftest itself.
 
 ## Licence
 

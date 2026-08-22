@@ -161,7 +161,8 @@ static int refuse(mc_write_report *rep, const char *fmt, ...)
 	return -1;
 }
 
-int mc_write_radio(mc_session *s, const mc_image *img, mc_write_report *rep)
+int mc_write_radio(mc_session *s, const mc_image *img, const char *backup_path,
+                   mc_write_report *rep)
 {
 	static uint8_t radio[MC_IMG_MAX], out[MC_IMG_MAX];
 	mc_image sent;
@@ -170,6 +171,7 @@ int mc_write_radio(mc_session *s, const mc_image *img, mc_write_report *rep)
 	FILE *f;
 	time_t now;
 	struct tm *tm;
+	char stamp[64];
 	int changed;
 	char why[220];
 
@@ -181,10 +183,32 @@ int mc_write_radio(mc_session *s, const mc_image *img, mc_write_report *rep)
 		return -1;
 	}
 	rep->radio_len = rlen;
-	now = time(NULL);
-	tm = localtime(&now);
-	strftime(rep->backup, sizeof rep->backup, "mcprog-backup-%Y%m%d-%H%M%S.dat", tm);
-	f = fopen(rep->backup, "wb");
+	if (backup_path && *backup_path) {
+		snprintf(rep->backup, sizeof rep->backup, "%s", backup_path);
+		f = fopen(rep->backup, "wb");
+	} else {
+		/* The generated name has one-second resolution, so two writes in the same second would
+		 * land on one file.  Never clobber a backup -- that is the one file W-2 exists to keep --
+		 * so try suffixes until one does not exist yet. */
+		int n;
+		now = time(NULL);
+		tm = localtime(&now);
+		strftime(stamp, sizeof stamp, "mcprog-backup-%Y%m%d-%H%M%S", tm);
+		for (n = 0, f = NULL; n < 100; n++) {
+			FILE *probe;
+			if (n)
+				snprintf(rep->backup, sizeof rep->backup, "%s-%d.dat", stamp, n);
+			else
+				snprintf(rep->backup, sizeof rep->backup, "%s.dat", stamp);
+			probe = fopen(rep->backup, "rb");
+			if (probe) {
+				fclose(probe);
+				continue;
+			}
+			f = fopen(rep->backup, "wb");
+			break;
+		}
+	}
 	if (!f || fwrite(radio, 1, rlen, f) != rlen) {
 		if (f)
 			fclose(f);

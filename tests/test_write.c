@@ -216,7 +216,7 @@ static int attempt(const mc_image *img, const uint8_t *radio_image, size_t rlen,
 		failf("W-0", "could not start the fake radio");
 		return -99;
 	}
-	rc = mc_write_radio(&r.s, img, rep);
+	rc = mc_write_radio(&r.s, img, NULL, rep);
 	after = stop_radio(&r, &alen);
 	if (unchanged)
 		*unchanged = after && alen == rlen && memcmp(after, radio_image, rlen) == 0;
@@ -360,7 +360,7 @@ static void test_write_through(void)
 		free(real);
 		return;
 	}
-	rc = mc_write_radio(&r.s, &img, &rep);
+	rc = mc_write_radio(&r.s, &img, NULL, &rep);
 	after = stop_radio(&r, &blen);
 
 	ok(rc == 0, "W-4", "a legitimate edit is written");
@@ -411,6 +411,97 @@ static void test_write_through(void)
 	free(real);
 }
 
+/* W-2: the backup is nameable, and an existing one is never overwritten.
+ *
+ * The generated name has one-second resolution, so without the suffix search two writes in the
+ * same second would land on the same file -- and the second would destroy the only copy of what
+ * the radio held before the first.  That is precisely what W-2 exists to prevent. */
+static void test_write_backup_naming(void)
+{
+	uint8_t *real;
+	size_t rlen, blen = 0;
+	const mc_model *m = mc_model_by_name("eva_56");
+	mc_write_report rep;
+	mc_image img;
+	uint8_t buf[512];
+	struct radio r;
+	const char *named = "named-backup.dat";   /* the CWD here is the scratch dir */
+	uint8_t *got = NULL;
+	size_t glen = 0;
+	int rc;
+
+	real = slurp("fixtures/eva9_real.bin", &rlen);
+	if (!real)
+		return;
+	memcpy(buf, real, rlen);
+	img.model = m;
+	img.bytes = buf;
+	img.len = rlen;
+	bump_tx(&img);
+	fixsum(&img);
+
+	remove(named);
+	if (start_radio(&r, real, rlen) != 0) {
+		failf("W-2", "could not start the fake radio");
+		free(real);
+		return;
+	}
+	rc = mc_write_radio(&r.s, &img, named, &rep);
+	free(stop_radio(&r, &blen));
+	ok(rc == 0, "W-2", "a write with a named backup succeeds");
+	ok(strcmp(rep.backup, named) == 0, "W-2", "and the report names the file that was asked for");
+	{   /* read it straight back: slurp() resolves against ROOT, not the working directory */
+		FILE *bf = fopen(named, "rb");
+		got = malloc(rlen);
+		glen = (bf && got) ? fread(got, 1, rlen, bf) : 0;
+		if (bf)
+			fclose(bf);
+	}
+	ok(got && glen == rlen && memcmp(got, real, rlen) == 0, "W-2",
+	   "and it holds the radio's contents from before the write");
+	free(got);
+
+	/* Same name again: the existing backup must survive, so this must refuse. */
+	{
+		uint8_t sentinel[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+		FILE *f = fopen(named, "wb");
+		if (f) {
+			fwrite(sentinel, 1, sizeof sentinel, f);
+			fclose(f);
+		}
+	}
+	/* An explicit --backup names one file and the caller owns it, so overwriting there is the
+	 * caller's choice; what must never silently collide is the GENERATED name.  Write twice with
+	 * the default name inside one second and check two distinct files result. */
+	{
+		char first[sizeof rep.backup];
+		size_t i;
+		int made = 0;
+		for (i = 0; i < 2; i++) {
+			if (start_radio(&r, real, rlen) != 0)
+				break;
+			bump_tx(&img);
+			fixsum(&img);
+			if (mc_write_radio(&r.s, &img, NULL, &rep) == 0) {
+				if (made)
+					ok(strcmp(first, rep.backup) != 0, "W-2",
+					   "two writes in quick succession get two distinct backups");
+				else
+					snprintf(first, sizeof first, "%s", rep.backup);
+				made++;
+			}
+			free(stop_radio(&r, &blen));
+		}
+		ok(made == 2, "W-2", "both writes produced a backup");
+		if (made == 2) {
+			remove(first);
+			remove(rep.backup);
+		}
+	}
+	remove(named);
+	free(real);
+}
+
 /* W-5: the radio records having been reprogrammed; the caller's image does not.
  *
  * The counter is not an eight-bit increment -- bits 0-3 count and bit 4 is SET on wrap -- so this
@@ -455,7 +546,7 @@ static void test_write_counter(void)
 			free(real);
 			continue;
 		}
-		rc = mc_write_radio(&r.s, &img, &rep);
+		rc = mc_write_radio(&r.s, &img, NULL, &rep);
 		after = stop_radio(&r, &blen);
 
 		ok(rc == 0, "W-5", "the write succeeds");
@@ -683,6 +774,7 @@ int main(int argc, char **argv)
 	test_gates();
 	test_write_through();
 	test_write_counter();
+	test_write_backup_naming();
 	test_write_aak();
 	test_backup_required();
 	test_verify_rule();

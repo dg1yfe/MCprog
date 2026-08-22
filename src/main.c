@@ -64,6 +64,8 @@ static void usage(FILE *f)
 	        "options:\n"
 	        "  --model NAME      override model detection\n"
 	        "  --log FILE        record the wire in .trace format (with --port)\n"
+	        "  --backup FILE     name the pre-write backup; default is a timestamped file in the\n"
+	        "                    working directory, never overwritten (W-2)\n"
 	        "  --baud N          default 1200; 0 leaves the port's speed alone\n"
 	        "  --no-line-setup   skip the DTR/RTS opening sequence (1.8 s).  DTR supplies the\n"
 	        "                    interface; RTS is the radio's HUB/PGM line, which selects\n"
@@ -232,6 +234,7 @@ static long read_radio(const char *port, const mc_serial_opts *o, const char *lo
 struct wctx {
 	const char *port;
 	const mc_serial_opts *opts;
+	const char *backup;        /* --backup; NULL lets mc_write_radio name it */
 };
 
 /* Opening the port again for the write, rather than holding it across an editing session, keeps
@@ -250,7 +253,7 @@ static int do_write(void *ctx, const mc_image *img, char *msg, size_t msgsz)
 		return -1;
 	}
 	mc_session_init(&s, t);
-	if (mc_write_radio(&s, img, &rep) != 0) {
+	if (mc_write_radio(&s, img, w->backup, &rep) != 0) {
 		snprintf(msg, msgsz, "NOT written: %s", rep.err);
 		mc_serial_close(t);
 		return -1;
@@ -264,6 +267,7 @@ static int do_write(void *ctx, const mc_image *img, char *msg, size_t msgsz)
 int main(int argc, char **argv)
 {
 	const char *port = NULL, *readto = NULL, *want = NULL, *logpath = NULL, *file = NULL;
+	const char *backup = NULL;
 	const char *writefrom = NULL, *selftest = NULL;
 	int identify = 0, dumpvec = 0, enable_write = 0, i;
 	mc_serial_opts o;
@@ -282,6 +286,8 @@ int main(int argc, char **argv)
 			want = argv[++i];
 		else if (!strcmp(argv[i], "--log") && i + 1 < argc)
 			logpath = argv[++i];
+		else if (!strcmp(argv[i], "--backup") && i + 1 < argc)
+			backup = argv[++i];
 		else if (!strcmp(argv[i], "--baud") && i + 1 < argc)
 			o.baud = (unsigned)atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--no-line-setup") || !strcmp(argv[i], "--no-modem-init"))
@@ -431,6 +437,7 @@ int main(int argc, char **argv)
 		char msg[256];
 		w.port = port;
 		w.opts = &o;
+		w.backup = backup;
 		if (writefrom) { /* non-interactive: write the named file and report */
 			int rc = do_write(&w, &img, msg, sizeof msg);
 			printf("%s\n", msg);

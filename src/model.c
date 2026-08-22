@@ -87,12 +87,17 @@ static const mc_timer TIMERS_EVA[] = {
 
 #define NT(x) (x), (uint8_t)(sizeof (x) / sizeof (x)[0])
 
+/* Order matters: mc_model_detect() takes the FIRST entry that fits, so this is the preference
+ * order when more than one model matches.  The two 512-byte models cannot be told apart by size or
+ * checksum, and `eva_sel5' leads deliberately -- `eva_56' is the trunking variant, which is
+ * unlikely to be in service as an amateur set without a firmware conversion, so a bare 512-byte
+ * image is far more likely to be an MCEV9. */
 static const mc_model MODELS[] = {
 	/* name       size cksum cklen  chan   band  refdiv nch str tx rx num  flags          PL: tone  list count mode   dec  max  k             timers          AAK    wcount/clr */
-	{ "eva_56",    512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10,  MC_PL_K_EVA,  NT(TIMERS_EVA), 0, 0, 0,
-	  "EVA, 5/6-tone signalling -- MCEV_56" },
 	{ "eva_sel5",  512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10,  MC_PL_K_EVA, NT(TIMERS_EVA), 0, 0x0AF, 0x00,
 	  "EVA, SEL5 signalling -- MCEV9, MCEV9M" },
+	{ "eva_56",    512, 0x000, 0,    0x0E0, 0x0DC, 0x0D4, 32, 8, 2, 5, 1, NF(FLAGS_EVA),  0x047, 0x047, 0x0CE, 0x1FD, 0,     10,  MC_PL_K_EVA,  NT(TIMERS_EVA), 0, 0, 0,
+	  "EVA, 5/6-tone signalling -- MCEV_56" },
 	{ "eza_sel5",  256, 0x000, 0,    0x0C8, 0x082, 0x0C4,  8, 6, 0, 3, 0, NF(FLAGS_EZA9), 0x02F, 0x031, 0x083, 0x07F, 0,     10,  MC_PL_K_EVA, NULL, 0,  0x076, 0x09E, 0x80,
 	  "EZA, SEL5 signalling -- MCEZ9 and its R/M builds" },
 	/* MCEZ13: no mode byte, an encoder table and a decoder table, and its checksum covers the

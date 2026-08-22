@@ -66,8 +66,10 @@ int mc_write_verify_record(const mc_image *img, unsigned p, uint16_t addr, const
  * W-1 is the caller's: this function does not check any flag, so do not call it unless the user
  * has asked for a write explicitly.  Everything else is here:
  *
- *   W-2  a full read is written to a timestamped file before the first write byte; if either the
- *        read or the backup fails, nothing is written
+ *   W-2  a full read is written to a backup file before the first write byte; if either the read
+ *        or the backup fails, nothing is written.  `backup_path' names it; NULL or "" generates
+ *        mcprog-backup-<date>-<time>.dat in the working directory, with a -1, -2, ... suffix if
+ *        that name is taken, because a backup is never overwritten
  *   W-3  fatal gates -- checksum valid, band programmed, size matches the radio, and every
  *        difference from the radio's copy accountable (K-30)
  *   W-4  each record is read back and compared; frequency fields compare by decoded frequency,
@@ -80,6 +82,7 @@ int mc_write_verify_record(const mc_image *img, unsigned p, uint16_t addr, const
  *
  * Returns 0 on success, -1 with rep->err set otherwise.
  */
-int mc_write_radio(mc_session *s, const mc_image *img, mc_write_report *rep);
+int mc_write_radio(mc_session *s, const mc_image *img, const char *backup_path,
+                   mc_write_report *rep);
 
 #endif /* MC_WRITE_H */

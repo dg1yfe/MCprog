@@ -320,6 +320,10 @@ came from. A value the law cannot spell is refused, never rounded (U-3).
 | model | size | checksum byte / extent | channels | band | ref dividers |
 |---|---|---|---|---|---|
 | `MCEV_56` 5/6-tone | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
+
+> The two 512-byte models cannot be told apart by size or checksum. Detection reports the
+> ambiguity and prefers **`eva_sel5`** (MCEV9): `eva_56` is the trunking variant and is unlikely
+> to be in amateur service without a firmware conversion.
 | `MCEV9` / `MCEV9M` SEL5 EVA | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEZ9` SEL5 EZA | 256 | 0x000 | 0x0C8, 8 × 6 | 0x082 b4-6 | 0x0C4 |
 | `MCEZ13` CS/PL | 128/256/512/1024 | **0x003**, whole device | 0x03B, 8 × 6 | 0x039 b4-6 | 0x004 |
@@ -384,8 +388,14 @@ allowed on confirmation; saving with ERRORs is refused.
 
 **W-1** Writing requires an explicit opt-in flag; absent it the action is visible but disabled, with
 the reason shown.
-**W-2** A full read of the radio is dumped to a timestamped backup file before the first write byte.
-Failure to read or to write the backup aborts the write.
+**W-2** A full read of the radio is dumped to a backup file before the first write byte. Failure to
+read or to write the backup aborts the write.
+
+> The caller may name the file (`--backup`). The generated default is
+> `mcprog-backup-<date>-<time>.dat` in the working directory, and **an existing backup is never
+> overwritten**: the timestamp has one-second resolution, so two writes in the same second would
+> otherwise land on one file and the second would destroy the only copy of what the radio held
+> before the first. A `-1`, `-2`, … suffix is appended until the name is free.
 **W-3** Pre-write gates, all fatal: checksum valid; band not 7; model and size match; every byte
 that differs from what the radio just returned is one MCprog itself writes (K-30). A write that
 would change nothing is refused rather than performed.

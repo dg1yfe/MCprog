@@ -42,9 +42,12 @@ MODELS = {
                      band=0x0DC, refdiv=0x0D4, numbered=True),
     'eza_sel5': dict(size=256, cksum=0x000, chan=0x0C8, nchan=8, stride=6, tx=0, rx=3,
                      band=0x082, refdiv=0x0C4, numbered=False),
-    # MCEZ13's checksum covers 126 of its 128 bytes, not the whole device
-    'eza_cspl': dict(size=128, cksum=0x001, cklen=126, chan=0x039, nchan=8, stride=6, tx=0, rx=3,
-                     band=0x037, refdiv=0x002, numbered=False),
+    # MCEZ13's checksum covers the whole 128 bytes and lives at 0x003.  Every offset in this row
+    # was two bytes low until the ident was fixed: the capture used to be stripped of two leading
+    # bytes to make it read back, and that was compensating for a malformed synthetic ident rather
+    # than for anything the radio does.  See ../../doc/EEPROM_MAP_EZA.md.
+    'eza_cspl': dict(size=128, cksum=0x003, cklen=0, chan=0x03B, nchan=8, stride=6, tx=0, rx=3,
+                     band=0x039, refdiv=0x004, numbered=False),
 }
 # --- per-model channel flag bits, spec K-22 ----------------------------------------------------
 # (name, bit, half, inverted, provenance).  half: 'both' | 'tx' | 'rx'.  These are NOT portable
@@ -57,7 +60,7 @@ FLAGS = {
                  ('tx_inhibit', 5, 'both', 0, 'C'), ('encode', 6, 'both', 0, 'C'),
                  ('clock_shift', 7, 'rx', 0, 'C'), ('power_high', 7, 'tx', 0, 'S')],
     # MCEZ13 carries almost no per-channel flags: PL lives in tables, TX inhibit is global.
-    'eza_cspl': [('clock_shift', 6, 'tx', 1, 'C'), ('reserved_b7', 7, 'tx', 0, 'S')],  # offsets -2
+    'eza_cspl': [('clock_shift', 6, 'tx', 1, 'C'), ('reserved_b7', 7, 'tx', 0, 'S')],
 }
 FLAGS['eva_sel5'] = FLAGS['eva_56']
 # --- PL / CTCSS, spec K-14 ---------------------------------------------------------------------
@@ -76,7 +79,7 @@ PL = {
     'eva_sel5': dict(tone=0x047, list=0x047, count=0x0CE, mode=0x1FD, max=10),
     'eza_sel5': dict(tone=0x02F, list=0x031, count=0x083, mode=0x07F, max=10),
     # MCEZ13 has no mode byte: an encoder table and, uniquely, a decoder table on its own law.
-    'eza_cspl': dict(tone=0x022, list=0x022, count=None, mode=None, dec=0x00E, max=10),
+    'eza_cspl': dict(tone=0x024, list=0x024, count=None, mode=None, dec=0x010, max=10),
 }
 
 

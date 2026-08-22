@@ -95,9 +95,15 @@ static const mc_model MODELS[] = {
 	  "EVA, SEL5 signalling -- MCEV9, MCEV9M" },
 	{ "eza_sel5",  256, 0x000, 0,    0x0C8, 0x082, 0x0C4,  8, 6, 0, 3, 0, NF(FLAGS_EZA9), 0x02F, 0x031, 0x083, 0x07F, 0,     10,  MC_PL_K_EVA, NULL, 0,  0x076, 0x09E, 0x80,
 	  "EZA, SEL5 signalling -- MCEZ9 and its R/M builds" },
-	/* MCEZ13: no mode byte -- an encoder table and a decoder table -- and its checksum covers 126
-	 * of its 128 bytes, measured off the sum loop at CS:0x767E. */
-	{ "eza_cspl",  128, 0x001, 126,  0x039, 0x037, 0x002,  8, 6, 0, 3, 0, NF(FLAGS_EZ13), 0x022, 0x022, 0,     0,     0x00E, 10,  MC_PL_K_EZ13, NULL, 0, 0, 0, 0,
+	/* MCEZ13: no mode byte, an encoder table and a decoder table, and its checksum covers the
+	 * WHOLE 128 bytes -- the sum loop at CS:0x767E runs 0..size-1 with size = 128, and the editor
+	 * zeroes 0x003 and stores the complement there (watched at CS:0x7B15/0x7B34).
+	 *
+	 * These offsets were all two bytes low until the ident was fixed.  tools/eza.py used to strip
+	 * two leading bytes off the INITIALIZE capture to make it read back, and every offset here was
+	 * then derived from the shifted image.  The strip was compensating for a malformed synthetic
+	 * ident, not for anything the radio does -- see ../doc/EEPROM_MAP_EZA.md. */
+	{ "eza_cspl",  128, 0x003, 0,    0x03B, 0x039, 0x004,  8, 6, 0, 3, 0, NF(FLAGS_EZ13), 0x024, 0x024, 0,     0,     0x010, 10,  MC_PL_K_EZ13, NULL, 0, 0, 0, 0,
 	  "EZA, CS/PL -- MCEZ13, the 128-byte variant" },
 };
 static const size_t NMODELS = sizeof MODELS / sizeof MODELS[0];

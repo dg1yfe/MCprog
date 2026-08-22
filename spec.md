@@ -181,12 +181,17 @@ frequency** (K-11). Any real mismatch aborts immediately, naming record and offs
 **K-1 Image.** The codeplug is the device's EEPROM verbatim. `.DAT` files are exactly these bytes,
 so old files load unchanged. **[C]**
 
-**K-2 Checksum.** One byte is chosen so that the covered range sums to `0xFF` mod 256. **Both the
-byte and the extent are per-model** (K-20): every model covers the whole device except **MCEZ13**,
-which covers all but its **last two bytes** — 126 of 128. That was measured off the sum loop at
-`CS:0x767E`, whose count comes from a variable, and confirmed by the comparison `cmp ax,0xff` that
-follows it. Summing the whole device on MCEZ13 gives the wrong answer whenever those last two bytes
-are non-zero. **[C]**
+**K-2 Checksum.** One byte is chosen so that the covered range sums to `0xFF` mod 256. **The byte
+is per-model** (K-20); the extent is the whole device on every model, MCEZ13 included. The sum loop
+at `CS:0x767E` runs `0 .. size-1` and `size` is 128 there — watched at runtime, not inferred. **[C]**
+
+> **This corrects a documented law.** MCEZ13's checksum was recorded as covering "126 of 128, all
+> but the last two bytes". It does not; that reading came from a fixture whose two leading bytes had
+> been stripped, which turned a 128-byte sum into a 126-byte one over a shifted array and moved
+> every MCEZ13 offset down by two. The strip was compensating for a malformed synthetic ident
+> rather than for anything the radio does — `../doc/EEPROM_MAP_EZA.md` has the whole chain. MCEZ13's
+> checksum byte is **`0x003`**: the editor zeroes it and stores the complement there, watched at
+> `CS:0x7B15` and `CS:0x7B34`.
 
 **K-10 Frequency.** Each 3-byte field:
 
@@ -317,7 +322,7 @@ came from. A value the law cannot spell is refused, never rounded (U-3).
 | `MCEV_56` 5/6-tone | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEV9` / `MCEV9M` SEL5 EVA | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEZ9` SEL5 EZA | 256 | 0x000 | 0x0C8, 8 × 6 | 0x082 b4-6 | 0x0C4 |
-| `MCEZ13` CS/PL | 128/256/512/1024 | **0x001**, covers 126 | 0x039, 8 × 6 | 0x037 b4-6 | 0x002 |
+| `MCEZ13` CS/PL | 128/256/512/1024 | **0x003**, whole device | 0x03B, 8 × 6 | 0x039 b4-6 | 0x004 |
 
 **K-21 Channel record.** EVA: `+0` BCD number, `+1` trakmode, `+2..4` TX, `+5..7` RX. EZA: `+0..2`
 TX, `+3..5` RX, with no number and no trakmode byte. **[C]**
@@ -421,10 +426,10 @@ checksum. **Implemented**, per model, from measurement.
 > writes `C6 12 31`, the year being `((y-1900) div 10)*16 + ((y-1900) mod 10)`. MCprog writes
 > neither on that model. **[C]**
 >
-> **MCEZ13 stays empty.** It reaches `WRITING` and stops with `ERROR : UNITS EXCHANGED`, one of a
-> family of write guards in the build. The session identifies the radio exactly once, so it is not
-> comparing two idents; the likely cause is that the MCEZ13 ident MCprog's emulation uses is
-> synthetic. Settling it needs a real radio. **[?]**
+> **MCEZ13 has none, and that is now measured rather than assumed.** It used to stop at `WRITING`
+> with `ERROR : UNITS EXCHANGED`; with a correctly shaped ident and an unshifted codeplug it reads
+> and writes end to end, and three chained cycles change **not one byte** — no counter, no date.
+> **[C]**
 **W-6** Record order 0..N faithful to the original. `--checksum-last` may be offered, but the
 faithful order is the only one known to work on hardware.
 

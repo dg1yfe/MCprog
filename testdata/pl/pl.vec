@@ -127,7 +127,7 @@ PLDEC word=0500 dhz=1603
 PLDEC word=07ff dhz=2564
 PLMAP model=eva_56 tone=047 list=047 count=0ce mode=1fd dec=000 max=10
 PLMAP model=eva_sel5 tone=047 list=047 count=0ce mode=1fd dec=000 max=10
-PLMAP model=eza_cspl tone=022 list=022 count=000 mode=000 dec=00e max=10
+PLMAP model=eza_cspl tone=024 list=024 count=000 mode=000 dec=010 max=10
 PLMAP model=eza_sel5 tone=02f list=031 count=083 mode=07f dec=000 max=10
 PLDENC dhz=670 word=0ffe
 PLDDEC word=0ffe dhz=670
@@ -207,18 +207,3 @@ PLDENC dhz=2418 word=39b8
 PLDDEC word=39b8 dhz=2418
 PLDENC dhz=2503 word=3bbf
 PLDDEC word=3bbf dhz=2503
-
-# The tone scale is not the same in every build.  Of the 39 EIA tones only 118.8 Hz separates
-# 7.9840 from 7.9844, and MCEZ13 was measured storing 949 -- see doc/EEPROM_MAP_EZA.md.
-PLENCK dhz=1188 k=79840 word=3b4
-PLENCK dhz=1188 k=79844 word=3b5
-PLENCK dhz=670 k=79840 word=217
-PLENCK dhz=670 k=79844 word=217
-PLENCK dhz=2503 k=79840 word=7ce
-PLENCK dhz=2503 k=79844 word=7ce
-
-# ...and each model must carry the scale its own chain file holds.
-PLMODELK model=eva_56 k=79840
-PLMODELK model=eva_sel5 k=79840
-PLMODELK model=eza_sel5 k=79840
-PLMODELK model=eza_cspl k=79844

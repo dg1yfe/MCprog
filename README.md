@@ -185,6 +185,10 @@ Reading the spec is worth it before changing anything, but these are the ones th
   they sit in. Both facts come from the table the original itself walks, not from fitting: a
   two-point fit of the synthesiser lock time is off by a millisecond, and the sample codeplug has
   zeroes exactly where the mask bits would have shown.
+* **A fixture can be wrong in a way every test agrees with.** MCEZ13's map was two bytes low
+  everywhere -- model offsets, golden vectors and fixtures all consistent with each other, and all
+  consistent with a capture that had been stripped of two leading bytes to work around a malformed
+  ident. Self-consistency is not correctness; only the radio's own software settles it.
 * **The write counter is four bits, not eight.** `0x1F` becomes `0x10`, not `0x20`: the low nibble
   counts and bit 4 is *set* on wrap. Adding one to the whole byte corrupts whatever bits 5-7 hold,
   and on the 5/6-tone build that offset is not a counter at all -- it is the programming date.

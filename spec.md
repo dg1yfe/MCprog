@@ -414,7 +414,7 @@ checksum. **Implemented**, per model, from measurement.
 |---|---|---|
 | `eva_sel5` | `0x0AF` | bits 0-3 count; bit 4 **set** on wrap; bits 5-7 preserved |
 | `eza_sel5` | `0x09E` | the same, **and bit 7 cleared** |
-| `eva_56` | — | keeps its programming *date* at `0x0AF`-`0x0B1`; no counter |
+| `eva_56` | — | keeps its programming *date* at `0x0AF`-`0x0B1`; no counter — see below |
 | `eza_cspl` | — | not measured; that build refuses to write under emulation |
 
 > Measured by chaining read-write cycles against the 1987 software and the simulated radio
@@ -432,6 +432,14 @@ checksum. **Implemented**, per model, from measurement.
 > the copy and fixes its checksum, so the caller's codeplug — and therefore any file it saves — is
 > byte-for-byte unchanged. It happens after every W-3 gate has passed, so a refused write never
 > advances it.
+>
+> **The 5/6-tone build genuinely has none, and that is worth stating twice** because it is the
+> surprising half: same radio, same 512-byte EEPROM, and the SEL5 build keeps a counter in the byte
+> the 5/6-tone build keeps a year in. Behaviour says so (three chained writes on a fixed date move
+> nothing) and so does the code — the byte-pair that reads the counter nibble, `push 0x00AF` then
+> `push 0x000F`, is in **every** EV9 `.000` overlay and in **no** MCEV_56 file. Where MCEV_56
+> touches `0x0AF` it writes the whole byte from a variable. Whether the radio's firmware reads
+> either is unknown; it is mask ROM. **[?]**
 >
 > **`eva_56` is the trap.** `0x0AF` is a write counter on the SEL5 EVA and the *year* of the
 > programming date on the 5/6-tone build — same offset, two 512-byte models MCprog cannot tell

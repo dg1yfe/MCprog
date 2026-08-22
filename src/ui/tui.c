@@ -527,7 +527,11 @@ static void edit_pl(void)
  * that the next radio-wide field has an obvious home. */
 static void edit_options(void)
 {
-	if (!mc_aak_supported(img.model)) {
+	size_t ntmr = mc_timer_count(img.model);
+	size_t row = 0;                        /* 0 = auto-ack, then one row per timer */
+	size_t nrow = (mc_aak_supported(img.model) ? 1 : 0) + ntmr;
+
+	if (nrow == 0) {
 		status("this model has no radio-wide options MCprog can edit");
 		getch();
 		return;
@@ -536,6 +540,8 @@ static void edit_options(void)
 		unsigned ms = mc_aak_get_ms(&img);
 		char buf[64], line[256];
 		int ch;
+		size_t i;
+		int aakrow = mc_aak_supported(img.model);
 
 		erase();
 		attron(A_BOLD);
@@ -543,35 +549,81 @@ static void edit_options(void)
 		attroff(A_BOLD);
 		mvprintw(1, 0, "model %s   shared by the whole radio", img.model->name);
 
-		attron(A_REVERSE);
-		if (ms)
-			mvprintw(3, 0, "  auto-acknowledge delay   %4u ms   (stored as %u x 1/64 s)", ms,
-			         mc_aak_encode_ms(ms));
-		else
-			mvprintw(3, 0, "  auto-acknowledge delay   not set");
-		attroff(A_REVERSE);
+		if (aakrow) {
+			if (row == 0)
+				attron(A_REVERSE);
+			if (ms)
+				mvprintw(3, 0, "  auto-acknowledge delay   %6u ms  (stored as %u x 1/64 s)",
+				         ms, mc_aak_encode_ms(ms));
+			else
+				mvprintw(3, 0, "  auto-acknowledge delay   not set");
+			if (row == 0)
+				attroff(A_REVERSE);
+		}
+		for (i = 0; i < ntmr; i++) {
+			const mc_timer *t = mc_timer_at(img.model, i);
+			if (row == i + (size_t)aakrow)
+				attron(A_REVERSE);
+			mvprintw((int)(3 + (size_t)aakrow + i), 0, "  %-24s %6u ms", t->name,
+			         mc_timer_get_ms(&img, i));
+			if (row == i + (size_t)aakrow)
+				attroff(A_REVERSE);
+		}
 
-		mvprintw(5, 0, "How long the radio waits before sending its automatic acknowledgement.");
-		mvprintw(6, 0, "Range %u-%u ms, stored as a count of 1/64 s, so the value is rounded to",
-		         MC_AAK_MIN_MS, MC_AAK_MAX_MS);
-		mvprintw(7, 0, "the nearest 15.625 ms.");
-		mvprintw(9, 0, "Only the repair build of the 1987 software ever exposed this field.");
+		if (row == 0 && aakrow) {
+			mvprintw((int)(5 + nrow), 0,
+			         "How long the radio waits before sending its automatic acknowledgement.");
+			mvprintw((int)(6 + nrow), 0,
+			         "Range %u-%u ms, a count of 1/64 s, so it rounds to the nearest 15.625 ms.",
+			         MC_AAK_MIN_MS, MC_AAK_MAX_MS);
+			mvprintw((int)(7 + nrow), 0,
+			         "Only the repair build of the 1987 software ever exposed this field.");
+		} else {
+			mvprintw((int)(5 + nrow), 0,
+			         "The timers the original shows on its `T' sub-screen (K-16).  Most are a");
+			mvprintw((int)(6 + nrow), 0,
+			         "byte or a big-endian word at 10 ms per count; the synth lock time and the");
+			mvprintw((int)(7 + nrow), 0,
+			         "TX time-out are not, and a value the law cannot represent is refused.");
+		}
 
-		status("enter edit   esc back");
+		status("up/down move   enter edit   esc back");
 		ch = getch();
 		if (ch == 27 || ch == 'q')
 			return;
+		if (ch == KEY_UP || ch == 'k') {
+			if (row) row--;
+			continue;
+		}
+		if (ch == KEY_DOWN || ch == 'j') {
+			if (row + 1 < nrow) row++;
+			continue;
+		}
 		if (ch != '\n' && ch != KEY_ENTER)
 			continue;
-		snprintf(line, sizeof line, "delay in ms (%u-%u): ", MC_AAK_MIN_MS, MC_AAK_MAX_MS);
-		if (prompt(line, buf, sizeof buf) != 0 || !buf[0])
-			continue;
-		if (mc_aak_set_ms(&img, (unsigned)atoi(buf)) != 0) {
-			snprintf(line, sizeof line, "%s is outside %u-%u ms -- refused, not clamped", buf,
-			         MC_AAK_MIN_MS, MC_AAK_MAX_MS);
-			status(line);
-			getch();
-			continue;
+		if (row == 0 && aakrow) {
+			snprintf(line, sizeof line, "delay in ms (%u-%u): ", MC_AAK_MIN_MS, MC_AAK_MAX_MS);
+			if (prompt(line, buf, sizeof buf) != 0 || !buf[0])
+				continue;
+			if (mc_aak_set_ms(&img, (unsigned)atoi(buf)) != 0) {
+				snprintf(line, sizeof line, "%s is outside %u-%u ms -- refused, not clamped",
+				         buf, MC_AAK_MIN_MS, MC_AAK_MAX_MS);
+				status(line);
+				getch();
+				continue;
+			}
+		} else {
+			size_t ti = row - (size_t)aakrow;
+			snprintf(line, sizeof line, "%s in ms: ", mc_timer_at(img.model, ti)->name);
+			if (prompt(line, buf, sizeof buf) != 0 || !buf[0])
+				continue;
+			if (mc_timer_set_ms(&img, ti, (unsigned)atoi(buf)) != 0) {
+				snprintf(line, sizeof line,
+				         "%s is not representable by that timer -- refused, not rounded", buf);
+				status(line);
+				getch();
+				continue;
+			}
 		}
 		dirty = 1;
 	}

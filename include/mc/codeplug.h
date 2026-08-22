@@ -76,6 +76,9 @@ typedef struct {
 	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable; 0 = model has none  */
 	uint16_t pl_dec;   /* PL DECODER table base (MCEZ13 only); 0 = model cannot decode */
 	uint8_t pl_max;    /* entries in the list                                          */
+	unsigned pl_k;     /* encoder scale x 10000 -- 79840 on EVA/EZ9, 79844 on MCEZ13   */
+	const struct mc_timer *timers; /* K-16, NULL where the block is not measured        */
+	uint8_t ntimers;
 	uint16_t aak;      /* auto-acknowledge delay byte (K-15); 0 = not established here */
 	const char *about; /* which radios this describes, for --list-models               */
 } mc_model;
@@ -212,14 +215,64 @@ unsigned mc_aak_get_ms(const mc_image *img);
  * is left exactly as found: the original never sets it and its meaning is unknown (K-30). */
 int mc_aak_set_ms(mc_image *img, unsigned ms);
 
+/* ---- timers (K-16) ---------------------------------------------------------------------------
+ * The original's timers sub-screen -- reached with `T' from any option page -- shows twelve fields,
+ * and it does not compute them one at a time: it walks four parallel word arrays of twelve entries,
+ * (offset, mask, A, B), through a single reader.  Both 512-byte families carry that table byte for
+ * byte identical (`MCEV_56' 0xC9B3, `MCEV9' 0x8C5D, and so on).  Its own law is
+ *
+ *     v       := ((cp[off] and $7F) shl 8 or cp[off+1]) and mask
+ *     display := Round(v * 10 / A) + B
+ *
+ * -- a real division ending in the Turbo Pascal runtime's Round entry, not an integer `div'.  That
+ * distinction is worth a millisecond: for the synthesiser lock (A = 12) truncation would show 80
+ * where the radio shows 81.  A is also the unit: six fields print seconds (A = 1000) and the rest
+ * milliseconds, so B is in whatever unit its field prints.
+ *
+ * This table keeps everything in milliseconds -- what the codeplug actually holds -- so `ms' here
+ * can be finer than the original's own screen can show.  Its seconds fields round 10 ms of rekey
+ * delay down to `0 sec'; the byte still holds 10 ms and MCprog says so.
+ *
+ * Values that the law cannot represent are REFUSED, never rounded into range (U-3), and every bit
+ * outside `mask' -- the enable, carrier-override, forced-reset and mode flags that share these
+ * words -- is left exactly as found (K-30).
+ */
+typedef struct mc_timer {
+	const char *name;
+	uint16_t off;    /* first byte of the value; two-byte fields are big-endian off:off+1    */
+	uint16_t mask;   /* the bits that are the value; the rest are flags and are preserved    */
+	uint8_t  width;  /* 1 or 2                                                               */
+	uint16_t den;    /* ms = round(v * 10 / den) + add_ms -- `A' from the original's table   */
+	uint16_t add_ms; /* `B', converted to ms                                                 */
+} mc_timer;
+
+size_t mc_timer_count(const mc_model *m);
+const mc_timer *mc_timer_at(const mc_model *m, size_t i);
+/* Milliseconds.  The raw law is exposed for the tests; 0 is a legitimate value here, unlike K-15. */
+unsigned mc_timer_decode(const mc_timer *t, unsigned raw);
+unsigned mc_timer_get_ms(const mc_image *img, size_t i);
+/* 0, or -1 if `ms` is not representable under that timer's law. */
+int mc_timer_set_ms(mc_image *img, size_t i, unsigned ms);
+
+#define MC_PL_K_EVA   79840u  /* 7.9840 -- every EVA and EZ9 build */
+#define MC_PL_K_EZ13  79844u  /* 7.9844 -- every MCEZ13 build      */
+
 typedef enum { MC_PL_OFF = 0, MC_PL_SINGLE, MC_PL_SELECTABLE, MC_PL_TABLE } mc_pl_mode;
 
 /* The standard list, index 0 = 0 meaning no PL.  Returns tenths of a Hz. */
 unsigned mc_pl_standard(size_t i);
 size_t mc_pl_standard_count(void);
 
-uint16_t mc_pl_encode(unsigned dhz);
+/* The tone scale is NOT the same in every build.  Every EVA and EZ9 chain file carries the Turbo
+ * Pascal real 7.984; every MCEZ13 build carries 7.9844 instead, and no 7.984 at all.  Theory says
+ * 150 x 2^16 / (4.9248 MHz / 4) = 7.984405, so MCEZ13 holds the more accurate figure.  Of the 39
+ * EIA tones only 118.8 Hz tells them apart -- 948 against 949 -- and MCEZ13 was measured storing
+ * 949.  mc_pl_encode keeps the EVA law for callers that have no model; the image-level accessors
+ * use the model's own. */
+uint16_t mc_pl_encode(unsigned dhz);                 /* EVA / EZ9 law, k = 7.9840 */
 unsigned mc_pl_decode(uint16_t word);
+uint16_t mc_pl_encode_k(unsigned dhz, unsigned k);   /* k = scale x 10000 */
+unsigned mc_pl_decode_k(uint16_t word, unsigned k);
 
 int mc_pl_supported(const mc_model *m);
 /* MCEZ13 is the only model that decodes PL as well as encoding it, and it uses a DIFFERENT law:

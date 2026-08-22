@@ -1,0 +1,60 @@
+# K-16, the EVA timers block.  Two independent sources agree on it and the file carries both.
+#
+# Measured: each byte mutated and the original's timers sub-screen (`T' from any option page)
+# re-rendered -- see ../../../doc/EEPROM_MAP.md.
+#
+# Read out of the binary: the sub-screen walks four parallel word arrays of twelve entries,
+# (offset, mask, A, B), through one reader -- MCEV_56 0xC9B3, MCEV9 0x8C5D, byte for byte identical
+# in every EVA build, which is why both 512-byte models carry the table.  The reader's own law is
+# Round(v * 10 / A) + B over ((cp[off] and $7F) shl 8 or cp[off+1]) and mask.
+#
+# TIMER model index name offset mask width den add_ms -- the model's own table
+TIMER eva_56 0 RX/TX_delay 0b3 00ff 1 1 0
+TIMER eva_56 1 encoder_pretime 0b4 00ff 1 1 0
+TIMER eva_56 2 encoder_hold_time 0b5 00ff 1 1 0
+TIMER eva_56 3 intersequence 0b6 00ff 1 1 0
+TIMER eva_56 4 synth_lock_time 0b7 00ff 1 12 10
+TIMER eva_56 5 TX_time-out 0b8 7fff 2 1 4000
+TIMER eva_56 6 rekey_delay 0ba 7fff 2 1 0
+TIMER eva_56 7 auto_reset_time 0bc 1fff 2 1 0
+TIMER eva_56 8 ext_alarm_time 0be 3fff 2 1 0
+TIMER eva_56 9 emergency_RX_time 0c0 7fff 2 1 0
+TIMER eva_56 10 emergency_TX_time 0c2 7fff 2 1 0
+TIMER eva_56 11 emergency_debounce 0c4 007f 1 1 0
+# The SEL5 build's table is the same twelve entries, so the model table must not diverge.
+TIMER eva_sel5 0 RX/TX_delay 0b3 00ff 1 1 0
+TIMER eva_sel5 4 synth_lock_time 0b7 00ff 1 12 10
+TIMER eva_sel5 5 TX_time-out 0b8 7fff 2 1 4000
+TIMER eva_sel5 11 emergency_debounce 0c4 007f 1 1 0
+#
+# TMRDEC mask width den add_ms raw ms -- the decode law at its measured points
+TMRDEC 00ff 1 1 0 14 200
+TMRDEC 00ff 1 1 0 28 400
+TMRDEC 00ff 1 1 0 ff 2550
+TMRDEC 7fff 2 1 0 0bb8 30000
+TMRDEC 1fff 2 1 0 a2bc 7000
+TMRDEC 7fff 2 1 4000 95e0 60000
+TMRDEC 7fff 2 1 4000 55e0 223840
+# The synthesiser lock: two points look exactly like n - 4, a third refutes it, and the rounding is
+# not academic.  An integer `div 12' -- what the EV9 notes assumed -- gives 80 and 176 for the two
+# marked points; the original divides for real and calls the runtime's Round entry, so it is 81/177.
+TMRDEC 00ff 1 12 10 54 80
+TMRDEC 00ff 1 12 10 55 81
+TMRDEC 00ff 1 12 10 64 93
+TMRDEC 00ff 1 12 10 c8 177
+#
+# TMRRT index ms -- set then get, on the eva_56 sample, and the flag bits outside the field survive
+TMRRT 0 200
+TMRRT 4 81
+TMRRT 4 177
+TMRRT 5 60000
+TMRRT 7 7000
+TMRRT 8 163830
+TMRRT 11 1270
+#
+# TMRNO index ms -- refused, never rounded into range (U-3)
+TMRNO 0 205
+TMRNO 0 2560
+TMRNO 5 3990
+TMRNO 7 81920
+TMRNO 11 1280

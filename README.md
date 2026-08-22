@@ -34,7 +34,7 @@ report wants.
 
 | | |
 |---|---|
-| codeplug library | five models, decode and edit |
+| codeplug library | four models, decode and edit |
 | protocol library | replays all three hardware captures byte for byte |
 | TUI | channel list, per-channel editor, save with checksum |
 | serial transport | POSIX — **read from a real radio, 17 Aug 2026** — and Win32 (compiles, never run on hardware) |
@@ -102,10 +102,10 @@ shifter and RTS drives the radio's HUB/PGM input, which is what selects programm
 
 | model | size | channels | notes |
 |---|---|---|---|
-| `eva_56` | 512 B | 32 | MCEV 5/6-tone |
-| `eva_sel5` | 512 B | 32 | MCEV9 / MCEV9M, SEL5 |
+| `eva_56` | 512 B | 32 | MCEV 5/6-tone — also the twelve radio-wide timers (`o`) |
+| `eva_sel5` | 512 B | 32 | MCEV9 / MCEV9M, SEL5 — the timers too; both families carry the same table |
 | `eza_sel5` | 256 B | 8 | MCEZ9, SEL5 — also the auto-acknowledge delay (`o`), which only the 1987 *repair* build ever exposed |
-| `eza_cspl` | 128 B | 8 | MCEZ13, carrier squelch / PL |
+| `eza_cspl` | 128 B | 8 | MCEZ13, carrier squelch / PL — the one model whose PL scale is 7.9844, not 7.984 |
 
 ## Build
 
@@ -181,6 +181,13 @@ Reading the spec is worth it before changing anything, but these are the ones th
 * **Channel flag bits are not portable between models.** Bit 3 is clock shift on the EVA and
   auto-acknowledge on the EZA 9; the EZA 9 splits bit 7 by half; the EZA 1/3 clock shift is stored
   *inverted*.
+* **The timers round, they do not truncate,** and four of the twelve are narrower than the word
+  they sit in. Both facts come from the table the original itself walks, not from fitting: a
+  two-point fit of the synthesiser lock time is off by a millisecond, and the sample codeplug has
+  zeroes exactly where the mask bits would have shown.
+* **The PL tone scale is not one constant.** Every EVA and EZ9 build carries 7.984, every MCEZ13
+  build 7.9844 — and exactly one of the 39 EIA tones, 118.8 Hz, tells them apart. The scale is a
+  per-model field, not a `#define`.
 * **The ident comes from `*`, not `)01`.** `)01` returns a single codeplug byte. Getting this
   backwards yields a tool that cannot identify a radio.
 

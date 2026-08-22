@@ -325,21 +325,31 @@ size_t mc_pl_standard_count(void)
 	return sizeof PL_STD / sizeof PL_STD[0];
 }
 
-uint16_t mc_pl_encode(unsigned dhz)
+uint16_t mc_pl_encode_k(unsigned dhz, unsigned k)
 {
-	return (uint16_t)((7984u * dhz + 5000u) / 10000u);
+	return (uint16_t)(((unsigned long)k * dhz + 50000u) / 100000u);
 }
 
-unsigned mc_pl_decode(uint16_t word)
+unsigned mc_pl_decode_k(uint16_t word, unsigned k)
 {
 	size_t i;
 	if (!word)
 		return 0;
 	/* Snap: the storage is lossy, so 707 means the 88.5 the operator typed, not 88.55. */
 	for (i = 1; i < sizeof PL_STD / sizeof PL_STD[0]; i++)
-		if (mc_pl_encode(PL_STD[i]) == word)
+		if (mc_pl_encode_k(PL_STD[i], k) == word)
 			return PL_STD[i];
-	return ((unsigned)word * 10000u + 3992u) / 7984u;
+	return (unsigned)(((unsigned long)word * 100000u + k / 2) / k);
+}
+
+uint16_t mc_pl_encode(unsigned dhz)
+{
+	return mc_pl_encode_k(dhz, MC_PL_K_EVA);
+}
+
+unsigned mc_pl_decode(uint16_t word)
+{
+	return mc_pl_decode_k(word, MC_PL_K_EVA);
 }
 
 /* ---- auto-acknowledge delay, K-15 ------------------------------------------------------------
@@ -504,7 +514,8 @@ unsigned mc_pl_get_tone(const mc_image *img, int i)
 	if (!mc_pl_supported(img->model) || i < 0 || i >= img->model->pl_max)
 		return 0;
 	o = pl_slot(img, i);
-	return mc_pl_decode((uint16_t)((img->bytes[o] << 8) | img->bytes[o + 1]));
+	return mc_pl_decode_k((uint16_t)((img->bytes[o] << 8) | img->bytes[o + 1]),
+			      img->model->pl_k);
 }
 
 int mc_pl_set_tone(mc_image *img, int i, unsigned dhz)
@@ -516,9 +527,70 @@ int mc_pl_set_tone(mc_image *img, int i, unsigned dhz)
 	/* 0 disables, as the original's prompt says; otherwise the radio's stated range. */
 	if (dhz && (dhz < 670 || dhz > 2510))
 		return -1;
-	w = dhz ? mc_pl_encode(dhz) : 0;
+	w = dhz ? mc_pl_encode_k(dhz, img->model->pl_k) : 0;
 	o = pl_slot(img, i);
 	img->bytes[o] = (uint8_t)(w >> 8);
 	img->bytes[o + 1] = (uint8_t)(w & 0xFF);
+	return 0;
+}
+
+/* ---- timers, K-16 -----------------------------------------------------------------------------
+ * Measured on MCEV_56 by mutating each byte and re-rendering the original's timers sub-screen; see
+ * ../doc/EEPROM_MAP.md.  Two of the twelve are not the plain x10 ms the rest are: the synthesiser
+ * lock time is round(n x 5/6) + 10 ms -- two points look exactly like n-4 and a third refutes it --
+ * and the TX time-out masks off bit 15 and carries a +4 s offset that the rekey timer beside it
+ * does not.
+ */
+size_t mc_timer_count(const mc_model *m)
+{
+	return m->timers ? m->ntimers : 0;
+}
+
+const mc_timer *mc_timer_at(const mc_model *m, size_t i)
+{
+	return (m->timers && i < m->ntimers) ? &m->timers[i] : NULL;
+}
+
+unsigned mc_timer_decode(const mc_timer *t, unsigned raw)
+{
+	unsigned v = raw & t->mask;
+	/* round(v * 10 / den) -- the original divides for real and calls the runtime's Round entry */
+	return (v * 10u + t->den / 2u) / t->den + t->add_ms;
+}
+
+static unsigned timer_raw(const mc_image *img, const mc_timer *t)
+{
+	if (t->width == 1)
+		return img->bytes[t->off];
+	return (unsigned)(img->bytes[t->off] << 8) | img->bytes[t->off + 1];
+}
+
+unsigned mc_timer_get_ms(const mc_image *img, size_t i)
+{
+	const mc_timer *t = mc_timer_at(img->model, i);
+	return t ? mc_timer_decode(t, timer_raw(img, t)) : 0;
+}
+
+int mc_timer_set_ms(mc_image *img, size_t i, unsigned ms)
+{
+	const mc_timer *t = mc_timer_at(img->model, i);
+	unsigned old, v, raw;
+
+	if (!t || ms < t->add_ms)
+		return -1;
+	/* Invert, then insist the value round-trips: that is what refuses everything the law cannot
+	 * spell, without a separate range test per field. */
+	v = ((ms - t->add_ms) * t->den + 5u) / 10u;
+	if (v > t->mask || mc_timer_decode(t, v) != ms)
+		return -1;
+
+	old = timer_raw(img, t);
+	raw = (old & ~(unsigned)t->mask) | v;   /* every bit outside the field stays as found */
+	if (t->width == 1) {
+		img->bytes[t->off] = (uint8_t)raw;
+	} else {
+		img->bytes[t->off] = (uint8_t)(raw >> 8);
+		img->bytes[t->off + 1] = (uint8_t)(raw & 0xFF);
+	}
 	return 0;
 }

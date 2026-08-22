@@ -158,9 +158,30 @@ before, after, out = drive([b' ', b'o', CR, b'2000', CR], 'fixtures/eza9_default
 check(before == after, 'U-3: 2000 ms is out of range and nothing is written')
 check('refused' in out, 'U-3: and the refusal says so')
 
-# A model with no measured offset must say so rather than offer a field it cannot place.
-_, _, out = drive([b' ', b'o'], 'fixtures/eva9_real.bin')
+# A model with no measured offset must say so rather than offer a field it cannot place.  MCEZ13 has
+# neither the auto-acknowledge delay nor a timers table.
+_, _, out = drive([b' ', b'o'], 'fixtures/ez13_default_band2.bin')
 check('no radio-wide options' in out, 'a model without the field says so instead of guessing')
+
+# K-16: the EVA timers, from the table the original itself walks.
+_, _, out = drive([b' ', b'o'], 'fixtures/eva9_real.bin')
+check('synth lock time' in out, 'the options page lists the EVA timers')
+check('TX time-out' in out and 'emergency debounce' in out, 'all twelve, first to last')
+
+# Editing one moves its own bytes and nothing else, and leaves the flags sharing the word alone.
+# 0x0BC is the auto-reset word: 13 bits of time under three flags (enable, carrier override,
+# forced reset), so it is the one to test preservation on.
+before, after, out = drive([b' ', b'o'] + [DOWN] * 7 + [CR, b'12000', CR, ESC, b's', b' ', b'q'],
+                           'fixtures/eva9_real.bin')
+diff = {i for i in range(len(before)) if before[i] != after[i]}
+check(diff <= {0x000, 0x0BC, 0x0BD}, 'editing auto reset moves only its word and the checksum, got %s'
+      % sorted(map(hex, diff)))
+check((after[0x0BC] << 8 | after[0x0BD]) & 0x1FFF == 1200, 'and 12000 ms is stored as 1200')
+check(after[0x0BC] & 0xE0 == before[0x0BC] & 0xE0, 'K-30: the three flags above it are untouched')
+
+before, after, out = drive([b' ', b'o'] + [DOWN] * 7 + [CR, b'12345', CR], 'fixtures/eva9_real.bin')
+check(before == after, 'U-3: 12345 ms is not on the 10 ms grid, so nothing is written')
+check('refused' in out, 'U-3: and the refusal says so')
 
 # The EZA models have different flags entirely (K-22).
 _, _, out = drive([b' ', CR], 'fixtures/ez13_default_band2.bin')

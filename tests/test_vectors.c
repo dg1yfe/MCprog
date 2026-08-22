@@ -308,12 +308,16 @@ static void test_parity(void)
 
 static void test_pl(void)
 {
-	char *vec = slurp("testdata/pl/pl.vec", NULL), *line, *save;
+	static const char *FILES[] = { "testdata/pl/pl.vec", "testdata/timers/timers.vec" };
+	size_t vi;
+
+	for (vi = 0; vi < sizeof FILES / sizeof FILES[0]; vi++) {
+	char *vec = slurp(FILES[vi], NULL), *line, *save;
 	if (!vec)
-		return;
+		continue;
 	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
-		char mname[64];
-		unsigned idx, dhz, word, tone, list, cnt, mode, dec, mx;
+		char mname[64], tname[64];
+		unsigned idx, dhz, word, tone, list, cnt, mode, dec, mx, off, mask, wid, den, add;
 
 		if (sscanf(line, "TONE idx=%u dhz=%u word=%x", &idx, &dhz, &word) == 3) {
 			ok(mc_pl_standard(idx) == dhz, "K-14", "the standard tone list matches");
@@ -323,6 +327,11 @@ static void test_pl(void)
 		} else if (sscanf(line, "PLDEC word=%x dhz=%u", &word, &dhz) == 2) {
 			ok(mc_pl_decode((uint16_t)word) == dhz, "K-14",
 			   "decode, snapped to the standard list where one matches");
+		} else if (sscanf(line, "PLENCK dhz=%u k=%u word=%x", &dhz, &cnt, &word) == 3) {
+			ok(mc_pl_encode_k(dhz, cnt) == word, "K-14",
+			   "the per-build tone scale: EVA 7.9840, MCEZ13 7.9844");
+			ok(mc_pl_decode_k((uint16_t)word, cnt) == dhz, "K-14",
+			   "and it round-trips under its own scale");
 		} else if (sscanf(line, "PLDENC dhz=%u word=%x", &dhz, &word) == 2) {
 			ok(mc_pl_dec_encode(dhz) == word, "K-14",
 			   "the MCEZ13 decoder law, round(61.107 x f)");
@@ -339,6 +348,62 @@ static void test_pl(void)
 			ok(m->pl_tone == tone && m->pl_list == list && m->pl_count == cnt &&
 			       m->pl_mode == mode && m->pl_dec == dec && m->pl_max == mx,
 			   "K-14", "the per-model PL layout matches");
+		} else if (sscanf(line, "TMRDEC %x %u %u %u %x %u", &mask, &wid, &den, &add, &word,
+		                  &dhz) == 6) {
+			mc_timer t;
+			t.name = "vec"; t.off = 0;
+			t.mask = (uint16_t)mask; t.width = (uint8_t)wid;
+			t.den = (uint16_t)den; t.add_ms = (uint16_t)add;
+			ok(mc_timer_decode(&t, word) == dhz, "K-16",
+			   "the timer decode law reproduces its measured point");
+		} else if (sscanf(line, "TIMER %63s %u %63s %x %x %u %u %u", mname, &idx, tname, &off,
+		                  &mask, &wid, &den, &add) == 8) {
+			const mc_model *m = mc_model_by_name(mname);
+			const mc_timer *t = m ? mc_timer_at(m, idx) : NULL;
+			char want[64];
+			size_t c;
+			for (c = 0; tname[c] && c + 1 < sizeof want; c++)
+				want[c] = tname[c] == '_' ? ' ' : tname[c];
+			want[c] = '\0';
+			ok(t && t->off == off && t->mask == mask && t->width == wid && t->den == den &&
+			       t->add_ms == add && strcmp(t->name, want) == 0,
+			   "K-16", "the model's timer table matches the original's own");
+		} else if (sscanf(line, "TMRRT %u %u", &idx, &dhz) == 2) {
+			const mc_model *m = mc_model_by_name("eva_56");
+			const mc_timer *t = mc_timer_at(m, idx);
+			uint8_t buf[512];
+			mc_image scratch;
+			scratch.model = m; scratch.bytes = buf; scratch.len = sizeof buf;
+			memset(buf, 0xFF, sizeof buf);   /* every flag bit outside the field set */
+			if (!t) {
+				failf("K-16", "no timer %u", idx);
+			} else {
+				unsigned keep = t->width == 1 ? 0xFFu & ~(unsigned)t->mask
+				                              : 0xFFFFu & ~(unsigned)t->mask;
+				unsigned raw;
+				int rc = mc_timer_set_ms(&scratch, idx, dhz);
+				raw = t->width == 1 ? buf[t->off]
+				                    : (unsigned)(buf[t->off] << 8) | buf[t->off + 1];
+				ok(rc == 0 && mc_timer_get_ms(&scratch, idx) == dhz && (raw & ~(unsigned)t->mask)
+				       == keep,
+				   "K-16", "the timer round-trips and leaves the flags beside it alone");
+			}
+		} else if (sscanf(line, "TMRNO %u %u", &idx, &dhz) == 2) {
+			const mc_model *m = mc_model_by_name("eva_56");
+			uint8_t buf[512];
+			mc_image scratch;
+			scratch.model = m; scratch.bytes = buf; scratch.len = sizeof buf;
+			memset(buf, 0x5A, sizeof buf);
+			ok(mc_timer_set_ms(&scratch, idx, dhz) != 0 && buf[0xB3] == 0x5A, "K-16",
+			   "U-3: a value the timer law cannot spell is refused and writes nothing");
+		} else if (sscanf(line, "PLMODELK model=%63s k=%u", mname, &cnt) == 2) {
+			const mc_model *m = mc_model_by_name(mname);
+			if (!m) {
+				failf("K-14", "unknown model %s", mname);
+				continue;
+			}
+			ok(m->pl_k == cnt, "K-14",
+			   "the model carries the tone scale its own chain file holds");
 		}
 	}
 	free(vec);
@@ -391,6 +456,7 @@ static void test_pl(void)
 			   "the EVA and EZA 9 encode only -- there is no PL decode on them");
 			free(img_bytes);
 		}
+	}
 	}
 }
 

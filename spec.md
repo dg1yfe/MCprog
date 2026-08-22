@@ -205,16 +205,24 @@ alternate spelling of a lower-`b1` value, and the original emits some (2 of 388 
 Encoders MUST produce `b2 < P`; decoders MUST accept `b2 ≥ P`; **verification MUST compare decoded
 frequencies, not bytes.** **[C]**
 
-**K-12 Tones and durations.** `tone = Round(f_Hz × 7.984)`, `duration = Round(t_ms × 8.208)`, both
+**K-12 Tones and durations.** `tone = Round(f_Hz × k)`, `duration = Round(t_ms × 8.208)`, both
 big-endian. These are literal Turbo Pascal reals in the original (`83 68 91 ED 7C 7F` and
 `84 D9 CE F7 53 03`). **[C]**
+
+**The scale `k` is not the same on every model.** Every EVA and EZ9 build carries **7.984**; every
+MCEZ13 build carries **7.9844** (`83 C5 6D 34 80 7F`, ten occurrences each, none mixed), and so
+does the M110 RSS — as an IEEE double, that software being a later toolchain. The hardware figure
+is `150 × 2^16 / (4.9248 MHz / 4)` = 7.98441, so 7.9844 is the *truer* of the two and 7.984 is the
+1987 authors' four-significant-figure rounding of it. Of the 39 EIA tones exactly one separates
+them — **118.8 Hz**, 948 against 949 — which is why the split went unnoticed for so long. Carry `k`
+per model (`mc_model.pl_k`, in units of 1/10000); do not hard-code either value. **[C]**
 
 **K-13 Signalling-format tone tables are COPIED, never computed.** The per-format tables have an
 internal scale of 5.28 which appears nowhere in the original software — it only copies them. An
 implementation that synthesises them from 5.28 will be wrong. **[C]**
 
 **K-14 PL / CTCSS.** Radio-wide on every model that has it, so it is not a channel field. Tones are
-`round(7.984 × f_Hz)` big-endian — the same law as K-12. The encoding is **lossy**: 88.5 Hz stores
+`round(k × f_Hz)` big-endian — the same law, and the same per-model `k`, as K-12. The encoding is **lossy**: 88.5 Hz stores
 as 707, which decodes to 88.55. Decoding therefore **snaps to the standard tone list**, 40 entries
 in tenths of a Hz that the original software itself carries (EVA image, `CS:0x3436`, index 0 = 0.0
 meaning no PL). Without the snap the tool shows 88.6 where the operator typed 88.5. **[C]**
@@ -253,6 +261,55 @@ low seven bits. Values outside 16–1984 ms are refused, never clamped (U-3). **
 > tested only the base build — the one of four where the menu entry is inert. `MCEZ9R` and both
 > `MCEZ9M` builds prompt for a frequency. Check every build before concluding a feature is absent.
 
+**K-16 Radio-wide timers.** The original's `T' sub-screen, twelve fields at `0x0B3`–`0x0C4`. It
+does not compute them one at a time. It walks **four parallel word arrays of twelve entries** —
+`(offset, mask, A, B)` — through a single reader, and every EVA build carries that table byte for
+byte identical (`MCEV_56` `0xC9B3`, `MCEV9` `0x8C5D`), which is why both 512-byte models get it.
+The reader's law is
+
+```
+v       := ((cp[off] and $7F) shl 8 or cp[off+1]) and mask
+display := Round(v * 10 / A) + B
+```
+
+**[S]**, and it agrees with twelve fields measured independently off the screen **[C]**.
+
+| field | offset | mask | A | B | ms |
+|---|---|---|---|---|---|
+| RX/TX delay | `0x0B3` | `0x00FF` | 1 | 0 | `v × 10` |
+| encoder pretime | `0x0B4` | `0x00FF` | 1 | 0 | `v × 10` |
+| encoder hold time | `0x0B5` | `0x00FF` | 1 | 0 | `v × 10` |
+| intersequence | `0x0B6` | `0x00FF` | 1 | 0 | `v × 10` |
+| synth lock time | `0x0B7` | `0x00FF` | 12 | 10 | `round(v × 10 / 12) + 10` |
+| TX time-out | `0x0B8` | `0x7FFF` | 1000 | 4 | `v × 10 + 4000` |
+| rekey delay | `0x0BA` | `0x7FFF` | 1000 | 0 | `v × 10` |
+| auto reset time | `0x0BC` | `0x1FFF` | 1000 | 0 | `v × 10` |
+| ext alarm time | `0x0BE` | `0x3FFF` | 1000 | 0 | `v × 10` |
+| emergency RX time | `0x0C0` | `0x7FFF` | 1000 | 0 | `v × 10` |
+| emergency TX time | `0x0C2` | `0x7FFF` | 1000 | 0 | `v × 10` |
+| emergency debounce | `0x0C4` | `0x007F` | 1 | 0 | `v × 10` |
+
+Four things in that table are easy to get wrong:
+
+* **It rounds, it does not truncate.** The division is a real one ending in the Turbo Pascal
+  runtime's `Round` entry (`0x17CE` — the sibling at `0x17D2` is `Trunc`; they share a body and
+  differ only in a flag that enables `inc ax` on the bit shifted out). An integer `div 12` fits the
+  two shipped synth-lock values perfectly and is still wrong: it shows 80 and 176 where the radio
+  shows 81 and 177. Three points refute it; two do not.
+* **`A` is the unit, so `B` is too.** Six fields print seconds. `B = 4` on the TX time-out is four
+  *seconds*, and the rekey delay's `A = 1000` is why the screen calls 10 ms of it `0 sec`.
+* **The masks matter and the sample hides them.** Four fields are narrower than their storage, and
+  in `MCMICR70.DAT` those extra bits happen to be zero. The real ones are not: `0x0B8` carries bit
+  15, and `0x0BC` carries enable, carrier override and forced reset above its 13 bits. Preserve
+  everything outside `mask` (K-30).
+* **The original's own offsets are one byte low** for the five byte-wide fields — it always fetches
+  a word and masks to `0x00FF`. That is the whole explanation for the stray read of `0x0B2` that
+  this project chased for a while: nothing lives there; it is the high half of the RX/TX delay
+  fetch.
+
+MCprog stores milliseconds, which is what the codeplug holds, so it can be finer than the screen it
+came from. A value the law cannot spell is refused, never rounded (U-3).
+
 **K-20 Model descriptor.** These genuinely vary and must be data, not assumptions:
 
 | model | size | checksum byte / extent | channels | band | ref dividers |
@@ -277,7 +334,12 @@ and diffing what it wrote (`../doc/EEPROM_MAP_EV9.md`, `../doc/EEPROM_MAP_EZA.md
 
 Three traps in one table: bit 3 means different things on the two families, EZA 9 splits bit 7 by
 half, and the EZA 1/3 clock shift is stored **inverted** — the bit is *set* when the screen shows
-`N`. MCEZ13 has no per-channel encode/decode/TX-inhibit at all; its PL lives in tables and TX
+`N`. The EVA row is pinned on the SEL5 build. `MCEV_56`'s own per-channel screen has
+since been found and driven, and it exposes only TX frequency, RX frequency and clock shift — so
+it corroborates bit 3 and says nothing about the rest. It also shows that the two builds differ in
+*which half they read*: `MCEV9M` writes clock shift into bit 3 of both halves, `MCEV_56` displays
+the TX half's bit 3 alone. Write both halves and the difference cannot bite you
+(`../doc/EEPROM_MAP.md`). **[C]** MCEZ13 has no per-channel encode/decode/TX-inhibit at all; its PL lives in tables and TX
 inhibit is a single global bit. **[C]** except as marked.
 
 **K-23 The channel table is terminated, not sparse.** Stop at the first record whose `+0` is `0xFF`.

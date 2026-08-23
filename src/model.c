@@ -46,15 +46,24 @@ static const mc_flag FLAGS_EZA9[] = {
 	{ "tx_inhibit",  5, MC_HALF_BOTH, 0, 'C' },
 	{ "encode",      6, MC_HALF_BOTH, 0, 'C' },
 	{ "clock_shift", 7, MC_HALF_RX,   0, 'C' },
-	/* Real and preserved across a round trip, but these builds never expose it; read as RF power
-	 * from the disassembly and unrefuted, not measured. */
-	{ "power_high",  7, MC_HALF_TX,   0, 'S' },
+	/* Was 'S': "these builds never expose it".  The EDITOR does not, but the Master build's report
+	 * generator does -- its channel table has a POWER column.  Planting bit 7 of the TX half with
+	 * the hidden EEPROM monitor and printing flips it HIGH -> LOW, so the bit, the half and the
+	 * sense are all measured now (`tools/revoracle.py --build ez9 --bits').  Note the sense is the
+	 * opposite of MCEZ13's, which is why that one carries inverted=1 and this one does not. */
+	{ "power_high",  7, MC_HALF_TX,   0, 'C' },
 };
 /* MCEZ13 keeps PL in tables and TX inhibit in a global bit, so the record carries almost nothing.
- * Its clock shift is stored inverted: the bit is SET when the screen shows N. */
+ * BOTH its flags are stored inverted: the bit is SET when the report shows N / LOW.
+ *
+ * Bit 7 was carried as `reserved_b7' -- "a stored bit the original never exposes" -- because the
+ * write-back oracle sees nothing when MAB 889 RF POWER LEVEL is edited.  It is the power level.
+ * The editor reads the bit and never writes it, which is invisible to a field-to-bytes oracle;
+ * planting the bit with the RSS's own EEPROM monitor and reading its printout shows it plainly
+ * (`tools/revoracle.py'):  bit 7 clear prints HIGH, set prints LOW, on every channel. */
 static const mc_flag FLAGS_EZ13[] = {
 	{ "clock_shift",  6, MC_HALF_TX, 1, 'C' },
-	{ "reserved_b7",  7, MC_HALF_TX, 0, 'S' },
+	{ "power_high",   7, MC_HALF_TX, 1, 'C' },
 };
 
 #define NF(a) (a), (uint8_t)(sizeof(a) / sizeof((a)[0]))

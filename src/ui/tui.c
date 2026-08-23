@@ -223,8 +223,6 @@ static const char *flag_help(const mc_flag *f)
 		return "acknowledge a received call automatically";
 	if (!strcmp(f->name, "power_high"))
 		return "RF power level: set = high";
-	if (!strcmp(f->name, "reserved_b7"))
-		return "a stored bit the original editor never exposes; preserved as found";
 	return "";
 }
 

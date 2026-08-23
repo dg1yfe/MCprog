@@ -206,7 +206,7 @@ check('refused' in out, 'U-3: and the refusal says so')
 # The EZA models have different flags entirely (K-22).
 _, _, out = drive([b' ', CR], 'fixtures/ez13_default_band2.bin')
 check('clock_shift' in out, 'MCEZ13 exposes clock_shift')
-check('reserved_b7' in out, 'and the bit it preserves but never exposes')
+check('power_high' in out, 'and the power level -- bit 7, measured with the EEPROM monitor')
 check('decode' not in out and 'encode' not in out,
       'K-22: MCEZ13 has no per-channel encode/decode flags')
 

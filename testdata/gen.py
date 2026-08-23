@@ -58,9 +58,9 @@ FLAGS = {
                ('power_high', 7, 'both', 0, 'C')],
     'eza_sel5': [('auto_ack', 3, 'both', 0, 'C'), ('decode', 4, 'both', 0, 'C'),
                  ('tx_inhibit', 5, 'both', 0, 'C'), ('encode', 6, 'both', 0, 'C'),
-                 ('clock_shift', 7, 'rx', 0, 'C'), ('power_high', 7, 'tx', 0, 'S')],
+                 ('clock_shift', 7, 'rx', 0, 'C'), ('power_high', 7, 'tx', 0, 'C')],
     # MCEZ13 carries almost no per-channel flags: PL lives in tables, TX inhibit is global.
-    'eza_cspl': [('clock_shift', 6, 'tx', 1, 'C'), ('reserved_b7', 7, 'tx', 0, 'S')],
+    'eza_cspl': [('clock_shift', 6, 'tx', 1, 'C'), ('power_high', 7, 'tx', 1, 'C')],
 }
 FLAGS['eva_sel5'] = FLAGS['eva_56']
 # --- PL / CTCSS, spec K-14 ---------------------------------------------------------------------
@@ -511,7 +511,10 @@ EDITS = [
       ('flag:power_high', 1, 1)]),
     ('fixtures/ez13_default_band2.bin', 'eza_cspl',
      [('set_tx', 1, 145_000_000), ('flag:clock_shift', 1, 1), ('flag:clock_shift', 1, 0),
-      ('flag:reserved_b7', 1, 1),
+      # Both senses: the shipped bit 7 is clear, which INVERTED already means high, so setting
+      # high is a no-op and only clearing it moves a byte.  Keeping just the no-op case would test
+      # nothing -- that is what the vector degenerated to when the flag was renamed.
+      ('flag:power_high', 1, 1), ('flag:power_high', 1, 0),
       # channel 5's record is zeroed, so its inverted clock-shift bit reads ON; programming it
       # must leave clock shift OFF (K-24a)
       ('set_tx', 5, 145_000_000)]),

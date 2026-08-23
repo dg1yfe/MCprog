@@ -128,6 +128,24 @@ previous one — confirmed on hardware, where all four EZA 9 records after the f
 Accepting only one misparses the end of every read on the other. This is not a spec ambiguity to be
 resolved but a difference between radios, so accept both. **[C]**
 
+**P-24a The end-of-memory NAK ends the session.** After it the radio answers nothing — not the next
+command, and not even `*`. Measured on every radio put through the selftest so far: two Radius M110s
+(`EZ3.01.00.44` CSQ/PL and `EZ9.01.00.45` Sel 5) and an MC micro EZA 9, across nine runs. **[C]**
+
+> **This is why nothing has been written to a radio yet.** Four write-enabled runs on 23 Aug 2026
+> all reported `write 0x0000: no first ACK`. The wire log shows the write frame was well formed —
+> exactly the 135 bytes P-25 specifies, `(40` + address + 128 characters — and that **no bytes came
+> back at all**. The read-only runs settle the cause: they lose the radio at the same point having
+> written nothing, so it is the NAK and not the write.
+>
+> The selftest sent the write *after* walking the whole EEPROM, so the radio had already gone quiet.
+> It now takes one record on its own first (`mc_read_block(..., chain = 0)`), exercises the write
+> path with that, and walks the EEPROM afterwards. **Untested on hardware** — the next radio through
+> is what settles whether the write path works at all.
+
+Anything that needs the radio after a full read must re-establish the session first; a power-cycle
+is the only method known to work (compare the RTS note under P-12).
+
 **P-25** `(40`+addr+128 chars — write 64 bytes. The reply is **two bare ACK bytes, no header**: the
 first ~130 ms after the last data byte (command accepted), the second **~710 ms** later (EEPROM burn
 complete). Measured across all 8 blocks of the write capture, consistent to 3 ms. **[C]**

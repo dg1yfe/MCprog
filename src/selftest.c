@@ -646,6 +646,29 @@ int mc_selftest(const mc_selftest_opts *o)
 		printable(pr, sizeof pr, (const uint8_t *)ident, ilen ? ilen - 1 : 0);
 	probe_single();
 	probe_02();
+
+	/* The write probe runs BEFORE the full read, and that ordering is load-bearing.
+	 *
+	 * A sequential read ends when the radio NAKs past the last record, and on every radio seen so
+	 * far the session ends with it: after that NAK the radio answers nothing at all, not even `*'.
+	 * Four write-enabled runs against two Radius M110s all reported "write 0x0000: no first ACK",
+	 * and the wire log shows why -- the frame was well formed, exactly the 135 bytes P-25
+	 * specifies, and nothing replied because nothing was listening.  The read-only runs settle
+	 * that the NAK is the cause rather than the write: they lose the radio at the same point
+	 * having written nothing.
+	 *
+	 * So take one record on its own (chain = 0, unacknowledged per P-26), exercise the write path
+	 * with it, and only then walk the whole EEPROM. */
+	if (o->write_back) {
+		uint8_t rec0[MC_BLOCK];
+		if (mc_read_block(&R.s, 0x0000, rec0, 0) == 1)
+			probe_write(rec0, MC_BLOCK);
+		else
+			note("P-25", "write one record (its own bytes, unchanged)", R_FAIL,
+			     "two ACKs, the second roughly 710 ms after the first",
+			     "could not read record 0 to write back: %s", R.s.err);
+	}
+
 	len = probe_read(img, sizeof img, &model, det, sizeof det, ident, ilen);
 	if (len)
 		probe_decode(img, len, model, det);
@@ -658,13 +681,6 @@ int mc_selftest(const mc_selftest_opts *o)
 			printf("\n  codeplug saved to %s\n", o->codeplug_path);
 		}
 	}
-
-	if (o->write_back && len)
-		probe_write(img, len);
-	else if (o->write_back)
-		note("P-25", "write one record (its own bytes, unchanged)", R_SKIP,
-		     "two ACKs, the second roughly 710 ms after the first",
-		     "skipped: nothing was read, so there is nothing safe to write back");
 
 	/* P-20 again at the end, after a whole session: the capture shows two idents 36 s apart. */
 	{

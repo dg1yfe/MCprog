@@ -72,6 +72,30 @@ static void nap_ms(unsigned ms)
 	nanosleep(&ts, NULL);
 }
 
+/* P-12, and the one thing that puts a radio into programming mode: everything down for 500 ms, then
+ * RTS up and 1300 ms to settle.  DTR stays DOWN throughout (P-11) -- it is the level shifter's
+ * negative rail, not a modem signal, and most USB adapters would raise it on open.
+ *
+ * RTS reaches the radio CPU's #NMI input, so the RISING edge is the whole point: it issues an NMI
+ * and the radio (re-)starts its programming routine.  That is why this is a pulse and not a level,
+ * and why the 1987 RSS calls its equivalent (`ser_OpenLine') before EVERY transaction rather than
+ * once on open -- see spec.md P-12 and P-24a.
+ *
+ * On a pty these ioctls are meaningless and fail; that is not an error there.  Returns 0 if the
+ * pulse was actually delivered, -1 if this port has no control lines. */
+static int pulse_rts(int fd)
+{
+	int bits = 0;
+
+	if (ioctl(fd, TIOCMSET, &bits) != 0)
+		return -1;
+	nap_ms(500);
+	bits = TIOCM_RTS;
+	ioctl(fd, TIOCMSET, &bits);
+	nap_ms(1300);
+	return 0;
+}
+
 static unsigned sr_now(mc_transport *t)
 {
 	return elapsed_ms(&((serial *)t)->t0);
@@ -179,20 +203,8 @@ static int configure(serial *s, const mc_serial_opts *o, char *err, size_t errsz
 	}
 	tcflush(s->fd, TCIOFLUSH);
 
-	if (o->line_setup) {
-		/* P-12: MCR = 0, wait 500 ms, assert RTS, wait 1300 ms.  P-11: DTR stays DOWN, which puts
-		 * the line at its negative level -- that is the level shifter's supply, not a modem
-		 * signal, and most USB adapters would raise it on open.  RTS drives the radio's HUB/PGM
-		 * input: asserting it is what asks the radio for programming mode.
-		 * On a pty these ioctls are meaningless and fail; that is not an error there. */
-		int bits = 0;
-		if (ioctl(s->fd, TIOCMSET, &bits) == 0) {
-			nap_ms(500);
-			bits = TIOCM_RTS;
-			ioctl(s->fd, TIOCMSET, &bits);
-			nap_ms(1300);
-		}
-	}
+	if (o->line_setup)
+		pulse_rts(s->fd);
 	return 0;
 }
 
@@ -242,6 +254,18 @@ int mc_serial_set_lines(mc_transport *t, int dtr, int rts)
 	if (rts >= 0)
 		bits = rts ? (bits | TIOCM_RTS) : (bits & ~TIOCM_RTS);
 	return ioctl(s->fd, TIOCMSET, &bits) == 0 ? 0 : -1;
+}
+
+int mc_serial_rearm(mc_transport *t)
+{
+	serial *s = (serial *)t;
+
+	if (!t || t->send != sr_send)
+		return -1;
+	if (pulse_rts(s->fd) != 0)
+		return -1;
+	tcflush(s->fd, TCIOFLUSH); /* the radio restarted; anything still queued predates it */
+	return 0;
 }
 
 static mc_transport *wrap(int fd, int owned, const mc_serial_opts *o, char *err, size_t errsz)

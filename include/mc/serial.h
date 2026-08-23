@@ -60,6 +60,22 @@ int mc_serial_enumerate(char out[][64], int max);
  * out which combination a real radio actually answers on (P-11). */
 int mc_serial_set_lines(mc_transport *t, int dtr, int rts);
 
+/* Re-arm the radio on an already-open port: the P-12 pulse again -- everything down for 500 ms,
+ * RTS up, 1300 ms.  Takes 1.8 s.  Returns 0 if the pulse went out, -1 on a port with no control
+ * lines (a pty) or a transport that is not a serial port.
+ *
+ * RTS reaches the radio CPU's #NMI input, and the rising edge issues the NMI that (re-)starts
+ * programming mode.  So this is not line housekeeping -- it is a command to the radio, and it is
+ * how the 1987 software gets away with never keeping a session: it pulses before every single
+ * transaction (`ser_OpenLine').
+ *
+ * The intended use is P-24a: after the end-of-memory NAK the radio answers nothing, and until now
+ * a power cycle was the only known way back.  UNTESTED ON HARDWARE -- and note the P-12 hardware
+ * note, where a radio went permanently deaf after RTS was de-asserted for several seconds across
+ * two probe combinations.  This pulse is 500 ms and never asserts DTR, which is what the original
+ * does; whether the distinction matters is exactly what needs measuring. */
+int mc_serial_rearm(mc_transport *t);
+
 #ifndef _WIN32
 /* Wrap a file descriptor that is already open -- used to run the protocol over a pty pair, which
  * is how the transport is tested without a radio. */

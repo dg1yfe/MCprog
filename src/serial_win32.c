@@ -49,6 +49,20 @@ void mc_serial_defaults(mc_serial_opts *o)
 	o->line_setup = 1;
 }
 
+/* P-12: everything down for 500 ms, then RTS up and 1300 ms to settle.  DTR stays DOWN (P-11).
+ *
+ * RTS reaches the radio CPU's #NMI input, so the RISING edge is the point: it issues an NMI and the
+ * radio (re-)starts its programming routine.  Hence a pulse, not a level -- and hence the 1987 RSS
+ * does this before EVERY transaction rather than once on open (spec.md P-12, P-24a). */
+static void pulse_rts(HANDLE h)
+{
+	EscapeCommFunction(h, CLRDTR);
+	EscapeCommFunction(h, CLRRTS);
+	Sleep(500);
+	EscapeCommFunction(h, SETRTS);
+	Sleep(1300);
+}
+
 static unsigned sr_now(mc_transport *t)
 {
 	return (unsigned)(GetTickCount() - ((serial *)t)->t0);
@@ -173,14 +187,8 @@ mc_transport *mc_serial_open(const char *device, const mc_serial_opts *o, char *
 	}
 	PurgeComm(h, PURGE_RXCLEAR | PURGE_TXCLEAR);
 
-	if (o->line_setup) {
-		/* P-12: everything down, 500 ms, RTS up, 1300 ms. */
-		EscapeCommFunction(h, CLRDTR);
-		EscapeCommFunction(h, CLRRTS);
-		Sleep(500);
-		EscapeCommFunction(h, SETRTS);
-		Sleep(1300);
-	}
+	if (o->line_setup)
+		pulse_rts(h);
 	s = calloc(1, sizeof *s);
 	s->t.send = sr_send;
 	s->t.recv = sr_recv;
@@ -217,5 +225,16 @@ int mc_serial_set_lines(mc_transport *t, int dtr, int rts)
 	if (rts >= 0)
 		ok &= EscapeCommFunction(s->h, rts ? SETRTS : CLRRTS) ? 1 : 0;
 	return ok ? 0 : -1;
+}
+
+int mc_serial_rearm(mc_transport *t)
+{
+	serial *s = (serial *)t;
+
+	if (!t)
+		return -1;
+	pulse_rts(s->h);
+	PurgeComm(s->h, PURGE_RXCLEAR | PURGE_TXCLEAR); /* the radio restarted; queued bytes predate it */
+	return 0;
 }
 #endif /* _WIN32 */

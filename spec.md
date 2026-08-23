@@ -58,8 +58,53 @@ clear, `CSTOPB` clear, `CRTSCTS` clear, and `ISTRIP`/`INPCK`/`PARMRK`/`IXON`/`IX
 > that would only show up against real hardware, as silent corruption. The settings are therefore
 > asserted directly by reading the termios back, not inferred from a successful round trip. **[C]**
 **P-11** **DTR de-asserted, RTS asserted.** Most USB adapters assert both on open; clear DTR
-explicitly. **[S]**
-**P-12** On open: `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms. **[S]**
+explicitly. **[S]** — confirmed from the code: `ser_OpenLine` writes only `MCR=0x00` and `MCR=0x02`,
+so DTR (bit 0) is never asserted by the original at all.
+
+**P-12** `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms — **before every transaction**, not once on
+open. **[S]**
+
+> **Read out of the 1987 code, 24 Aug 2026 [S].** The routine is `ser_OpenLine`, at file offset
+> `0x6E6B` in `merged/MCEZ13M_rt.bin` (IP = offset + 0x100). Its port sequence is **byte-identical
+> in all 22 images that carry it**, the 1989 repair build included. In the EZA and `CQM*` images it
+> sits in the merged binary; in the EVA / EV56 / centro family it lives only in the **overlay**
+> (`M5/MCEV_56.001` +`0x1EDB`, `M4/MCCENTRM.000` +`0x32E5`, `M5/MCEV9M.000` +`0x6C9`), which is why
+> a static scan of the merged images finds nothing at all. In order:
+>
+> ```
+> LCR = 0x80          DLAB on
+> DLH = 0x00 ; DLL = 0x60      divisor 96 = 1200 baud
+> LCR = 0x0A          7 data bits, odd parity, 1 stop  (built as `mov ax,8 / add ax,2`)
+> IER = 0x00          no interrupts, polled
+> MCR = 0x00          DTR and RTS both DOWN
+>     wait 0x32 = 50
+> MCR = 0x02          RTS UP, DTR still down
+>     wait 0x82 = 130
+> ```
+>
+> The delay unit is a **centisecond**, which is what makes the two constants 500 ms and 1300 ms:
+> the clock helper (`0x6D8D`) calls `INT 21h AH=2Ch` and returns `DH*100 + (DL/10)*10` — seconds
+> and hundredths within the current minute — and the deadline helper (`0x6DD5`) wraps it modulo
+> **6000** (`cmp 0x1766` / `sub 0x1770`), i.e. 60 s at 100 Hz. The expiry test (`0x6E19`) is
+> `(now - deadline) >= 0 && < 100`, the upper bound guarding that same wrap. Resolution is 100 ms,
+> so the real waits are 500 and 1300 ms ±100 ms. P-12's timings were previously marked **[S]**
+> without this chain; they are now derived from the constants themselves.
+>
+> `LCR = 0x0A` is an independent confirmation of **P-2**: the original drives the UART at 7O1 in
+> hardware, exactly the frame MCprog synthesises in software on an 8N1 port.
+>
+> Only the sequence itself is common. The clock helpers around it are **not**: MCEZ9R (1989)
+> rewrote them to return `DH*100 + DL` with a two-minute signed span instead of truncating to
+> tenths, so its resolution is 10 ms rather than 100 ms. The unit stays a centisecond, so `0x32`
+> and `0x82` still mean 500 and 1300 ms there. That a repair build shipped a 10× finer clock is
+> worth remembering against the fast-PC problem.
+>
+> **The RSS never reuses an open link.** Driving each build under emulation, the whole sequence
+> runs once per radio operation: one bounce per read, and one before a write (the EV56 write emits
+> 8 record-writes after a single bounce, so it is per *operation*, not per record). Confirmed
+> independently from the call graph rather than the wire: `ser_OpenLine` is invoked by
+> `proto_AttentionBody`, which both the read driver and the write driver call. MCprog did it
+> **only on open** until `mc_serial_rearm()`. See the note under P-24a.
 
 > **First hardware run, 17 Aug 2026 [C].** A real radio answered on `DTR=0 RTS=1` *and* on
 > `DTR=1 RTS=1`, and was silent on both combinations with RTS de-asserted. So **RTS asserted is
@@ -78,7 +123,11 @@ explicitly. **[S]**
 > Neither line is doing modem control, and nothing here is a handshake. In the interface of
 > `doc/ANALYSIS.md` §3, **DTR supplies the level shifter's negative rail** and **RTS drives the
 > radio's HUB/PGM input, which is what puts the radio into programming mode** -- reported by the
-> user, who has built the interface, and consistent with the schematic: DTR drives a BC557 (a PNP,
+> user, who has built the interface. More precisely, and from the same source: that line reaches
+> the **`#NMI` input of the radio's CPU**, and taking RTS *high* issues the NMI that (re-)starts
+> programming mode. **[user]** So RTS is an edge-triggered *command*, not a level the radio sits
+> in, which is exactly why P-12 pulses it rather than merely holding it -- and why the original can
+> re-enter programming mode at will. Consistent with the schematic: DTR drives a BC557 (a PNP,
 > so it conducts when its base is pulled negative) through 27 k, and RTS runs straight through.
 > An RS-232 line that is *de-asserted* sits at its negative level, so `MCR=0` is what puts a
 > negative voltage on DTR. That reading reconciles P-12 with the hardware, but it has not been
@@ -143,8 +192,50 @@ command, and not even `*`. Measured on every radio put through the selftest so f
 > path with that, and walks the EEPROM afterwards. **Untested on hardware** — the next radio through
 > is what settles whether the write path works at all.
 
-Anything that needs the radio after a full read must re-establish the session first; a power-cycle
-is the only method known to work (compare the RTS note under P-12).
+Anything that needs the radio after a full read must re-establish the session first. A power-cycle
+is the only method **known** to work — but the 1987 software suggests a second one that has never
+been tried.
+
+> **What the original does instead of a power-cycle [S], 24 Aug 2026.** It re-establishes the
+> session *by construction*: it runs the whole P-12 sequence — full 8250 re-init, `MCR=0` for
+> 500 ms, RTS back up, 1300 ms — **before every single transaction**. It therefore never faces the
+> question P-24a poses, because it never carries a session across a read boundary. Under emulation
+> the second read of a two-read session is preceded by exactly this bounce, at the instruction the
+> first read's last byte leaves off.
+>
+> **And there is a mechanism for it. [user]** RTS reaches the radio CPU's **`#NMI` input** through
+> the interface circuitry, and taking RTS **high** issues that NMI — which is what (re-)starts
+> programming mode. So the `MCR=0` → `MCR=2` bounce is not a handshake and not line housekeeping:
+> it is the RSS **deliberately firing an NMI at the radio** to put it back into the programming
+> routine, and the 500 ms low is just long enough to guarantee a clean edge. That is why the
+> original can afford to ignore P-24a entirely — it re-enters programming mode from scratch before
+> every transaction, so a session that ended at the NAK never needs to survive.
+>
+> This makes the RTS pulse the **first thing to try** after the end-of-memory NAK, in place of the
+> power-cycle: on the still-open port, drop RTS, wait 500 ms, raise it, wait 1300 ms, then ask for
+> `*`. A power-cycle and an NMI both land the CPU back at the same entry point, which would explain
+> why the power-cycle works.
+>
+> **`mc_serial_rearm()`** implements exactly this pulse on an already-open port, for both the POSIX
+> and Win32 transports. It is not wired into the read or write path: the call belongs wherever the
+> session has to survive, and on current evidence that decision needs a radio, not a guess.
+>
+> The emulator can now at least ask whether the *RSS* is consistent with the account.
+> `radiosim.Radio(nmi=True)` makes the simulated radio deaf until it sees a rising edge on RTS and
+> deaf again at the end-of-memory NAK; `tools/nmitest.py` drives every build against it. All four
+> survive unchanged — same commands served as with the rule off, each arming the radio itself
+> (1–4 times, matching the transaction count) — while the negative control, a radio that never
+> hears the NMI, is served **nothing at all**. So the rule bites and the RSS satisfies it unaided.
+> That is corroboration, not proof: the model is built from the account it tests, and only a radio
+> can confirm that RTS reaches `#NMI`.
+>
+> What remains **[?]**: the P-12 hardware note still reports a radio going
+> permanently deaf after RTS was de-asserted, in a run that *did* re-assert it. That is not the
+> same experiment — the probe left RTS **down across two whole line-combinations**, several seconds
+> including a port close and reopen, and one of those combinations asserted DTR, which by §3 is the
+> level shifter's negative rail; with the rail collapsed the edge may never have reached the CPU at
+> all. The RSS, by contrast, drops RTS for exactly 500 ms and never asserts DTR (its only two `MCR`
+> values are `0x00` and `0x02`, which is also P-11 confirmed from the code).
 
 **P-25** `(40`+addr+128 chars — write 64 bytes. The reply is **two bare ACK bytes, no header**: the
 first ~130 ms after the last data byte (command accepted), the second **~710 ms** later (EEPROM burn

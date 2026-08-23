@@ -698,6 +698,121 @@ static void test_edits(void)
 	free(vec);
 }
 
+/* The Radius M110: a different radio on the same wire protocol.  These assertions exist because
+ * every one of them was, at some point, the opposite of what this program assumed. */
+static void test_m110(void)
+{
+	static const struct {
+		const char *file, *want, *tag;
+		int band, p;
+		uint32_t tx_hz;
+		int mirrored;
+	} R[] = {
+		{ "fixtures/m110_cspl_radio.bin",    "m110_cspl", "EZA", 12, 254, 438612500u, 1 },
+		{ "fixtures/m110_sel5_radio.bin",    "m110_sel5", "EZ9", 15, 254, 439987500u, 0 },
+		{ "fixtures/m110_sel5_2m_radio.bin", "m110_sel5", "EZ9",  7,  80, 144800000u, 0 },
+	};
+	size_t k;
+
+	for (k = 0; k < sizeof R / sizeof R[0]; k++) {
+		size_t len = 0;
+		uint8_t *b = (uint8_t *)slurp(R[k].file, &len);
+		const mc_model *m;
+		mc_image img;
+		mc_channel c;
+		char note[200];
+		uint8_t saved;
+
+		if (!b) {
+			failf("K-20", "%s missing", R[k].file);
+			continue;
+		}
+		ok(len == 256, "K-25", "the M110 device returns 256 bytes");
+
+		/* K-20: detected on its own marker and its own checksum rule -- NOT as a damaged
+		 * eza_sel5, which is what every one of these did before. */
+		m = mc_model_detect(b, len, note, sizeof note);
+		if (!m || strcmp(m->name, R[k].want) != 0) {
+			failf("K-20", "%s detected as %s, want %s (%s)", R[k].file,
+			      m ? m->name : "nothing", R[k].want, note);
+			free(b);
+			continue;
+		}
+		ok(1, "K-20", "an M110 codeplug detects as its own model");
+		ok(memcmp(b + 7, R[k].tag, 3) == 0, "K-20", "the family tag is at 0x07..0x09");
+
+		img.model = m;
+		img.bytes = b;
+		img.len = len;
+		ok(mc_image_check(&img) == 0, "K-20", "the model fits the image");
+
+		/* K-2: sums to 0x01, not 0xFF, with the byte at 0x0F. */
+		ok(m->cksum == 0x0F, "K-2", "the M110 checksum byte is at 0x0F");
+		ok(m->cksum_target == 0x01, "K-2", "the M110 checksum target is 0x01");
+		ok(mc_checksum_valid(&img), "K-2", "a real M110 codeplug is checksum-valid");
+		ok(mc_checksum_total(&img) == 0x01, "K-2", "and the covered bytes really sum to 0x01");
+
+		/* The negative control the 1989 RSS itself gives us: doctored to the MC micro's constant,
+		 * it must be INVALID here too. */
+		saved = b[0x20];
+		b[0x20] = (uint8_t)(b[0x20] + 0xFE); /* moves the sum 0x01 -> 0xFF */
+		ok(mc_checksum_total(&img) == 0xFF, "K-2", "the doctored image sums to 0xFF");
+		ok(!mc_checksum_valid(&img), "K-2", "an M110 image summing to 0xFF is REJECTED");
+		b[0x20] = saved;
+		ok(mc_checksum_valid(&img), "K-2", "and restoring it makes it valid again");
+
+		/* K-2 again, from the other side: fixing must not touch 0x000, which on this format is
+		 * serial-number byte 0.  Applying the MC micro rule here corrupted the serial. */
+		saved = b[0x000];
+		b[0x0F] = (uint8_t)(b[0x0F] + 3); /* break it */
+		ok(!mc_checksum_valid(&img), "K-2", "a broken M110 checksum is detected");
+		mc_checksum_fix(&img);
+		ok(mc_checksum_valid(&img), "K-2", "mc_checksum_fix repairs it to the model's target");
+		ok(b[0x000] == saved, "K-2", "and leaves 0x000 -- the serial -- alone");
+
+		/* K-20: the band is four bits at the bottom of 0x0A, not three in the middle. */
+		ok(mc_band_index(&img) == R[k].band, "K-20", "the M110 band index is bits 0-3 of 0x0A");
+		ok(mc_band_p_of(&img) == (unsigned)R[k].p, "K-20", "and maps to the measured P");
+
+		/* K-21: channel 1 decodes to the frequency the radio was programmed with. */
+		ok(mc_channel_get(&img, 0, mc_band_p_of(&img), &c) == 0, "K-21", "channel 1 reads");
+		ok(c.tx_hz == R[k].tx_hz, "K-21", "and decodes to the programmed TX frequency");
+
+		/* K-25: device size, codeplug size and write extent are three numbers. */
+		if (R[k].mirrored) {
+			ok(memcmp(b, b + 128, 128) == 0, "K-25",
+			   "the CSQ/PL device returns two identical 128-byte copies");
+			ok(m->cksum_len == 128, "K-25", "and only the first 128 are covered by the sum");
+			ok(mc_write_len(&img) == 128, "K-25", "and only the first 128 are written");
+		} else {
+			ok(mc_write_len(&img) == 256, "K-25", "the Sel 5 writes all 256");
+		}
+
+		/* W-5: neither M110 model has a measured write counter, so nothing may bump one.  On
+		 * eza_sel5 that offset is 0x09E, which here is live channel data. */
+		ok(m->wcount == 0, "W-5", "no write counter is claimed on the M110");
+		free(b);
+	}
+
+	/* K-20: the MC micro models must not claim M110 bytes, and vice versa.  Before the marker
+	 * test, a 256-byte M110 image reached `eza_sel5' and was reported as merely damaged. */
+	{
+		size_t len = 0;
+		uint8_t *b = (uint8_t *)slurp("fixtures/eza9_radio.bin", &len);
+		char note[200];
+		const mc_model *m;
+		if (b) {
+			m = mc_model_detect(b, len, note, sizeof note);
+			ok(m && strcmp(m->name, "eza_sel5") == 0, "K-20",
+			   "a real MC micro EZA 9 still detects as eza_sel5");
+			/* and it carries no M110 marker */
+			ok(memcmp(b + 7, "EZA", 3) != 0 && memcmp(b + 7, "EZ9", 3) != 0, "K-20",
+			   "an MC micro codeplug carries no M110 family tag");
+			free(b);
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
 	static const char *CODEPLUGS[] = {
@@ -717,6 +832,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < sizeof CODEPLUGS / sizeof CODEPLUGS[0]; i++)
 		test_codeplug(CODEPLUGS[i]);
 	test_detect_ident();
+	test_m110();
 	test_freq();
 	test_edits();
 	test_pl();

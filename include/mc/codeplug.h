@@ -51,16 +51,29 @@ typedef struct {
 
 /* ---- model descriptor (K-20) ---------------------------------------------------------------
  * These fields genuinely differ between models, so they are data rather than assumptions -- the
- * checksum BYTE among them.  The extent is the whole device on every model, MCEZ13 included; the
- * `cklen' field exists for a shorter range but no model currently needs one.
+ * checksum byte, its target, its extent and the write extent among them.
+ *
+ * The MC micro family sums the whole device to 0xFF.  The Radius M110 sums to 0x01, and its CSQ/PL
+ * variant covers only the first 128 of the 256 bytes the device returns, because the upper half is
+ * a mirror of the lower.  None of that is expressible as a constant, hence these fields.
  */
 typedef struct {
 	const char *name;
 	uint16_t size;     /* nominal device size, bytes                                   */
 	uint16_t cksum;    /* offset of the checksum byte                                  */
 	uint16_t cksum_len;/* bytes covered by the sum; 0 = the whole device (K-2)         */
+	uint8_t cksum_target; /* what the covered bytes must sum to: 0xFF MC micro, 0x01 M110 */
+	uint16_t write_len;/* bytes sent to the radio; 0 = the whole image (K-21)          */
 	uint16_t chan;     /* offset of the channel table                                  */
-	uint16_t band;     /* offset of the band byte; index is bits 4-6                   */
+	uint16_t band;     /* offset of the band byte                                      */
+	uint8_t band_shift;/* right-shift applied to it before masking                     */
+	uint8_t band_mask; /* mask after shifting -- 7 on MC micro, 0x0F on the M110       */
+	const uint8_t *band_p; /* band index -> frequency multiplier P; NULL = MC micro table */
+	uint8_t band_n;    /* entries in band_p                                            */
+	/* Positive identification (K-20).  A documented field of the format, not an incidental
+	 * string, so its presence is evidence in its own right.  NULL = this model has no marker. */
+	const char *tag;
+	uint16_t tag_off;
 	uint16_t refdiv;   /* offset of the reference divider pair (2 x 16-bit big-endian) */
 	uint8_t nchan;     /* channel slots                                                */
 	uint8_t stride;    /* bytes per channel record                                     */
@@ -95,6 +108,12 @@ const mc_model *mc_model_by_index(size_t i); /* NULL past the end; for enumerati
  * plus a valid checksum is all the evidence a file carries, and eva_56 and eva_sel5 are
  * indistinguishable by layout -- `note` says so when more than one fits.  Returns NULL if nothing
  * does. */
+/* Which model's identifying marker do these bytes carry, if any?  A marker is a documented field of
+ * the format, so it names the format regardless of what else agrees -- which makes it the one thing
+ * a --model override must not be allowed to contradict.  NULL when nothing is marked, which is the
+ * case for every MC micro codeplug. */
+const mc_model *mc_model_marked(const uint8_t *bytes, size_t len);
+
 const mc_model *mc_model_detect(const uint8_t *bytes, size_t len, char *note, size_t notesz);
 /* As above, but allowed to use the radio's ident to settle what size and checksum cannot: the two
  * 512-byte models are identical in both, and a real EVA's ident names its signalling.  Pass the
@@ -127,11 +146,20 @@ int mc_checksum_valid(const mc_image *img);
 /* Recompute the stored byte so the image becomes valid.  Returns the byte written. */
 uint8_t mc_checksum_fix(mc_image *img);
 
-/* Band (K-10).  Index 7 means unprogrammed: ask the user, do not treat it as an error. */
+/* Band (K-10).  On the MC micro, index 7 means unprogrammed: ask the user, do not treat it as an
+ * error.  The field's width and position are per-model -- bits 4-6 of one byte on the MC micro,
+ * bits 0-3 on the M110 -- so read it through these rather than by masking yourself. */
 int mc_band_index(const mc_image *img);
 int mc_band_raster(const mc_image *img);
-/* Channel-spacing divisor P for a band index, or 0 if the band does not determine one. */
+/* Channel-spacing divisor P for this image's band, or 0 if the band does not determine one --
+ * which covers both "unprogrammed" and "this model's table does not have that index measured". */
+unsigned mc_band_p_of(const mc_image *img);
+/* The MC micro table alone, by index.  Prefer mc_band_p_of() unless you genuinely have no image. */
 unsigned mc_band_p(int band_index);
+
+/* Bytes actually written to the radio (K-21).  The whole image on every MC micro model; only the
+ * first half on the M110 CSQ/PL, whose upper 128 bytes are a mirror the original never writes. */
+size_t mc_write_len(const mc_image *img);
 
 uint16_t mc_refdiv(const mc_image *img, int which); /* which = 0 or 1 */
 

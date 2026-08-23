@@ -254,11 +254,17 @@ int mc_write_radio(mc_session *s, const mc_image *img, const char *backup_path,
 		rep->counter = 1;
 	}
 
-	/* W-4, W-6: every record in order, each read back and compared. */
+	/* W-4, W-6: every record in order, each read back and compared.
+	 *
+	 * K-25: the extent is per-model, and is not always the whole image.  The M110 CSQ/PL device
+	 * returns 256 bytes that are two identical 128-byte copies, and its own 1989 programmer writes
+	 * only the first 128 -- so writing all 256 would push a second, differing copy into the upper
+	 * half, and the write counter bump above guarantees the halves DO differ.  Whether the upper
+	 * half is separate storage or an address alias is unestablished, and both readings are bad. */
 	v.img = &sent;
-	v.p = mc_band_p(mc_band_index(img));
+	v.p = mc_band_p_of(img);
 	v.err[0] = 0;
-	if (mc_write_all(s, sent.bytes, sent.len, verify_record, &v) != 0) {
+	if (mc_write_all(s, sent.bytes, mc_write_len(&sent), verify_record, &v) != 0) {
 		/* The backup path leads, because after a half-written EEPROM it is the only thing the user
 		 * strictly needs from this sentence. */
 		snprintf(rep->err, sizeof rep->err,
@@ -266,6 +272,6 @@ int mc_write_radio(mc_session *s, const mc_image *img, const char *backup_path,
 		         rep->backup, s->err, v.err[0] ? " -- " : "", v.err);
 		return -1;
 	}
-	rep->records = (int)(img->len / MC_BLOCK);
+	rep->records = (int)(mc_write_len(&sent) / MC_BLOCK);
 	return 0;
 }

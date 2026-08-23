@@ -459,7 +459,7 @@ static void probe_decode(const uint8_t *img, size_t len, const mc_model *model, 
 	     mc_checksum_valid(&im) ? "" : " -- a real radio has been captured with an invalid one, so "
 	                                   "this is worth reporting but is not necessarily a fault");
 
-	p = mc_band_p(mc_band_index(&im));
+	p = mc_band_p_of(&im);
 	nch = mc_channel_count(&im, &term);
 	if (mc_band_index(&im) == 7) {
 		note("K-10", "band and channels", R_DIFFERS, "a programmed band, 1-4",

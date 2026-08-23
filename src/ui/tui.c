@@ -139,7 +139,7 @@ static int prompt(const char *label, char *buf, size_t n)
 static void draw_list(int sel, int top)
 {
 	int band = mc_band_index(&img);
-	unsigned p = mc_band_p(band);
+	unsigned p = mc_band_p_of(&img);
 	int term = 0, live = mc_channel_count(&img, &term);
 	int rows = LINES - 5, i;
 	char buf[128];
@@ -228,7 +228,7 @@ static const char *flag_help(const mc_flag *f)
 
 static void edit_channel(int slot0)
 {
-	unsigned p = mc_band_p(mc_band_index(&img));
+	unsigned p = mc_band_p_of(&img);
 	const mc_flag *flags;
 	size_t nf;
 	int sel = 0, nrows;

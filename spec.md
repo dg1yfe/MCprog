@@ -290,9 +290,19 @@ frequency** (K-11). Any real mismatch aborts immediately, naming record and offs
 **K-1 Image.** The codeplug is the device's EEPROM verbatim. `.DAT` files are exactly these bytes,
 so old files load unchanged. **[C]**
 
-**K-2 Checksum.** One byte is chosen so that the covered range sums to `0xFF` mod 256. **The byte
-is per-model** (K-20); the extent is the whole device on every model, MCEZ13 included. The sum loop
-at `CS:0x767E` runs `0 .. size-1` and `size` is 128 there — watched at runtime, not inferred. **[C]**
+**K-2 Checksum.** One byte is chosen so that the covered range sums to a per-model **target** mod
+256. **The byte, the extent and the target are all per-model** (K-20). On every MC micro model the
+target is `0xFF` and the extent is the whole device, MCEZ13 included; the sum loop at `CS:0x767E`
+runs `0 .. size-1` and `size` is 128 there — watched at runtime, not inferred. **[C]**
+
+> **The Radius M110 uses a different constant**: its covered bytes sum to **`0x01`**, with the byte
+> at **`0x0F`**. Read out of `M110/MRAR0200.EXE`: the writer at file `0x1BD82` zeroes the cell, sums,
+> then computes `1 - sum`; the verifier at `0x1BBF6` does `sum / dec / je`. Measured on four radios,
+> and the negative controls are decisive — an image doctored to sum to `0xFF`, the MC micro's own
+> constant, is **rejected by the M110's own software**. **[C][S]**
+>
+> Assuming a single global target is therefore not a simplification but a corruption: applying the
+> MC micro rule to an M110 rewrites `0x000`, which on that format is **serial-number byte 0**.
 
 > **This corrects a documented law.** MCEZ13's checksum was recorded as covering "126 of 128, all
 > but the last two bytes". It does not; that reading came from a fixture whose two leading bytes had
@@ -439,6 +449,28 @@ came from. A value the law cannot spell is refused, never rounded (U-3).
 | `MCEV9` / `MCEV9M` SEL5 EVA | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEZ9` SEL5 EZA | 256 | 0x000 | 0x0C8, 8 × 6 | 0x082 b4-6 | 0x0C4 |
 | `MCEZ13` CS/PL | 128/256/512/1024 | **0x003**, whole device | 0x03B, 8 × 6 | 0x039 b4-6 | 0x004 |
+| **M110** CSQ/PL `EZ3.01.00.44` | 256 device / **128 codeplug** | **0x00F**, first 128, target **0x01** | 0x01B, 10 × 10 | **0x00A b0-3** | 0x013 |
+| **M110** Sel 5 `EZ9.01.00.45` | 256 | **0x00F**, whole device, target **0x01** | 0x092, 15 × 7 | **0x00A b0-3** | 0x089 |
+
+> The M110 is a different radio that answers the same wire protocol, and **no MC micro offset lands
+> on a real field**: `eza_sel5`'s reference dividers read `00 00 00 00` and its write counter at
+> `0x09E` is live channel data on both families — channel 1's TX middle byte on the CSQ/PL, channel
+> 2's RX middle byte on the Sel 5. It is two models, not a variant. **[C]**
+>
+> Detection therefore needs a **positive marker**, not just size and checksum. Bytes `0x07..0x09`
+> hold the family tag `"EZA"` or `"EZ9"` — a documented field, from the RSS's own radio-type
+> descriptor table at `MRAR0200.EXE` file `0x31798`, which is also where the checksum offset `0x0F`
+> is confirmed statically for both families. **[S]**
+>
+> The band is **four** bits, not three: `doc/M110_MNEMONICS.md` recorded bits 0-2, but its samples
+> were all `VLO`(4) and `VHI`(7), which have bit 3 clear. `ULO`(12) and `UHI`(15) need the fourth.
+> Measured P: `VHI` → 80, `ULO` → 254, `UHI` → 254. `VLO`, `MIB`, `UX1`, `UX2` are **[?]** and the
+> table holds zero for them, which reads as "not computable" rather than as a wrong answer.
+>
+> **Unestablished, hence absent from both models:** the PL encoding (the CSQ/PL record carries PLE
+> at `+0` and PLD at `+5`, but the tone scale has not been measured), the channel flag bits, and the
+> timer block. The channel *counts* are the size of the region the table occupies, which is
+> inference from four radios that leave the rest of it zero — see K-25. **[?]**
 
 **K-21 Channel record.** EVA: `+0` BCD number, `+1` trakmode, `+2..4` TX, `+5..7` RX. EZA: `+0..2`
 TX, `+3..5` RX, with no number and no trakmode byte. **[C]**
@@ -470,6 +502,25 @@ Records past the terminator are stale and **must be written back unchanged**. **
 **K-24 Three channel states.** Beyond the terminator (does not exist), allocated but unprogrammed
 (valid number, zero frequency), and programmed. Never render an unprogrammed slot as `0.00000 MHz`.
 **[C]**
+
+**K-25 The device size, the codeplug size and the write extent are three different numbers.** On
+every MC micro model they coincide. On the **M110 CSQ/PL** they do not: the device returns 256 bytes
+that are **two identical 128-byte copies** (`bytes[:128] == bytes[128:]` on both hardware radios),
+the codeplug is the first 128, and the 1989 programmer writes **only those 128** — its emitted
+record list is `[(0,64), (64,64)]`, against `[(0,64), (64,64), (128,64), (192,64)]` for the Sel 5.
+So the write extent is per-model. **[C]**
+
+> This is also the whole of the "sums to `0x02`" puzzle: each 128-byte copy independently sums to
+> `0x01`, so the 256-byte total is `0x02`. Never an offset error, never a damaged codeplug.
+>
+> Writing all 256 to a CSQ/PL would be actively harmful. The write-counter bump guarantees the two
+> halves differ, and whether the upper half is separate storage or an address alias of the lower is
+> **[?]** — both readings are bad. Separate storage leaves two disagreeing copies with no way to
+> know which the firmware reads; an alias means record order makes **the second half win**, so the
+> radio ends up holding the copy that was *not* checked.
+>
+> Channel *counts* on both M110 models are the size of the region the table occupies, which is
+> inference from four radios that leave the rest of it zero, not a measurement. **[?]**
 
 **K-24a Programming an empty slot defaults clock shift OFF.** An unprogrammed record's flag bits
 are leftovers, not settings. That matters because MCEZ13 stores clock shift **inverted**, so a

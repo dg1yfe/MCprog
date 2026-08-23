@@ -33,14 +33,14 @@ mcprog --list-models                            models compiled into this build
 
 | capability | state |
 |---|---|
-| Decode, edit, re-encode, checksum | four models |
+| Decode, edit, re-encode, checksum | six models — four MC micro, two Radius M110 |
 | Read a codeplug from a radio | **works on hardware** — EZA 9, 256 bytes, every mapped field as predicted |
 | Write a codeplug to a radio | **never landed on hardware** — see below |
 | Protocol library | replays all three recorded hardware sessions byte for byte |
 | TUI | channel list, per-channel editor, PL, options, timers, save |
 | Serial transport, POSIX | used against a real radio |
 | Serial transport, Win32 | compiles; never built or run on Windows |
-| Test suite | 1316 assertions, all passing |
+| Test suite | 1382 assertions, all passing |
 
 Everything not marked as hardware-verified is verified against captured hardware sessions, a fake
 radio on a pseudo-terminal, and the original software under emulation.
@@ -63,21 +63,48 @@ a radio rather than a guess.
 
 ## Models
 
-| name | bytes | channels | PL | radios |
-|---|---|---|---|---|
-| `eva_sel5` | 512 | 32 × 8 | encode | EVA, SEL5 signalling — MCEV9, MCEV9M |
-| `eva_56` | 512 | 32 × 8 | encode | EVA, 5/6-tone signalling — MCEV_56 |
-| `eza_sel5` | 256 | 8 × 6 | encode | EZA, SEL5 signalling — MCEZ9 and its R/M builds |
-| `eza_cspl` | 128 | 8 × 6 | encode + decode | EZA, CS/PL — MCEZ13 |
+| name | bytes | channels | checksum | PL | radios |
+|---|---|---|---|---|---|
+| `eva_sel5` | 512 | 32 × 8 | `0x000` → 0xFF | encode | EVA, SEL5 signalling — MCEV9, MCEV9M |
+| `eva_56` | 512 | 32 × 8 | `0x000` → 0xFF | encode | EVA, 5/6-tone signalling — MCEV_56 |
+| `eza_sel5` | 256 | 8 × 6 | `0x000` → 0xFF | encode | EZA, SEL5 signalling — MCEZ9 and its R/M builds |
+| `eza_cspl` | 128 | 8 × 6 | `0x003` → 0xFF | enc + dec | EZA, CS/PL — MCEZ13 |
+| `m110_cspl` | 256 (128 real) | 10 × 10 | `0x00F` → **0x01** | — | **Radius M110** CSQ/PL, `EZ3.01.00.44` |
+| `m110_sel5` | 256 | 9 × 12 | `0x00F` → **0x01** | — | **Radius M110** Sel 5, `EZ9.01.00.45` |
 
-Detection is by size and checksum. The two 512-byte models are the same hardware differing only in
-signalling, so **nothing in a file separates them**; detection assumes `eva_sel5`. From a radio the
-ident decides: `5/6 Tone` selects `eva_56`. There is no SEL5 marker, so its absence falls back to the
-default rather than concluding anything. Override with `--model`.
+Detection is by size, checksum **and a marker in the bytes** where the format has one. The M110
+names its family at `0x07..0x09` (`EZA` or `EZ9`) — a documented field of that format, from the 1989
+software's own radio-type descriptor table — so it is identified positively rather than by
+elimination.
+
+The two 512-byte models are the same hardware differing only in signalling, so **nothing in a file
+separates them**; detection assumes `eva_sel5`. From a radio the ident decides: `5/6 Tone` selects
+`eva_56`. There is no SEL5 marker, so its absence falls back to the default rather than concluding
+anything. Override with `--model`.
+
+`--model` skips detection, but **not** the marker: naming a model that contradicts the marker in the
+bytes is refused, because it is never resolving an ambiguity — it is a mistake that would read and
+write the wrong offsets.
 
 Per-model differences that matter: `eva_56` has no write counter (`0x0AF` is a programming date);
 `eza_sel5` has an auto-ack delay at `0x076` and its counter at `0x09E`; `eza_cspl` uses PL scale
 7.9844 rather than 7.984, which changes exactly one of the 39 EIA tones (118.8 Hz).
+
+### The Radius M110 is a different radio
+
+It answers the same wire protocol and nothing else is shared. Its checksum sums to **`0x01`**, not
+`0xFF`, with the byte at `0x0F`; its band is four bits at the bottom of `0x0A`; and **no MC micro
+offset lands on a real field** — `eza_sel5`'s reference dividers read as zeros and its write counter
+at `0x09E` is live channel data on both families.
+
+The CSQ/PL device returns 256 bytes that are **two identical 128-byte copies**. The codeplug is the
+first 128, and only those are written — which is also why its 256-byte total is `0x02`: each half
+sums to `0x01` independently.
+
+What is **not** established, and so is absent rather than guessed: the PL encoding (the CSQ/PL record
+carries PLE and PLD, but the tone scale is unmeasured), the channel flag bits, and the timer block.
+The channel counts are the size of the region the table occupies — inference from four radios that
+leave the rest of it zero, not a measurement.
 
 ## Control lines
 

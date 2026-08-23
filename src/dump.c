@@ -48,7 +48,7 @@ void mc_dump_vec(FILE *f, const mc_image *img, const char *path)
 {
 	const mc_model *m = img->model;
 	int band = mc_band_index(img);
-	unsigned p = mc_band_p(band);
+	unsigned p = mc_band_p_of(img);
 	int term = 0, live = mc_channel_count(img, &term);
 	char pbuf[16], tbuf[16];
 

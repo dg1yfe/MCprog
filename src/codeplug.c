@@ -32,6 +32,13 @@ size_t mc_image_check(const mc_image *img)
 	const mc_model *m = img->model;
 	size_t need = 0, x;
 
+	/* The nominal device size is a floor, not just the accessors' high-water mark.  They differ on
+	 * the M110 CSQ/PL, which declares 256 (what the device returns) but addresses only the first
+	 * 128 (the codeplug; the rest is a mirror -- K-25).  Detection and the write path both compare
+	 * `img->len' against `size', so an image shorter than that is unusable however few bytes the
+	 * accessors happen to touch. */
+	need = m->size;
+
 	/* the highest byte any accessor can touch, per model */
 	x = (size_t)m->cksum + 1;                                     if (x > need) need = x;
 	x = (size_t)m->band + 1;                                      if (x > need) need = x;
@@ -75,22 +82,32 @@ uint8_t mc_checksum_total(const mc_image *img)
 
 int mc_checksum_valid(const mc_image *img)
 {
-	return mc_checksum_total(img) == 0xFF;
+	return mc_checksum_total(img) == img->model->cksum_target;
 }
 
 uint8_t mc_checksum_fix(mc_image *img)
 {
 	uint8_t *cell = &img->bytes[img->model->cksum];
-	/* Solve for the stored byte: it is part of the sum, so back it out first. */
-	*cell = (uint8_t)(*cell - (uint8_t)(mc_checksum_total(img) - 0xFF));
+	uint8_t want = img->model->cksum_target;
+	/* Solve for the stored byte: it is part of the sum, so back it out first.  The target is
+	 * per-model -- 0xFF on the MC micro, 0x01 on the M110 -- and getting it wrong does not merely
+	 * leave the image invalid, it overwrites a live byte with a plausible-looking wrong one. */
+	*cell = (uint8_t)(*cell - (uint8_t)(mc_checksum_total(img) - want));
 	return *cell;
+}
+
+size_t mc_write_len(const mc_image *img)
+{
+	size_t n = img->model->write_len ? img->model->write_len : img->len;
+	return n > img->len ? img->len : n;
 }
 
 /* ---- band, K-10 ----------------------------------------------------------------------------- */
 
 int mc_band_index(const mc_image *img)
 {
-	return (img->bytes[img->model->band] >> 4) & 7;
+	const mc_model *m = img->model;
+	return (img->bytes[m->band] >> m->band_shift) & m->band_mask;
 }
 
 int mc_band_raster(const mc_image *img)
@@ -107,6 +124,18 @@ unsigned mc_band_p(int band_index)
 	case 4: return 254;
 	default: return 0; /* 7 = unprogrammed; anything else is unknown */
 	}
+}
+
+unsigned mc_band_p_of(const mc_image *img)
+{
+	const mc_model *m = img->model;
+	int i = mc_band_index(img);
+
+	if (!m->band_p)
+		return mc_band_p(i);
+	/* A model-supplied table.  Entries are 0 where the band exists but its P has never been
+	 * measured, and 0 reads downstream as "not computable" -- which is the honest answer. */
+	return (i >= 0 && i < m->band_n) ? m->band_p[i] : 0;
 }
 
 uint16_t mc_refdiv(const mc_image *img, int which)
@@ -243,7 +272,7 @@ static uint8_t *half_ptr(mc_image *img, int slot0, mc_dir dir)
 
 int mc_channel_set_freq(mc_image *img, int slot0, mc_dir dir, uint32_t hz)
 {
-	unsigned p = mc_band_p(mc_band_index(img));
+	unsigned p = mc_band_p_of(img);
 	uint8_t *f;
 	mc_channel before;
 	int was_empty;

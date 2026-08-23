@@ -105,8 +105,13 @@ static void list_models(void)
 		printf("%-10s %5u 0x%03X %8s  %-7s %s\n", m->name, m->size, m->cksum, chans, pl,
 		       m->about ? m->about : "");
 	}
-	printf("\nModel detection is by size and checksum, so the two 512-byte EVA models cannot be\n"
-	       "told apart from the bytes alone -- use --model to choose.\n");
+	printf("\nDetection is by size, checksum and -- where the format has one -- a marker in the\n"
+	       "bytes: the Radius M110 names its family at 0x07..0x09.  The two 512-byte EVA models\n"
+	       "have no marker and no other difference, so they cannot be told apart from a file at\n"
+	       "all; from a radio the ident settles it.  Use --model to choose.\n"
+	       "\n--model SKIPS detection entirely.  Naming a model whose layout does not match the\n"
+	       "bytes will read and write the wrong offsets, so use it to resolve an ambiguity the\n"
+	       "tool reports -- not to force a file open that it refused.\n");
 }
 
 static void wirelog(void *ctx, int tx, const uint8_t *buf, size_t n)
@@ -376,6 +381,22 @@ int main(int argc, char **argv)
 			fprintf(stderr, "mcprog: unknown model %s -- these are the ones this build knows:\n\n",
 			        want);
 			list_models();
+			return 2;
+		}
+		/* --model skips detection, which is the point of it -- but not so far as to let a model
+		 * claim bytes that announce themselves as something else.  A codeplug carrying a family
+		 * marker names its own format, and overriding that is never resolving an ambiguity; it is
+		 * a mistake, and an expensive one.  Forcing `eza_sel5' onto a Radius M110 puts the write
+		 * counter into live channel data and makes mc_checksum_fix() rewrite the serial number. */
+		const mc_model *marked = mc_model_marked(img_bytes, (size_t)len);
+		if (marked && marked != model) {
+			fprintf(stderr,
+			        "mcprog: refusing --model %s: these bytes carry the \"%s\" marker of model "
+			        "%s\n", want, marked->tag, marked->name);
+			fprintf(stderr,
+			        "       that marker is part of the format, so the file is a %s codeplug and\n"
+			        "       %s's offsets do not describe it. Use --model %s, or no --model at "
+			        "all.\n", marked->name, want, marked->name);
 			return 2;
 		}
 		snprintf(note, sizeof note, "model %s given on the command line", want);

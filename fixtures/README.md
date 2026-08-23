@@ -12,6 +12,15 @@ radio; none contains Motorola code.
 | `eza9_radio.bin` | **256-byte codeplug read off a real EZA 9**, VHF band 2, 8 channels all TX 149.85000 / RX 154.45000 MHz | `mcprog --selftest`, 17 Aug 2026 — the only fixture here that came from hardware rather than from the 1987 software |
 | `eza9_default_band[1-4].bin` | **factory default codeplugs for the SEL5 EZA 9**, 256 bytes each, one per RF range | captured from `MCEZ9R`'s `INITIALIZE`, see below |
 | `ez13_default_band[1-4].bin` | **factory default codeplugs for the CS/PL EZA 1/3**, 128 bytes each (the `1 x 128` EEPROM configuration) | captured verbatim from `MCEZ13R`'s `INITIALIZE` — see below |
+| `m110_cspl_radio.bin` | **Radius M110 CSQ/PL read off hardware** (`EZ3.01.00.44`), 70 cm, 2 channels TX 438.61250 / RX 431.01250 MHz, both on the same pair and differing only in PL. 256 bytes as the device returns them — **two identical 128-byte copies**, K-25 | `mcprog --selftest`, `reports/run3-EZA3,70cm,2Ch/` |
+| `m110_sel5_radio.bin` | **Radius M110 Sel 5 read off hardware** (`EZ9.01.00.45`), 70 cm, 1 channel 439.98750 MHz. A genuine 256-byte codeplug, not mirrored | `mcprog --selftest`, `reports/run5-EZA9,70cm/` |
+| `m110_sel5_2m_radio.bin` | **a second, different Sel 5 radio**, 2 m, 1 channel 144.80000 MHz, and the only capture with 5-tone data programmed | `mcprog --selftest`, `reports/write-runs/report8.md.dat` |
+
+The three M110 images are hardware reads, like `eza9_radio.bin`, and they are here because the M110
+is a *different radio* that answers the same wire protocol: its checksum sums to `0x01` rather than
+`0xFF`, its checksum byte is at `0x0F`, and no MC micro offset lands on a real field. Two of them
+being the two different families is the point — the CSQ/PL mirroring is invisible in a single
+capture, and the third exists so nothing depends on one radio per family.
 
 ## `ev9_default.bin`
 

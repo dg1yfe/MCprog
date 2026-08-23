@@ -61,18 +61,33 @@ def drive(keys, src, model=None, settle=2.0):
         os._exit(1)
     out = b''
 
-    def pump(t, quiet=0.08):
+    def pump(t, quiet=0.08, grace=0.0, need_output=False):
         """Read until the stream has been silent for `quiet` seconds, or `t` elapses.
 
-        A fixed sleep here is a race: under load the program may not have finished drawing when the
-        next key is sent, and the first keypress then lands on the model-detection note instead of
-        the channel list.  That failed twice during full `make check' runs and never once in ten
-        isolated runs, which is exactly the signature.  Waiting for quiet is both faster when idle
-        and correct when not.
+        A fixed sleep here is a race: the program may not have finished drawing when the next key is
+        sent, and the first keypress then lands on the model-detection note instead of the channel
+        list.  Waiting for quiet is both faster when idle and correct when not.
+
+        But "silent for 80 ms" cannot tell *finished drawing* from *has not started yet*, and at
+        startup it is the second.  This test was therefore order-dependent -- it passed only if the
+        binary had already been run once.  Measured: the FIRST execution of a freshly linked binary
+        costs 130 ms (`mcprog --list-models': 0.13 s cold, 0.00 s warm; macOS validates the
+        signature and the caches are cold).  With an 80 ms window the startup pump returned having
+        read nothing, the key went into a program that had not drawn, the next pump did the same,
+        and SIGTERM arrived at ~160 ms.  Hence 6 of 6 passes at rest, 2-3 of 4 failures straight
+        after `make', 3 of 3 passes when the binary was executed once beforehand -- and always the
+        same seven checks, the ones driven earliest, while later ones passed on a by-then-warm
+        binary.
+
+        So: `need_output' makes a pump wait for the first byte however long it takes, and `grace'
+        stops any pump returning early before then.  The startup pump also uses a wider `quiet',
+        because a cold draw has gaps inside it and an 80 ms lull mid-draw is not the end of it.
         """
         nonlocal out
-        end = time.time() + t
-        last = time.time()
+        start = time.time()
+        end = start + t
+        last = start
+        got = False
         while time.time() < end:
             if select.select([fd], [], [], 0.02)[0]:
                 try:
@@ -82,13 +97,15 @@ def drive(keys, src, model=None, settle=2.0):
                 if not d:
                     return
                 out += d
+                got = True
                 last = time.time()
-            elif time.time() - last >= quiet:
+            elif time.time() - last >= quiet and (got or not need_output) \
+                    and time.time() - start >= grace:
                 return
-    pump(settle)
+    pump(settle, quiet=0.35, need_output=True)
     for k in keys:
         os.write(fd, k)
-        pump(settle)
+        pump(settle, grace=0.15)
     try:
         os.kill(pid, signal.SIGTERM)
         os.waitpid(pid, os.WNOHANG)

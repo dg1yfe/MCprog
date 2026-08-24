@@ -37,8 +37,9 @@
 
 /* Is `off` a byte MCprog could legitimately have changed?  Everything else differing means the
  * image and the radio disagree about something we do not understand, and K-30 says refuse. */
-static int ours(const mc_model *m, size_t off)
+static int ours(const mc_image *img, size_t off)
 {
+	const mc_model *m = img->model;
 	if (off == m->cksum)
 		return 1;
 	if (off >= m->chan && off < (size_t)m->chan + (size_t)m->nchan * m->stride)
@@ -53,7 +54,10 @@ static int ours(const mc_model *m, size_t off)
 		return 1;
 	if (m->aak && off == m->aak)
 		return 1;
-	if (m->pl_mode && off == m->pl_mode)
+	/* K-30a/K-31: the mode byte's address is derived on trakmode models, so ask rather than
+	 * compare against the static field -- otherwise a 1024-byte codeplug would guard 0x1FD while
+	 * the PL editor writes 0x3FD. */
+	if (mc_pl_mode_off(img) && off == mc_pl_mode_off(img))
 		return 1;
 	if (m->wcount && off == m->wcount)   /* W-5: we are about to bump it anyway */
 		return 1;
@@ -72,7 +76,7 @@ int mc_write_explain(const mc_image *img, const uint8_t *radio, size_t radio_len
 		if (img->bytes[i] == radio[i])
 			continue;
 		changed++;
-		if (!ours(img->model, i)) {
+		if (!ours(img, i)) {
 			snprintf(why, whysz,
 			         "0x%03X differs (radio %02X, ours %02X) and is not a byte this program "
 			         "writes -- refusing rather than guessing (K-30)",

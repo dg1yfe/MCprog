@@ -464,6 +464,40 @@ differential sweep caught it turning `0xE7` into `0x60`, clearing the nibble. **
 > why. The regression test plants `0xE7` and requires `0x60`, and it fails against the old masking
 > implementation.
 
+**K-31 The trakmode block is derived from the codeplug size, not hardcoded.** A *trakmode* is
+Motorola's term for a shared signalling personality — one **27-byte** record holding the basecall
+code, repeater-access sequence, groupcall positions, PL encode mode, AAK/secret bits and the
+signalling FORMAT. Records are counted **downward from the top of the codeplug** and every channel
+points at one via record byte `+1`. The EZA family has no such block. **[C]**/**[S]**
+
+The radio does not take the codeplug size on trust. It reads **bit 7 of `0x0CF`** — clear = 512
+bytes, set = 1024 — and derives everything from that:
+
+```
+top        = (cp[0x0CF] & 0x80) ? 1024 : 512      EZA33 E969 (checksum), F512 (trakmode)
+TrakBase(t)= top - 27*(t+1)
+PL mode    = TrakBase(t) + 0x18
+```
+
+For a 512-byte EVA that gives `TrakBase(0) = 0x1E5` and a PL mode byte at **`0x1FD`** — which is what
+MCprog previously hardcoded. For a 1024-byte codeplug it moves to **`0x3FD`**, and the hardcoded value
+would have edited the wrong byte. `mc_pl_mode_off()` is now authoritative and `pl_mode` is its
+512-byte fallback; the write gate asks the same function, so it cannot guard one address while the
+editor writes another. **[S]**
+
+> The 1987 RSS computes the same thing: `TrakBase(n) = [0x810] - 27*(n+1) + 1` at `0x3A78`, which with
+> its stored top index `0x1FF` also gives `0x1E5`. Two implementations, one formula. **[C]**
+>
+> **No model is 1024 bytes today**, so this is a latent correctness fix rather than an observed bug.
+> It is worth making anyway: it removes an assumption we now know the radio does not share, and the
+> accessor refuses a block that would fall outside the image instead of running off the end.
+
+Accessors: `mc_codeplug_top()`, `mc_trak_base()`, `mc_trak_count()` (bits 0–3 of `0x0DA`),
+`mc_trak_enabled()` (bit 7), `mc_channel_trak()`. **PL uses trakmode 0 deliberately** — a 512-byte
+EVA has room for exactly one record and every sample codeplug carries trakmode `0x00` on every
+channel, so "per-trakmode" and "radio-wide" coincide. Resolving a channel's own trakmode needs a
+codeplug that actually has more than one, and none exists to test against. **[?]**
+
 **K-14a PL in the channel record, and the two laws.** The Radius M110 CSQ/PL gives **every channel
 its own** encode and decode tone, in the record rather than in a shared table: **encode at `+0`,
 decode at `+5`**, straddling the TX triplet. Both are big-endian words, 0 meaning none. **[C]**

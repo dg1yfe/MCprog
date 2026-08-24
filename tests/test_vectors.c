@@ -522,6 +522,38 @@ static void test_pl(void)
 			   "and clamps one that points past the last populated tone");
 			ok((img_bytes[im.model->pl_mode] & 0x40) != 0, "K-30a",
 			   "bit 6, which gates PL encode in the radio, is set in both modes");
+
+			/* K-31.  The radio does not take the codeplug size on trust: it reads bit 7 of the
+			 * size-flag byte and computes the trakmode block down from the top (EZA33 §7f).
+			 * MCprog used to hardcode 0x1FD, which is only right for a 512-byte codeplug. */
+			ok(mc_codeplug_top(&im) == 512, "K-31",
+			   "a codeplug with the size flag clear is 512 bytes");
+			ok(mc_trak_base(&im, 0) == 0x1E5, "K-31",
+			   "TrakBase(0) = 512 - 27 = 0x1E5, matching the RSS routine at 0x3A78");
+			ok(mc_pl_mode_off(&im) == 0x1FD, "K-31",
+			   "so the PL mode byte derives to 0x1FD -- the value that used to be hardcoded");
+			ok(mc_pl_mode_off(&im) == im.model->pl_mode, "K-31",
+			   "and the static field agrees, so 512-byte behaviour is unchanged");
+			{
+				/* Flip the size flag and the whole block must move with it.  The image is only
+				 * 512 bytes here, so mc_trak_base() must refuse rather than point outside it --
+				 * that refusal is the safety property worth pinning. */
+				uint8_t save = img_bytes[im.model->size_flag];
+				img_bytes[im.model->size_flag] = (uint8_t)(save | 0x80);
+				ok(mc_codeplug_top(&im) == 1024, "K-31",
+				   "setting bit 7 of the size flag makes it a 1024-byte codeplug");
+				ok(mc_trak_base(&im, 0) == 0, "K-31",
+				   "and a block that would fall outside a short image is refused, not returned");
+				ok(mc_pl_mode_off(&im) == im.model->pl_mode, "K-31",
+				   "so the PL offset falls back to the static field rather than running off the end");
+				img_bytes[im.model->size_flag] = save;
+			}
+			ok(mc_trak_base(&im, 99) == 0, "K-31",
+			   "an absurd trakmode index is refused");
+			ok(mc_channel_trak(&im, 0) == img_bytes[im.model->chan + 1], "K-31",
+			   "a channel's trakmode is record byte +1");
+			ok(mc_channel_trak(&im, im.model->nchan) == -1, "K-31",
+			   "and an out-of-range channel yields -1, not a stray byte");
 			ok(mc_pl_supported(mc_model_by_name("eza_cspl")) == 1, "K-14",
 			   "MCEZ13 does have PL, now that its read is solved");
 			ok(mc_pl_has_decoder(mc_model_by_name("eza_cspl")) == 1, "K-14",

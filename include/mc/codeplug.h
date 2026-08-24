@@ -86,7 +86,11 @@ typedef struct {
 	uint16_t pl_tone;  /* the single-tone slot                                         */
 	uint16_t pl_list;  /* base of the selectable tone list                             */
 	uint16_t pl_count; /* byte whose HIGH nibble holds the number of selectable tones  */
-	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable; 0 = model has none  */
+	/* Mode byte: high nibble 0x60 single / 0xE0 selectable, low nibble the radio's index into the
+	 * tone list (K-30a).  0 = model has none.  On models with a trakmode block this is a FALLBACK:
+	 * the radio computes the address from the codeplug top, so mc_pl_mode_off() is authoritative
+	 * and this value is what it yields for a 512-byte codeplug. */
+	uint16_t pl_mode;
 	uint16_t pl_dec;   /* PL DECODER table base (MCEZ13 only); 0 = model cannot decode */
 	/* PL held IN the channel record rather than in a shared table -- the Radius M110 CSQ/PL.
 	 * These are offsets WITHIN the record, like `tx' and `rx'.  MC_PL_NONE means the model has no
@@ -95,6 +99,14 @@ typedef struct {
 	uint8_t pl_ch_dec;
 	uint8_t pl_max;    /* entries in the list                                          */
 	unsigned pl_k;     /* encoder scale x 10000 -- 79840 on EVA/EZ9, 79844 on MCEZ13   */
+	/* Trakmode block (K-31).  A trakmode is Motorola's term for a shared signalling personality:
+	 * one 27-byte record holding the basecall code, repeater-access sequence, groupcall positions,
+	 * PL encode mode, AAK/secret bits and the signalling FORMAT.  Records are counted DOWNWARD from
+	 * the top of the codeplug and every channel points at one via record byte +1.  The EZA family
+	 * has no such block, so `trak' is 0 there. */
+	uint8_t trak;      /* 1 = this model has a trakmode block                          */
+	uint16_t trak_ct;  /* byte holding the count (bits 0-3) and enable (bit 7); 0 = none */
+	uint16_t size_flag;/* byte whose bit 7 selects a 1024- (set) or 512-byte (clear) codeplug */
 	const struct mc_timer *timers; /* K-16, NULL where the block is not measured        */
 	uint8_t ntimers;
 	uint16_t aak;      /* auto-acknowledge delay byte (K-15); 0 = not established here */
@@ -363,6 +375,32 @@ int mc_channel_pl_enc_set(mc_image *img, int slot0, unsigned dhz);
 int mc_channel_pl_dec_set(mc_image *img, int slot0, unsigned dhz);
 mc_pl_mode mc_pl_get_mode(const mc_image *img);
 void mc_pl_set_mode(mc_image *img, mc_pl_mode mode);
+
+/* ---- trakmodes, K-31 ------------------------------------------------------------------------ */
+
+#define MC_TRAK_SIZE 27   /* bytes per trakmode record                                    */
+#define MC_TRAK_PL   0x18 /* offset of the PL mode byte within a record                   */
+
+/* Codeplug extent as the RADIO sees it: bit 7 of the size-flag byte, not the model's `size'.
+ * Falls back to the model size where no flag byte is established. */
+size_t mc_codeplug_top(const mc_image *img);
+
+/* Base of trakmode record `t', counted down from the top: top - 27*(t+1).  Returns 0 if the model
+ * has no trakmode block or the record would fall outside the image. */
+size_t mc_trak_base(const mc_image *img, int t);
+
+/* How many trakmodes are programmed (bits 0-3 of the count byte), and whether the feature is on
+ * (bit 7).  Both 0 / 0 on models without a trakmode block. */
+int mc_trak_count(const mc_image *img);
+int mc_trak_enabled(const mc_image *img);
+
+/* The trakmode a channel points at -- record byte +1, on `numbered' models.  -1 if not applicable. */
+int mc_channel_trak(const mc_image *img, int ch);
+
+/* Where the PL mode byte really lives.  Derived from the codeplug top on trakmode models, so it
+ * follows a 1024-byte codeplug to 0x3FD instead of staying at 0x1FD; the static `pl_mode' field
+ * otherwise. */
+size_t mc_pl_mode_off(const mc_image *img);
 /* Number of selectable tones in force; 0 when PL is off or the model has none. */
 int mc_pl_get_count(const mc_image *img);
 void mc_pl_set_count(mc_image *img, int n);

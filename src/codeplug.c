@@ -537,6 +537,74 @@ int mc_pl_dec_set(mc_image *img, int i, unsigned dhz)
 	return 0;
 }
 
+/* ---- trakmodes, K-31 ------------------------------------------------------------------------ */
+
+size_t mc_codeplug_top(const mc_image *img)
+{
+	const mc_model *m = img->model;
+	/* The radio does not take the size on trust: cp_Checksum reads the flag byte and sums 2 or 4
+	 * chunks of 256 (EZA33 E969, ANDA #$80), and the trakmode arithmetic at F512 picks a 0x400 or
+	 * 0x200 top from the same bit.  Follow the radio, not the model table. */
+	if (m->size_flag && (size_t)m->size_flag < img->len)
+		return (img->bytes[m->size_flag] & 0x80) ? 1024u : 512u;
+	return m->size;
+}
+
+size_t mc_trak_base(const mc_image *img, int t)
+{
+	size_t top, base;
+	if (!img->model->trak || t < 0)
+		return 0;
+	top = mc_codeplug_top(img);
+	if ((size_t)(t + 1) * MC_TRAK_SIZE > top)
+		return 0;
+	base = top - (size_t)(t + 1) * MC_TRAK_SIZE;
+	return base + MC_TRAK_SIZE <= img->len ? base : 0;
+}
+
+int mc_trak_count(const mc_image *img)
+{
+	const mc_model *m = img->model;
+	if (!m->trak || !m->trak_ct || (size_t)m->trak_ct >= img->len)
+		return 0;
+	return img->bytes[m->trak_ct] & 0x0F;
+}
+
+int mc_trak_enabled(const mc_image *img)
+{
+	const mc_model *m = img->model;
+	if (!m->trak || !m->trak_ct || (size_t)m->trak_ct >= img->len)
+		return 0;
+	return (img->bytes[m->trak_ct] & 0x80) != 0;
+}
+
+int mc_channel_trak(const mc_image *img, int ch)
+{
+	const mc_model *m = img->model;
+	size_t off;
+	/* Record byte +1.  Only meaningful on `numbered' models, where +0 is the BCD channel number
+	 * and +1 is the trakmode this channel points at (doc/EEPROM_MAP_EV9.md). */
+	if (!m->trak || !m->numbered || ch < 0 || ch >= m->nchan)
+		return -1;
+	off = (size_t)m->chan + (size_t)ch * m->stride + 1;
+	return off < img->len ? img->bytes[off] : -1;
+}
+
+size_t mc_pl_mode_off(const mc_image *img)
+{
+	size_t base;
+	if (img->model->trak) {
+		/* Trakmode 0 deliberately.  A 512-byte codeplug has room for exactly one record, and
+		 * every sample carries trakmode 0 on every channel, so PL is radio-wide in practice
+		 * (doc/EZA33_FIRMWARE.md §7f).  Per-channel PL would mean resolving the channel's own
+		 * trakmode, which needs a codeplug that actually has more than one. */
+		base = mc_trak_base(img, 0);
+		if (base)
+			return base + MC_TRAK_PL;
+	}
+	return img->model->pl_mode;
+}
+
 mc_pl_mode mc_pl_get_mode(const mc_image *img)
 {
 	uint8_t v;
@@ -544,7 +612,7 @@ mc_pl_mode mc_pl_get_mode(const mc_image *img)
 		return MC_PL_OFF;
 	if (!img->model->pl_mode)
 		return MC_PL_TABLE; /* MCEZ13: the tables are simply there */
-	v = (uint8_t)(img->bytes[img->model->pl_mode] & 0xF0);
+	v = (uint8_t)(img->bytes[mc_pl_mode_off(img)] & 0xF0);
 	if (v == 0x60)
 		return MC_PL_SINGLE;
 	if (v == 0xE0)
@@ -558,7 +626,7 @@ void mc_pl_set_mode(mc_image *img, mc_pl_mode mode)
 	int n;
 	if (!mc_pl_supported(img->model) || !img->model->pl_mode)
 		return;
-	p = &img->bytes[img->model->pl_mode];
+	p = &img->bytes[mc_pl_mode_off(img)];
 
 	/* K-30a.  The low nibble is NOT unknown padding -- the radio uses it as the index into the
 	 * selectable tone list.  The firmware fetches cp_pl_list[low nibble] at `0x047 + 2*i'

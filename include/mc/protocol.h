@@ -36,8 +36,32 @@
 
 #define MC_BLOCK 64        /* bytes per read/write record (P-23, P-25) */
 #define MC_T_BYTE 190      /* ms per received byte (P-30) */
-#define MC_T_BURN 800      /* ms for the write's second ACK (P-31) */
 #define MC_IDENT_MAX 128
+
+/* The two write ACKs are not the same wait, and until the radio firmware was disassembled both
+ * used one generous number.  P-31a: the radio sends the first ACK as soon as it has taken the
+ * record into RAM -- before a single byte reaches the EEPROM -- so it arrives within a character
+ * time.  Only the second waits out the burn.
+ *
+ * The burn is a *timed* loop, not a poll: eep_WriteByte delays LDX #$0BF7 / DEX / BNE = 3063 x 4
+ * = 12252 cycles per byte, and at E = 4924800/4 Hz that is 9.95 ms.  With the bit-banged bus
+ * transaction on top it is ~10.9 ms per byte, so a 64-byte record takes ~697 ms.  The old 800 ms
+ * left 15 % margin over a number nobody had measured; it is raised here with the derivation
+ * recorded, because a spurious timeout on the write path is expensive to diagnose and a generous
+ * one costs only the time to notice a genuinely dead radio.  See spec.md P-31a. */
+#define MC_T_ACK1 400      /* ms for the first ACK -- pre-burn, so it is prompt (P-31a) */
+#define MC_T_BURN 2000     /* ms for the second ACK -- covers the burn with room for other firmware */
+
+/* Microseconds of burn per byte, from the EVA firmware (spec.md P-31a).  Only that one radio's
+ * constant is known, so this predicts rather than requires: the selftest compares it against the
+ * measured gap and reports a divergence instead of failing on it. */
+#define MC_BURN_US_PER_BYTE 10890
+#define MC_BURN_EXPECT_MS(n) ((unsigned)(((n) * (unsigned long)MC_BURN_US_PER_BYTE) / 1000))
+
+/* The radio's own limits, enforced by proto_ReadHeader in firmware: a count over 0x40 or an
+ * address high byte over 0x03 is NAKed before anything else happens (spec.md P-23a). */
+#define MC_ADDR_MAX 0x03FF
+#define MC_COUNT_MAX 0x40
 
 /* ---- transport ------------------------------------------------------------------------------ */
 typedef struct mc_transport mc_transport;

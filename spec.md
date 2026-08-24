@@ -167,6 +167,25 @@ previous one — confirmed on hardware, where all four EZA 9 records after the f
 > A record takes about 1.25 s at 1200 baud: 135 characters out and back, plus the turnaround. A
 > whole 256-byte EZA 9 read measured 5015 ms. **[C]**
 
+**P-23a The address space is 10 bits, and overrun aliases instead of failing.** Two limits, both
+enforced in firmware and both worth respecting client-side:
+
+* `proto_ReadHeader` NAKs a **count over `0x40`** or an **address high byte over `0x03`** before doing
+  anything else — so the reachable window is `0x0000`–`0x03FF`, 4 banks × 256.
+* More dangerous: the address that actually reaches the bus is **`addr & 0x03FF`**. The I²C device
+  byte is built as `0xA0 | ((addr >> 7) & 6)`, which keeps only address bits 9:8 and **discards
+  everything above**. A request past the top therefore does not error — it returns *plausible data
+  from bank 0*. The write loop re-checks the range on every byte (`CMPA #$03 / BHI`), but **the read
+  loop has no range check at all**, so an unaligned request can walk off the top inside the record.
+
+`mc_read_block` refuses `addr + 64 - 1 > 0x03FF` rather than accept silently wrong bytes. **[S]**
+
+> This also explains **where the end-of-memory NAK comes from**. The firmware is willing to address
+> 1024 bytes, but the fitted part is smaller — 128 on an EZA CSQ/PL, 256 on an EZA Sel5 and both
+> M110s, 512 on an EVA. Reading into a bank that is not populated gets **no ACK from any device**,
+> which the firmware reports as the NAK of P-24. "End of memory" is the bus going unanswered, not a
+> firmware limit being reached. **[S]**
+
 **P-24** Past the end of memory the radio NAKs, in one of **two forms — both real**:
 
 | form | seen on |
@@ -211,6 +230,17 @@ nine runs. **[C]**
 > It now takes one record on its own first (`mc_read_block(..., chain = 0)`), exercises the write
 > path with that, and walks the EEPROM afterwards. **Untested on hardware** — the next radio through
 > is what settles whether the write path works at all.
+
+**P-24b A second way the session dies: the Ext Alarm input.** Independently of any NAK, the radio's
+character reader checks **pin 15 (Ext Alarm)** on every call and abandons programming mode if it is
+asserted — `ser_GetChar` at `E7A3` tests Port 2 bit 6, powers the EEPROM down, and jumps out. It picks
+the exit by the write-in-progress flag (`$0087` bit 6): `EDDD` if a write was underway, `FA3D`
+otherwise. So a radio can go silent **mid-record with no protocol error at all**, and the wire looks
+identical to a radio that simply stopped answering.
+
+Practical consequence: when a session dies unexpectedly, a stuck or noisy Ext Alarm line is a
+candidate alongside P-24a, and it is one the protocol cannot distinguish. Worth knowing before
+attributing every silence to the NAK. **[S]**
 
 Anything that needs the radio after a full read must re-establish the session first. A power-cycle
 is the only method **known** to work — but the 1987 software suggests a second one that has never
@@ -279,10 +309,37 @@ Both captures agree, and the write capture's eight verification reads carry no A
 **P-30** 190 ms per received byte. Measured margin: the worst inter-byte gap *within* a reply is
 43 ms and the median is 8 ms, matching the 8.33 ms character time. **[C]**
 
-**P-31** 800 ms for the write's second reply, measured from completion of transmission. Note that
-`tcdrain`/`FlushFileBuffers` on a USB bridge does not reliably mean "on the wire", so matching the
-observed 130/710 ms exactly is not achievable — the *ordering* requirement of P-25 is what is
+**P-31** **2000 ms** for the write's second reply, measured from completion of transmission. Note
+that `tcdrain`/`FlushFileBuffers` on a USB bridge does not reliably mean "on the wire", so matching
+the observed 130/710 ms exactly is not achievable — the *ordering* requirement of P-25 is what is
 absolute. **[S]**
+
+**P-31a The burn is a timed loop, and its duration is derivable.** The radio does not poll the EEPROM
+for write completion; `eep_WriteByte` waits out a fixed delay per byte —
+`LDX #$0BF7 / DEX / BNE` = 3063 × 4 = **12252 cycles**, which at E = 4924800/4 = 1231200 Hz is
+**9.95 ms**. With the bit-banged I²C transaction on top it is ≈ **10.89 ms per byte**, so a 64-byte
+record predicts a **≈ 697 ms** gap between the two ACKs. **[S]**
+
+> **This independently confirms the capture.** P-25 measured ~710 ms on hardware **[C]**; the
+> disassembly predicts 697 ms **[S]** — **1.9 % apart**, from two completely unrelated methods. That
+> agreement also validates the cycle model behind it (the 1-cycle `DEX`, the 4924800/4 clock, and the
+> `0x0BF7` constant), which is why the tone-decoder timings in `doc/EZA33_FIRMWARE.md` can be trusted.
+>
+> It also shows the **old 800 ms timeout was too tight** — 15 % over the derived figure, 13 % over the
+> measured one, for a path that has never once succeeded on hardware. A spurious timeout there is
+> expensive to diagnose; a generous one costs only the time to notice a genuinely dead radio. Hence
+> 2000 ms, and a separate short timeout for the first ACK.
+
+**P-31b The two ACKs need different timeouts.** The first is sent when the record has been taken into
+RAM, *before any byte reaches the EEPROM* (firmware `E7F6`, before the burn loop at `E7FE`), so it
+arrives within a character time — the captures show ~130 ms. Only the second waits out the burn.
+`MC_T_ACK1` = 400 ms and `MC_T_BURN` = 2000 ms. Separating them distinguishes **"the radio never took
+the record"** from **"it took the record and stopped partway through committing it"**. **[S]**
+
+**P-31c There is no rollback.** The radio burns byte by byte and ACKs only at the end, so a failure
+between the two ACKs leaves an **unknown prefix of that record already committed**. Nothing undoes it.
+Error text must say so, and a failed write must be followed by a verifying read rather than a blind
+retry — this is the same reasoning as P-32's "no retry around write". **[S]**
 
 **P-32** Exactly **one** retry, of the attention phase only. **No retry** around read, write or
 verify — fail loudly. An automatic retry mid-write is how a glitch becomes a half-written EEPROM.

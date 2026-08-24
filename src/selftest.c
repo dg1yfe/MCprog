@@ -492,9 +492,26 @@ static void probe_write(const uint8_t *img, size_t len)
 		return;
 	}
 	note("P-25", "write one record (its own bytes, unchanged)", R_PASS,
-	     "two ACKs, the second roughly 710 ms after the first",
+	     "two ACKs, the second after the burn",
 	     "accepted and burnt in %u ms; the gap between the two ACKs was %u ms", dt,
 	     R.s.last_burn_ms);
+
+	/* P-31a.  The burn is a timed loop in firmware, so the gap is deterministic and predictable --
+	 * ~10.89 ms per byte on the one radio whose ROM we have read.  A radio that diverges is not
+	 * broken; it is running different firmware or a different clock, and that is worth knowing.
+	 * Reported as information, never as a failure: only the EVA constant is established. */
+	{
+		unsigned want = MC_BURN_EXPECT_MS(MC_BLOCK), got = R.s.last_burn_ms;
+		unsigned lo = want - want / 4, hi = want + want / 4;
+		int near = (got >= lo && got <= hi);
+		char exp[80];
+
+		snprintf(exp, sizeof exp, "a timed loop, so about %u ms for %d bytes", want, MC_BLOCK);
+		note("P-31a", "the burn takes as long as the firmware says", R_INFO, exp,
+		     "measured %u ms against a predicted %u ms (+/-25%%): %s", got, want,
+		     near ? "matches the EVA constant"
+		          : "a different burn constant -- worth recording for this model");
+	}
 
 	if (mc_read_block(&R.s, 0x0000, back, 0) != 1)
 		note("P-42", "read the record back", R_FAIL, "the record reads back byte for byte",

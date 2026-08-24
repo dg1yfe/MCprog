@@ -172,6 +172,15 @@ int mc_read_block(mc_session *s, uint16_t addr, uint8_t out[MC_BLOCK], int chain
 	size_t off = 0;
 	int got;
 
+	/* P-23a.  The radio masks the address to 10 bits -- the device byte carries only bits 9:8 --
+	 * so a request past 0x03FF does not fail, it *aliases* back into bank 0 and returns plausible
+	 * data for the wrong address.  The firmware's own header check rejects a high byte over 3, but
+	 * an unaligned request can still walk off the top inside the record loop, which has no range
+	 * check at all.  Refuse here rather than accept silently wrong bytes. */
+	if (addr > MC_ADDR_MAX || addr + MC_BLOCK - 1 > MC_ADDR_MAX)
+		return fail(s, "read 0x%04X: past the device's 0x%04X limit (would alias to bank 0)",
+		            addr, MC_ADDR_MAX);
+
 	/* The acknowledgement of the previous record rides in front of this command. */
 	if (s->pending_ack)
 		cmd[off++] = 0x06;
@@ -221,12 +230,22 @@ int mc_write_block(mc_session *s, uint16_t addr, const uint8_t in[MC_BLOCK])
 
 	/* P-25.  Two bare ACKs: the command was accepted, then the EEPROM burn finished.  Returning
 	 * after the first and sending the next record desynchronises the radio immediately, so this
-	 * function does not return until the second has arrived. */
-	if (rx(s, &a, 1, MC_T_BURN) != 1 || a != 0x06)
-		return fail(s, "write 0x%04X: no first ACK", addr);
+	 * function does not return until the second has arrived.
+	 *
+	 * P-31a: the first ACK is sent before any byte reaches the EEPROM, so it is prompt and gets a
+	 * short timeout; only the second waits out the burn.  Separating them tells the two failures
+	 * apart -- a radio that never took the record at all, versus one that took it and then stopped
+	 * partway through committing it. */
+	if (rx(s, &a, 1, MC_T_ACK1) != 1 || a != 0x06)
+		return fail(s, "write 0x%04X: no first ACK (record not accepted; nothing was written)",
+		            addr);
 	t1 = s->t_rx;
+	/* P-31b: there is no rollback.  The radio burns byte by byte and only ACKs at the end, so a
+	 * failure here means an unknown prefix of this record is already committed. */
 	if (rx(s, &a, 1, MC_T_BURN) != 1 || a != 0x06)
-		return fail(s, "write 0x%04X: no second ACK (burn not confirmed)", addr);
+		return fail(s, "write 0x%04X: no second ACK (burn not confirmed; up to %d bytes of this "
+		                "record may already be committed -- verify before retrying)",
+		            addr, MC_BLOCK);
 	t2 = s->t_rx;
 	s->last_burn_ms = t2 - t1;
 	return 0;

@@ -88,6 +88,11 @@ typedef struct {
 	uint16_t pl_count; /* byte whose HIGH nibble holds the number of selectable tones  */
 	uint16_t pl_mode;  /* mode byte: 0x60 single, 0xE0 selectable; 0 = model has none  */
 	uint16_t pl_dec;   /* PL DECODER table base (MCEZ13 only); 0 = model cannot decode */
+	/* PL held IN the channel record rather than in a shared table -- the Radius M110 CSQ/PL.
+	 * These are offsets WITHIN the record, like `tx' and `rx'.  MC_PL_NONE means the model has no
+	 * such field; 0 cannot be the sentinel because the M110 keeps its encode word at +0. */
+	uint8_t pl_ch_enc;
+	uint8_t pl_ch_dec;
 	uint8_t pl_max;    /* entries in the list                                          */
 	unsigned pl_k;     /* encoder scale x 10000 -- 79840 on EVA/EZ9, 79844 on MCEZ13   */
 	const struct mc_timer *timers; /* K-16, NULL where the block is not measured        */
@@ -330,14 +335,32 @@ uint16_t mc_pl_encode_k(unsigned dhz, unsigned k);   /* k = scale x 10000 */
 unsigned mc_pl_decode_k(uint16_t word, unsigned k);
 
 int mc_pl_supported(const mc_model *m);
-/* MCEZ13 is the only model that decodes PL as well as encoding it, and it uses a DIFFERENT law:
- * round(61.107 x f_Hz) rather than round(7.984 x f_Hz).  Measured at 67.0, 103.5 and 250.3 Hz,
- * which bounds the constant to [61.1063, 61.1087]. */
+/* Decoding PL uses a DIFFERENT law from encoding it: round(61.107 x f_Hz) against
+ * round(7.9844 x f_Hz).  Measurement on MCEZ13 bounded the constant to [61.1063, 61.1087]; the
+ * Radius M110 RSS settles it exactly, carrying both laws as IEEE doubles -- 7.9844 and 61.107 --
+ * side by side with 0.5 and 10 (round-half-up on deci-Hz) at file 0x3174D of M110/MRAR0200.EXE.
+ * The same pair appears at 0x315E8 and 0x3176C. **[S]**
+ *
+ * So the two constants are not per-model at all; the ENCODER and the DECODER simply scale
+ * differently, and MCEZ13 is the only MC micro model that exposes both. */
 int mc_pl_has_decoder(const mc_model *m);
 uint16_t mc_pl_dec_encode(unsigned dhz);
 unsigned mc_pl_dec_decode(uint16_t word);
 unsigned mc_pl_dec_get(const mc_image *img, int i);
 int mc_pl_dec_set(mc_image *img, int i, unsigned dhz);
+
+/* ---- PL held in the channel record (K-14a) ---------------------------------------------------
+ * The Radius M110 CSQ/PL gives every channel its own encode and decode tone, in the record, rather
+ * than sharing one table across the codeplug.  Same two laws as above.
+ *
+ * Tones are in tenths of a Hz, 0 meaning none -- the same convention as mc_pl_get_tone().  The
+ * setters return 0, or -1 for a bad slot or a model with no such field. */
+#define MC_PL_NONE 0xFF
+int mc_pl_per_channel(const mc_model *m);
+unsigned mc_channel_pl_enc(const mc_image *img, int slot0);
+unsigned mc_channel_pl_dec(const mc_image *img, int slot0);
+int mc_channel_pl_enc_set(mc_image *img, int slot0, unsigned dhz);
+int mc_channel_pl_dec_set(mc_image *img, int slot0, unsigned dhz);
 mc_pl_mode mc_pl_get_mode(const mc_image *img);
 void mc_pl_set_mode(mc_image *img, mc_pl_mode mode);
 /* Number of selectable tones in force; 0 when PL is off or the model has none. */

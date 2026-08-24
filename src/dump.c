@@ -163,6 +163,22 @@ static void dump_channels(FILE *f, const mc_image *img, unsigned p, int live, in
 		fprintf(f, "CHAN   %-2d num=%s tx=%u rx=%u txraw=%s rxraw=%s canon=%d state=%s\n", c.slot,
 		        num, c.tx_hz, c.rx_hz, tx, rx, c.canonical,
 		        c.state == MC_CH_EMPTY ? "empty" : "prog");
+		/* K-14a: PL lives in the record on the M110, so it belongs on the channel's own line
+		 * rather than in the shared-table block above. */
+		if (mc_pl_per_channel(m)) {
+			unsigned e = mc_channel_pl_enc(img, i), d = mc_channel_pl_dec(img, i);
+			fprintf(f, "CHPL   %-2d enc=", c.slot);
+			if (e)
+				fprintf(f, "%u.%u", e / 10, e % 10);
+			else
+				fputc('-', f);
+			fprintf(f, " dec=");
+			if (d)
+				fprintf(f, "%u.%u", d / 10, d % 10);
+			else
+				fputc('-', f);
+			fputc('\n', f);
+		}
 	}
 	/* K-23: everything from the terminator on is stale and must survive a write untouched. */
 	if (term)

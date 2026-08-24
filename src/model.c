@@ -112,7 +112,12 @@ static const mc_timer TIMERS_EVA[] = {
 /* Designated initialisers on purpose.  These entries were positional, and adding a field in the
  * middle of the struct then shifted every value after it silently -- the compiler cannot catch it
  * because the types line up.  Name each field and that whole class of bug goes away. */
-#define MC_MICRO .cksum_target = 0xFF, .band_shift = 4, .band_mask = 7
+/* Note .pl_ch_enc/.pl_ch_dec: 0 is a REAL record offset (the M110 keeps its encode word at +0), so
+ * every model that does not hold PL in the channel record must say MC_PL_NONE explicitly.  A
+ * designated initialiser would otherwise default them to 0 and give every MC micro channel a
+ * phantom PL field over its first two bytes. */
+#define MC_MICRO .cksum_target = 0xFF, .band_shift = 4, .band_mask = 7, \
+                 .pl_ch_enc = MC_PL_NONE, .pl_ch_dec = MC_PL_NONE
 
 /* M110 band -> frequency multiplier P, indexed by bits 0-3 of 0x0A.
  *
@@ -211,12 +216,19 @@ static const mc_model MODELS[] = {
 	  .chan = 0x01B, .band = 0x00A, .band_shift = 0, .band_mask = 0x0F,
 	  .band_p = BAND_P_M110, .band_n = (uint8_t)(sizeof BAND_P_M110), .tag = "EZA", .tag_off = 7,
 	  .refdiv = 0x013, .nchan = M110_CSPL_NCHAN, .stride = 10, .tx = 2, .rx = 7,
+	  /* K-14a: PL per channel, in the record -- encode at +0, decode at +5, straddling the TX
+	   * triplet.  Both laws are the ones MCEZ13 already uses, and the M110 RSS carries them as
+	   * IEEE doubles: 7.9844 for the encoder and 61.107 for the decoder (MRAR0200.EXE 0x3174D).
+	   * Confirmed on hardware: 123.0 Hz stores 982 (= 123.0 x 7.9844) and 7516 (= x 61.107). */
+	  .pl_ch_enc = 0, .pl_ch_dec = 5, .pl_k = MC_PL_K_EZ13,
 	  .about = "Radius M110, CSQ/PL -- EZ3.01.00.44; 128 real bytes mirrored into 256" },
 	{ .name = "m110_sel5", .size = 256,
 	  .cksum = 0x00F, .cksum_target = 0x01,
 	  .chan = 0x092, .band = 0x00A, .band_shift = 0, .band_mask = 0x0F,
 	  .band_p = BAND_P_M110, .band_n = (uint8_t)(sizeof BAND_P_M110), .tag = "EZ9", .tag_off = 7,
 	  .refdiv = 0x089, .nchan = M110_SEL5_NCHAN, .stride = 12, .tx = 1, .rx = 4,
+	  /* Sel 5 signalling, so no PL at all -- and 0 is a real offset, hence explicit. */
+	  .pl_ch_enc = MC_PL_NONE, .pl_ch_dec = MC_PL_NONE,
 	  .about = "Radius M110, Sel 5 -- EZ9.01.00.45" },
 };
 static const size_t NMODELS = sizeof MODELS / sizeof MODELS[0];

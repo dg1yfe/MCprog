@@ -362,6 +362,43 @@ radio). The low nibble of the mode byte and of the count byte are not understood
 preserved (K-30) — the count's low nibble is a selectable-lockout marker. Range is 67.0–250.3 Hz,
 or 0 to disable; anything else is refused, never rounded (U-3). **[C]**
 
+**K-14a PL in the channel record, and the two laws.** The Radius M110 CSQ/PL gives **every channel
+its own** encode and decode tone, in the record rather than in a shared table: **encode at `+0`,
+decode at `+5`**, straddling the TX triplet. Both are big-endian words, 0 meaning none. **[C]**
+
+The two fields use **different scales**, which is why one tone stores as two different numbers:
+
+| field | law | 123.0 Hz stores |
+|---|---|---|
+| encode (`PLE`) | `round(f × 7.9844)` | **982** = `0x03D6` |
+| decode (`PLD`) | `round(f × 61.107)` | **7516** = `0x1D5C` |
+
+Neither constant is new. `7.9844` is K-12's MCEZ13 scale and `61.107` is the decoder law MCEZ13
+already uses for its `0x010` table — so **the two constants are not per-model at all: the encoder
+and the decoder simply scale differently**, and MCEZ13 and the M110 are the two radios that expose
+both. Measurement on MCEZ13 had only bounded the decoder constant to `[61.1063, 61.1087]`.
+
+> The 1989 M110 RSS settles it exactly, carrying both as IEEE doubles side by side with `0.5` and
+> `10` — round-half-up on deci-Hz — at `M110/MRAR0200.EXE` file `0x3174D`, and again at `0x315E8`
+> and `0x3176C`. `8.208`, the K-16 duration constant, sits in the same block at `0x31E13`. **[S]**
+>
+> Confirmed on hardware: both CSQ/PL radios carry `982` and `7516` on channel 2, which the RSS
+> prints as `,PLE 123.0` and `,PLD 123.0`, and channel 1 is zero in both fields (`N`).
+>
+> And confirmed against the original software across the whole range: `tools/plsweep.py` hands the
+> 1989 RSS each tone in a `.CP`, lets it program a simulated radio, and reads back what it stored —
+> **19 encode and 19 decode tones, every one matching these two laws exactly**, with `N` storing 0.
+> The measured table is kept in `tools/verify_docs.py`, deliberately not generated from the laws it
+> checks. **[C]**
+>
+> **118.8 Hz is the only tone that separates `7.9844` from `7.9840`** (949 against 948), so it is
+> the single point of evidence that the M110 uses the MCEZ13 constant rather than the EVA one — the
+> same tone that already distinguishes the two MC micro scales. The sweep measured it: the RSS
+> stored **949**. **[C]**
+>
+> The Sel 5 M110 has no PL at all. Note `+0` is a **real** offset here, so a model with no
+> per-channel PL must say so explicitly rather than leave the field zero.
+
 **K-15 Auto-acknowledge delay.** One byte, `round(ms / 15.625)` — a count of 1/64 second — range
 1–127, i.e. 16–1984 ms. Radio-wide. Only the EZA 9 map has it, at `0x076`. Bit 7 is never set by
 the original software and its meaning is unknown, so it is preserved (K-30) and the value is the

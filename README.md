@@ -69,7 +69,7 @@ a radio rather than a guess.
 | `eva_56` | 512 | 32 × 8 | `0x000` → 0xFF | encode | EVA, 5/6-tone signalling — MCEV_56 |
 | `eza_sel5` | 256 | 8 × 6 | `0x000` → 0xFF | encode | EZA, SEL5 signalling — MCEZ9 and its R/M builds |
 | `eza_cspl` | 128 | 8 × 6 | `0x003` → 0xFF | enc + dec | EZA, CS/PL — MCEZ13 |
-| `m110_cspl` | 256 (128 real) | 10 × 10 | `0x00F` → **0x01** | — | **Radius M110** CSQ/PL, `EZ3.01.00.44` |
+| `m110_cspl` | 256 (128 real) | 10 × 10 | `0x00F` → **0x01** | enc + dec, per channel | **Radius M110** CSQ/PL, `EZ3.01.00.44` |
 | `m110_sel5` | 256 | 9 × 12 | `0x00F` → **0x01** | — | **Radius M110** Sel 5, `EZ9.01.00.45` |
 
 Detection is by size, checksum **and a marker in the bytes** where the format has one. The M110
@@ -101,10 +101,15 @@ The CSQ/PL device returns 256 bytes that are **two identical 128-byte copies**. 
 first 128, and only those are written — which is also why its 256-byte total is `0x02`: each half
 sums to `0x01` independently.
 
-What is **not** established, and so is absent rather than guessed: the PL encoding (the CSQ/PL record
-carries PLE and PLD, but the tone scale is unmeasured), the channel flag bits, and the timer block.
-The channel counts are the size of the region the table occupies — inference from four radios that
-leave the rest of it zero, not a measurement.
+Unlike every MC micro model, the CSQ/PL keeps **PL per channel**, in the record: encode at `+0`,
+decode at `+5`. The two fields scale differently, so one tone stores as two numbers — 123.0 Hz is
+`982` to encode (`× 7.9844`) and `7516` to decode (`× 61.107`). Both constants are ones MCEZ13
+already uses; the 1989 RSS carries them as IEEE doubles, which pins the decoder constant that
+measurement had only bounded. The Sel 5 has no PL.
+
+What is **not** established, and so is absent rather than guessed: the channel flag bits and the
+timer block. The channel counts are the size of the region the table occupies — inference from four
+radios that leave the rest of it zero, not a measurement.
 
 ## Control lines
 

@@ -791,6 +791,56 @@ static void test_m110(void)
 		/* W-5: neither M110 model has a measured write counter, so nothing may bump one.  On
 		 * eza_sel5 that offset is 0x09E, which here is live channel data. */
 		ok(m->wcount == 0, "W-5", "no write counter is claimed on the M110");
+
+		/* K-14a: PL is per channel on the CSQ/PL, and absent on the Sel 5. */
+		if (strcmp(m->name, "m110_cspl") == 0) {
+			static const unsigned EIA[] = {
+				670, 719, 744, 770, 797, 825, 854, 885, 915, 948, 974, 1000, 1035, 1072,
+				1109, 1148, 1188, 1230, 1273, 1318, 1365, 1413, 1462, 1514, 1567, 1622,
+				1679, 1738, 1799, 1862, 1928, 2035, 2107, 2181, 2257, 2336, 2418, 2503
+			};
+			size_t t;
+			int bad = 0;
+			uint8_t keep[10];
+
+			ok(mc_pl_per_channel(m), "K-14a", "the CSQ/PL holds PL in the channel record");
+			ok(m->pl_ch_enc == 0 && m->pl_ch_dec == 5, "K-14a",
+			   "encode at +0 and decode at +5, straddling the TX triplet");
+			/* Channel 2 of both CSQ/PL radios is 123.0 Hz on both fields, and the two words
+			 * differ because the laws differ: 982 = 123.0 x 7.9844, 7516 = 123.0 x 61.107. */
+			ok(mc_channel_pl_enc(&img, 1) == 1230, "K-14a", "channel 2 encodes 123.0 Hz");
+			ok(mc_channel_pl_dec(&img, 1) == 1230, "K-14a", "channel 2 decodes 123.0 Hz");
+			ok(mc_channel_pl_enc(&img, 0) == 0, "K-14a", "channel 1 has no PL");
+			ok(mc_channel_pl_dec(&img, 0) == 0, "K-14a", "and none to decode");
+			{
+				const uint8_t *r = b + m->chan + m->stride; /* channel 2's record */
+				ok(((r[0] << 8) | r[1]) == 982, "K-14a", "the stored encode word is 982");
+				ok(((r[5] << 8) | r[6]) == 7516, "K-14a", "the stored decode word is 7516");
+				ok(mc_pl_encode_k(1230, MC_PL_K_EZ13) == 982, "K-14a",
+				   "  which is round(123.0 x 7.9844)");
+				ok(mc_pl_dec_encode(1230) == 7516, "K-14a",
+				   "  and round(123.0 x 61.107) -- two laws, not one");
+			}
+			/* Every EIA tone must survive a round trip through both laws. */
+			memcpy(keep, b + m->chan, m->stride);
+			for (t = 0; t < sizeof EIA / sizeof EIA[0]; t++) {
+				mc_channel_pl_enc_set(&img, 0, EIA[t]);
+				mc_channel_pl_dec_set(&img, 0, EIA[t]);
+				if (mc_channel_pl_enc(&img, 0) != EIA[t] ||
+				    mc_channel_pl_dec(&img, 0) != EIA[t])
+					bad++;
+			}
+			ok(bad == 0, "K-14a", "all 38 EIA tones round-trip through both PL laws");
+			/* 118.8 Hz is the ONE tone that separates 7.9844 from 7.9840, so it is the only
+			 * evidence that the M110 uses the MCEZ13 constant rather than the EVA one. */
+			ok(mc_pl_encode_k(1188, MC_PL_K_EZ13) == 949 &&
+			   mc_pl_encode_k(1188, MC_PL_K_EVA) == 948, "K-14a",
+			   "118.8 Hz is the only tone separating 7.9844 from 7.9840");
+			memcpy(b + m->chan, keep, m->stride);
+		} else {
+			ok(!mc_pl_per_channel(m), "K-14a", "the Sel 5 has no PL at all");
+			ok(mc_channel_pl_enc(&img, 0) == 0, "K-14a", "  and reports none");
+		}
 		free(b);
 	}
 

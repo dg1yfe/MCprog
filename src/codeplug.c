@@ -454,6 +454,65 @@ unsigned mc_pl_dec_decode(uint16_t word)
 	return ((unsigned)word * 10000u + 30553u) / 61107u;
 }
 
+/* ---- PL in the channel record, K-14a --------------------------------------------------------- */
+
+int mc_pl_per_channel(const mc_model *m)
+{
+	return m->pl_ch_enc != MC_PL_NONE || m->pl_ch_dec != MC_PL_NONE;
+}
+
+/* The word at `within' bytes into slot `slot0's record, or NULL if this model has no such field. */
+static uint8_t *pl_ch_ptr(const mc_image *img, int slot0, uint8_t within)
+{
+	const mc_model *m = img->model;
+	size_t o;
+
+	if (within == MC_PL_NONE || slot0 < 0 || slot0 >= m->nchan)
+		return NULL;
+	o = (size_t)m->chan + (size_t)slot0 * m->stride + within;
+	if (o + 1 >= img->len)
+		return NULL;
+	return img->bytes + o;
+}
+
+unsigned mc_channel_pl_enc(const mc_image *img, int slot0)
+{
+	const uint8_t *p = pl_ch_ptr(img, slot0, img->model->pl_ch_enc);
+	return p ? mc_pl_decode_k((uint16_t)((p[0] << 8) | p[1]), MC_PL_K_EZ13) : 0;
+}
+
+unsigned mc_channel_pl_dec(const mc_image *img, int slot0)
+{
+	const uint8_t *p = pl_ch_ptr(img, slot0, img->model->pl_ch_dec);
+	return p ? mc_pl_dec_decode((uint16_t)((p[0] << 8) | p[1])) : 0;
+}
+
+int mc_channel_pl_enc_set(mc_image *img, int slot0, unsigned dhz)
+{
+	uint8_t *p = pl_ch_ptr(img, slot0, img->model->pl_ch_enc);
+	uint16_t w;
+
+	if (!p)
+		return -1;
+	w = dhz ? mc_pl_encode_k(dhz, MC_PL_K_EZ13) : 0;
+	p[0] = (uint8_t)(w >> 8);
+	p[1] = (uint8_t)w;
+	return 0;
+}
+
+int mc_channel_pl_dec_set(mc_image *img, int slot0, unsigned dhz)
+{
+	uint8_t *p = pl_ch_ptr(img, slot0, img->model->pl_ch_dec);
+	uint16_t w;
+
+	if (!p)
+		return -1;
+	w = dhz ? mc_pl_dec_encode(dhz) : 0;
+	p[0] = (uint8_t)(w >> 8);
+	p[1] = (uint8_t)w;
+	return 0;
+}
+
 unsigned mc_pl_dec_get(const mc_image *img, int i)
 {
 	size_t o;

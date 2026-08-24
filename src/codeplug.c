@@ -554,13 +554,37 @@ mc_pl_mode mc_pl_get_mode(const mc_image *img)
 
 void mc_pl_set_mode(mc_image *img, mc_pl_mode mode)
 {
-	uint8_t *p;
+	uint8_t *p, low;
+	int n;
 	if (!mc_pl_supported(img->model) || !img->model->pl_mode)
 		return;
 	p = &img->bytes[img->model->pl_mode];
-	/* Only the high nibble is ours; the low nibble is not understood, so it is preserved (K-30). */
-	*p = (uint8_t)((*p & 0x0F) |
-	               (mode == MC_PL_SINGLE ? 0x60 : mode == MC_PL_SELECTABLE ? 0xE0 : 0x00));
+
+	/* K-30a.  The low nibble is NOT unknown padding -- the radio uses it as the index into the
+	 * selectable tone list.  The firmware fetches cp_pl_list[low nibble] at `0x047 + 2*i'
+	 * (EZA33 F270: ANDB #$0F / ASLB / LDX #$47 / ABX), gated on bit 6 of this same byte.
+	 *
+	 * So preserving it across a mode change is wrong.  In single-tone mode the tone lives in the
+	 * first list slot, which is `pl_tone' == `pl_list', so the index must be 0 or the radio reads
+	 * a different slot than the one we wrote.  The RSS agrees: it *assigns* 0x60 rather than
+	 * masking, and the sweep caught it turning 0xE7 into 0x60 -- clearing the nibble. */
+	if (mode == MC_PL_SINGLE) {
+		*p = 0x60;
+	} else if (mode == MC_PL_SELECTABLE) {
+		/* Here the nibble is meaningful: it is the operator's current choice among the list, made
+		 * at the radio.  Keep it, but never leave it pointing past the populated entries.  The
+		 * count is read straight from its byte rather than through mc_pl_get_count(), which
+		 * reports 0 unless the mode is *already* selectable -- and we are mid-change. */
+		low = (uint8_t)(*p & 0x0F);
+		n = img->model->pl_count ? img->bytes[img->model->pl_count] >> 4 : 0;
+		if (n > img->model->pl_max)
+			n = img->model->pl_max;
+		if (n > 0 && low >= (uint8_t)n)
+			low = (uint8_t)(n - 1);
+		*p = (uint8_t)(0xE0 | low);
+	} else {
+		*p = 0x00;
+	}
 }
 
 int mc_pl_get_count(const mc_image *img)

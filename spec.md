@@ -435,9 +435,34 @@ meaning no PL). Without the snap the tool shows 88.6 where the operator typed 88
 | EZA 1/3 | — | — | — | — |
 
 Mode byte: `0x60` = single tone, `0xE0` = selectable (the operator picks from the list at the
-radio). The low nibble of the mode byte and of the count byte are not understood and must be
-preserved (K-30) — the count's low nibble is a selectable-lockout marker. Range is 67.0–250.3 Hz,
-or 0 to disable; anything else is refused, never rounded (U-3). **[C]**
+radio). The **count** byte's low nibble is a selectable-lockout marker and must be preserved (K-30).
+Range is 67.0–250.3 Hz, or 0 to disable; anything else is refused, never rounded (U-3). **[C]**
+
+**K-30a The mode byte's low nibble is the radio's index into the tone list.** It is not unknown
+padding, and preserving it across a mode change is a bug. The EVA firmware fetches the tone as
+`cp_pl_list[mode & 0x0F]` at `0x047 + 2i` — `F270`: `ANDB #$0F / ASLB / LDX #$47 / ABX` — gated on
+**bit 6** of the same byte, which is why both `0x60` and `0xE0` carry it. **[S]**
+
+The consequence is concrete. In single-tone mode the tone is written to slot 0 (`pl_tone` ==
+`pl_list`), so a stale nibble makes the radio read a **different slot than the programmer wrote**:
+set single-tone on a codeplug holding `0xE7` and a masking implementation leaves `0x67`, so the tone
+goes to `0x047` while the radio reads `0x047 + 14 = 0x055`.
+
+The 1987 RSS does not have this problem — it **assigns** `0x1FD := 0x60` rather than masking, and the
+differential sweep caught it turning `0xE7` into `0x60`, clearing the nibble. **[C]** So:
+
+| mode | mode byte |
+|---|---|
+| single | `0x60` exactly — index 0, the slot the tone was written to |
+| selectable | `0xE0 \| index`, the operator's own choice, **clamped** below the populated count |
+| off | `0x00` |
+
+> **How this was found.** The radio-side read path (`doc/EZA33_FIRMWARE.md` §7f) traced the full PL
+> chain — channel → trakmode → trakmode byte `0x18` → `cp_pl_list` — and that byte is `0x1FD` on a
+> 512-byte EVA. The RSS-derived map had already named `0x1FD` "PL encode mode" and recorded the
+> `0xE7 → 0x60` transition; what it could not say was *why* the nibble mattered. The firmware says
+> why. The regression test plants `0xE7` and requires `0x60`, and it fails against the old masking
+> implementation.
 
 **K-14a PL in the channel record, and the two laws.** The Radius M110 CSQ/PL gives **every channel
 its own** encode and decode tone, in the record rather than in a shared table: **encode at `+0`,

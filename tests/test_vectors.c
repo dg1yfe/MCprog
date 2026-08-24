@@ -499,6 +499,29 @@ static void test_pl(void)
 			mc_pl_set_count(&im, 99);
 			ok(mc_pl_get_count(&im) == im.model->pl_max, "K-14",
 			   "an out-of-range count is clamped to the model's maximum");
+
+			/* K-30a.  The mode byte's LOW nibble is the radio's index into the tone list --
+			 * EZA33 F270 reads cp_pl_list[low nibble] at 0x047 + 2*i.  In single-tone mode the
+			 * tone is written to slot 0, so a stale nibble makes the radio read a different
+			 * slot than the one we wrote.  The 1987 RSS assigns 0x60 outright (the sweep caught
+			 * 0xE7 -> 0x60); we must too.  Masking with 0xF0 hides this, so check the byte
+			 * whole. */
+			img_bytes[im.model->pl_mode] = 0xE7; /* selectable, operator on tone 7 */
+			mc_pl_set_mode(&im, MC_PL_SINGLE);
+			ok(img_bytes[im.model->pl_mode] == 0x60, "K-30a",
+			   "single-tone mode clears the list index, so the radio reads the slot we wrote");
+			/* Selectable keeps the operator's choice, but never past the populated entries. */
+			mc_pl_set_count(&im, 4);
+			img_bytes[im.model->pl_mode] = (uint8_t)(0xE0 | 2);
+			mc_pl_set_mode(&im, MC_PL_SELECTABLE);
+			ok(img_bytes[im.model->pl_mode] == 0xE2, "K-30a",
+			   "selectable preserves an in-range list index");
+			img_bytes[im.model->pl_mode] = (uint8_t)(0xE0 | 9);
+			mc_pl_set_mode(&im, MC_PL_SELECTABLE);
+			ok(img_bytes[im.model->pl_mode] == (uint8_t)(0xE0 | 3), "K-30a",
+			   "and clamps one that points past the last populated tone");
+			ok((img_bytes[im.model->pl_mode] & 0x40) != 0, "K-30a",
+			   "bit 6, which gates PL encode in the radio, is set in both modes");
 			ok(mc_pl_supported(mc_model_by_name("eza_cspl")) == 1, "K-14",
 			   "MCEZ13 does have PL, now that its read is solved");
 			ok(mc_pl_has_decoder(mc_model_by_name("eza_cspl")) == 1, "K-14",

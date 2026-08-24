@@ -711,6 +711,38 @@ int mc_selftest(const mc_selftest_opts *o)
 		note("P-20", "ident still answered after a full session", again == 0 ? R_PASS : R_DIFFERS,
 		     "the radio answers `*` at any point, not once per power-up",
 		     again == 0 ? "answered again, %u bytes" : "no reply (%u bytes)", (unsigned)la);
+
+		/* P-24a, the one experiment that needs a radio and costs nothing to try.
+		 *
+		 * If the ident above failed, the end-of-memory NAK has ended the session -- measured on
+		 * every radio so far, and the reason a power cycle has been the only known way back. The
+		 * 1987 software never has the problem because it re-pulses RTS before every transaction,
+		 * and that pulse reaches the CPU's #NMI input. mc_serial_rearm() reproduces it.
+		 *
+		 * This runs LAST, on a radio that is already unresponsive and after the codeplug has been
+		 * read and saved, so a failure costs nothing and a success retires the power cycle. Skipped
+		 * when the ident answered -- there would be nothing to recover. */
+		if (again != 0) {
+			char b[MC_IDENT_MAX];
+			size_t lb = 0;
+			int pulsed = mc_serial_rearm(t);
+			if (pulsed != 0) {
+				note("P-24a", "RTS pulse revives a dead session", R_SKIP,
+				     "an RTS pulse re-enters programming mode via #NMI",
+				     "no control lines on this transport, so the pulse could not be sent");
+			} else {
+				int back = mc_identify(&R.s, b, sizeof b, &lb);
+				note("P-24a", "RTS pulse revives a dead session",
+				     back == 0 ? R_PASS : R_FAIL,
+				     "an RTS pulse re-enters programming mode via #NMI",
+				     back == 0
+				         ? "REVIVED: the radio answered `*` again after the pulse, %u bytes -- "
+				           "a power cycle is not required after all"
+				         : "still silent after the pulse (%u bytes); a power cycle remains the "
+				           "only known recovery",
+				     (unsigned)lb);
+			}
+		}
 	}
 
 	if (R.trace)

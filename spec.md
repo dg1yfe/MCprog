@@ -230,6 +230,13 @@ nine runs. **[C]**
 > It now takes one record on its own first (`mc_read_block(..., chain = 0)`), exercises the write
 > path with that, and walks the EEPROM afterwards. **Untested on hardware** — the next radio through
 > is what settles whether the write path works at all.
+>
+> **And that same run now tests the recovery.** The selftest's last act is a `*` after the full
+> session, which on every radio so far has gone unanswered. When it does, the selftest pulses RTS
+> (`mc_serial_rearm()`) and asks again, reporting `P-24a` as PASS if the radio comes back. It runs
+> last, on a radio that is already unresponsive and after the codeplug has been read and saved, so
+> failure costs nothing and success retires the power-cycle requirement outright. It is skipped when
+> the ident answered — there would be nothing to recover — and on a transport with no control lines.
 
 **P-24b A second way the session dies: the Ext Alarm input.** Independently of any NAK, the radio's
 character reader checks **pin 15 (Ext Alarm)** on every call and abandons programming mode if it is

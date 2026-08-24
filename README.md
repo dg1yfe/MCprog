@@ -56,6 +56,9 @@ radio answers that NAK it stops responding to everything, including the identify
 issued after a full read goes to a radio that is already deaf. Measured on every radio tested so far,
 across nine runs. The selftest now exercises the write path *before* walking the EEPROM. Untested.
 
+That behaviour may not be universal: a disassembled EVA radio firmware returns to its command loop
+after sending the NAK rather than going deaf. No EVA has been tested, so the recovery path stays.
+
 Recovery after a full read currently requires a power cycle. `mc_serial_rearm()` implements the
 alternative the original software uses — a 500 ms RTS pulse, which reaches the radio CPU's `#NMI`
 input and restarts programming mode — but it is not wired into any path, because that decision needs

@@ -177,9 +177,29 @@ previous one — confirmed on hardware, where all four EZA 9 records after the f
 Accepting only one misparses the end of every read on the other. This is not a spec ambiguity to be
 resolved but a difference between radios, so accept both. **[C]**
 
-**P-24a The end-of-memory NAK ends the session.** After it the radio answers nothing — not the next
-command, and not even `*`. Measured on every radio put through the selftest so far: two Radius M110s
-(`EZ3.01.00.44` CSQ/PL and `EZ9.01.00.45` Sel 5) and an MC micro EZA 9, across nine runs. **[C]**
+> **Where the first form comes from [S], 24 Aug 2026.** The EVA radio firmware (`EPROM/EZA33.BIN`,
+> `doc/EZA33_FIRMWARE.md` §5a) echoes the parsed header — `(`, count, both address bytes — at
+> `E763`–`E771`, *before* it reads the first EEPROM byte. A NAK raised later, in the byte loop, is
+> therefore preceded by the complete 7-character echo; a NAK raised in the header parser
+> (`proto_ReadHeader`, `E7CF`, which rejects a count over `0x40` or an address high byte over `0x03`)
+> comes bare. That accounts for the EVA row exactly. It does **not** account for the bare `0x15` from
+> the EZA 9, whose addresses were in range — different firmware, not disassembled. **[?]**
+
+**P-24a The end-of-memory NAK ends the session — on the radios tested.** After it the radio answers
+nothing — not the next command, and not even `*`. Measured on every radio put through the selftest so
+far: two Radius M110s (`EZ3.01.00.44` CSQ/PL and `EZ9.01.00.45` Sel 5) and an MC micro EZA 9, across
+nine runs. **[C]**
+
+> **An EVA firmware does not behave this way [S], 24 Aug 2026.** In `EPROM/EZA33.BIN` the NAK path is
+> `LDAA #$15 / BSR ser_PutChar / BRA $E787`, and `E787` is `BRA $E74E` — the top of
+> `nmi_ProgramMode`'s command loop. It sends the `0x15` and goes straight back to waiting for the
+> next sigil, with the stack reset. Both NAK sources behave this way: a rejected header and an
+> EEPROM that fails to ACK.
+>
+> **None of the three radios measured above is an EVA**, so this is not a contradiction — it is
+> evidence that P-24a is **model-specific rather than universal**. The `[C]` measurements stand for
+> the radios they were taken on. Nothing here should be assumed for an EVA until one is on the bench,
+> and nothing in the client may drop the recovery path on the strength of one disassembly. **[?]**
 
 > **This is why nothing has been written to a radio yet.** Four write-enabled runs on 23 Aug 2026
 > all reported `write 0x0000: no first ACK`. The wire log shows the write frame was well formed —

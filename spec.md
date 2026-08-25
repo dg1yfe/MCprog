@@ -408,6 +408,31 @@ The RX field holds the local oscillator; the displayed RX frequency is **field +
 first IF). `P` = 80, 80, 128, 254 for bands 1–4. Band index 7 means unprogrammed — ask the user,
 do not error. **[C]**
 
+> **`b0` bit 2 does a second job: it also picks the reference divider.** The radio at `EZA33` `F9C3`
+> does `TIM #$04,0,X` on the channel record's byte 0 and loads the PLL's reference divider from
+> `0x0D6` when set, `0x0D4` when clear — the same bit that selects the 3125/2500 Hz step. And 3125 =
+> 6.25 kHz ÷ 2, 2500 = 5 kHz ÷ 2, so **the step is exactly half the channel spacing** and one bit
+> selects both. A programmer that changed the step without regard for the divider would be
+> inconsistent with the radio. MCprog does not write either, so this is a reading, not a bug. **[S]**
+
+**K-10a The reference dividers are checkable.** `REF_DIV.001`, shipped beside the RSS on every disk
+set, is the operator's reference card, and its four values decode exactly as
+**`word = 2 × (Fref ÷ spacing) + 1`**:
+
+| Fref | 5 kHz | 6.25 kHz |
+|---|---|---|
+| 14.4 MHz (standard) | `0x1681` | `0x1201` |
+| 12.8 MHz (SP) | `0x1401` | `0x1001` |
+
+So `refdiv[0]` is the **5 kHz** divider and `refdiv[1]` the **6.25 kHz** one — they are not
+interchangeable. All eleven EVA sample codeplugs carry the standard pair. `mc_refdiv_spacing()`
+returns the implied spacing for a word, or 0 if it is not one of the four.
+
+This does **not** license computing them — K-30 still says preserve verbatim, because a radio may
+carry an SP crystal or a value nobody has seen. It licenses *reporting*: a pair that is neither
+standard nor SP, or one implying two different `Fref`, is recognisably wrong rather than merely
+unfamiliar. **[C]**
+
 **K-11 Encoding is not canonical.** `b2` is a full byte but `P` ≤ 254, so any `b2 ≥ P` is an
 alternate spelling of a lower-`b1` value, and the original emits some (2 of 388 sample fields).
 Encoders MUST produce `b2 < P`; decoders MUST accept `b2 ≥ P`; **verification MUST compare decoded

@@ -178,7 +178,13 @@ unsigned mc_band_p(int band_index);
  * first half on the M110 CSQ/PL, whose upper 128 bytes are a mirror the original never writes. */
 size_t mc_write_len(const mc_image *img);
 
-uint16_t mc_refdiv(const mc_image *img, int which); /* which = 0 or 1 */
+uint16_t mc_refdiv(const mc_image *img, int which);
+
+/* K-10a: the channel spacing a reference-divider word implies, or 0 if it is not a value the
+ * factory shipped.  `word = 2*(Fref/spacing)+1' with Fref 14.4 MHz (standard) or 12.8 MHz (SP),
+ * from REF_DIV.001, the reference card on the original disks.  Reporting only -- K-30 still says
+ * preserve the dividers verbatim. */
+unsigned mc_refdiv_spacing(uint16_t word); /* which = 0 or 1 */
 
 /* ---- frequency codec (K-10, K-11) ----------------------------------------------------------
  *   coarse = ((b0 & 3) << 8) | b1

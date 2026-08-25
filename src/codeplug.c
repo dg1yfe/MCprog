@@ -138,6 +138,20 @@ unsigned mc_band_p_of(const mc_image *img)
 	return (i >= 0 && i < m->band_n) ? m->band_p[i] : 0;
 }
 
+unsigned mc_refdiv_spacing(uint16_t word)
+{
+	/* Only the four the factory shipped.  Deliberately a table and not the inverse formula: a
+	 * word that happens to be odd is not thereby a valid divider, and saying "unrecognised" is
+	 * more useful than inventing an Fref to fit it. */
+	switch (word) {
+	case 0x1681: return 5000;   /* 14.4 MHz standard */
+	case 0x1201: return 6250;
+	case 0x1401: return 5000;   /* 12.8 MHz SP       */
+	case 0x1001: return 6250;
+	default:     return 0;
+	}
+}
+
 uint16_t mc_refdiv(const mc_image *img, int which)
 {
 	size_t o = (size_t)img->model->refdiv + (size_t)(which ? 2 : 0);

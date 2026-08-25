@@ -496,6 +496,21 @@ static void test_pl(void)
 			   "and it is stored in the high nibble");
 			ok((img_bytes[im.model->pl_count] & 0x0F) == 5, "K-30",
 			   "the low nibble, the selectable-lockout marker, is preserved");
+			/* K-10a.  The reference dividers decode as word = 2*(Fref/spacing)+1, from
+			 * REF_DIV.001 on the original disks.  Reporting only -- K-30 keeps them verbatim --
+			 * so this is deliberately NOT wired into the dump, whose golden vectors are an
+			 * independent expectation and would stop testing anything if both sides moved. */
+			ok(mc_refdiv_spacing(0x1681) == 5000, "K-10a", "0x1681 is the 14.4 MHz 5 kHz divider");
+			ok(mc_refdiv_spacing(0x1201) == 6250, "K-10a", "0x1201 is 14.4 MHz at 6.25 kHz");
+			ok(mc_refdiv_spacing(0x1401) == 5000, "K-10a", "0x1401 is the SP 12.8 MHz 5 kHz divider");
+			ok(mc_refdiv_spacing(0x1001) == 6250, "K-10a", "0x1001 is SP at 6.25 kHz");
+			ok(mc_refdiv_spacing(0x1683) == 0, "K-10a",
+			   "a word that is merely odd is not thereby a divider");
+			ok(mc_refdiv_spacing(0x0000) == 0, "K-10a", "and zero is not one either");
+			/* every EVA sample carries the standard pair, in that order */
+			ok(mc_refdiv(&im, 0) == 0x1681 && mc_refdiv(&im, 1) == 0x1201, "K-10a",
+			   "the sample carries the standard 5 kHz / 6.25 kHz pair");
+
 			mc_pl_set_count(&im, 99);
 			ok(mc_pl_get_count(&im) == im.model->pl_max, "K-14",
 			   "an out-of-range count is clamped to the model's maximum");

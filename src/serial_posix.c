@@ -203,8 +203,10 @@ static int configure(serial *s, const mc_serial_opts *o, char *err, size_t errsz
 	}
 	tcflush(s->fd, TCIOFLUSH);
 
-	if (o->line_setup)
-		pulse_rts(s->fd);
+	/* P-27: NO pulse here.  The 1987 software has no persistent "open" -- it runs ser_OpenLine
+	 * at the start of each OPERATION, twice, and mc_session_arm() reproduces that.  Pulsing here
+	 * as well would make three where the original makes two, and the whole point of this path is
+	 * to be identical.  The port configuration above still happens on open, as it must. */
 	return 0;
 }
 
@@ -280,6 +282,10 @@ static mc_transport *wrap(int fd, int owned, const mc_serial_opts *o, char *err,
 	s->t.send = sr_send;
 	s->t.recv = sr_recv;
 	s->t.now_ms = sr_now;
+	/* NULL when the user said --no-line-setup, so the AUTOMATIC arming in mc_session_arm() does
+	 * nothing.  An EXPLICIT mc_serial_rearm() still works: the selftest sets line_setup = 0
+	 * because it drives the lines itself, and P-24a needs to pulse them deliberately. */
+	s->t.rearm = o->line_setup ? mc_serial_rearm : NULL;
 	s->fd = fd;
 	s->owned = owned;
 	s->sw_parity = o->sw_parity;

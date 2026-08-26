@@ -73,6 +73,12 @@ struct mc_transport {
 	int (*recv)(mc_transport *t, uint8_t *buf, size_t n, unsigned timeout_ms);
 	/* Milliseconds on this transport's clock; replay returns the capture's own timeline. */
 	unsigned (*now_ms)(mc_transport *t);
+	/* OPTIONAL, may be NULL.  Re-run the line-opening sequence: everything down 500 ms, RTS up,
+	 * 1300 ms.  RTS reaches the radio CPU's #NMI, so the rising edge restarts its programming
+	 * routine -- which is how the 1987 software begins every operation (P-12, P-27).  NULL on any
+	 * transport without control lines (replay, pty, fake radio), and callers must treat a NULL or
+	 * a failure as "nothing to do" rather than as an error. */
+	int (*rearm)(mc_transport *t);
 	char err[160];
 };
 
@@ -141,6 +147,13 @@ int mc_read_block(mc_session *s, uint16_t addr, uint8_t out[MC_BLOCK], int chain
  */
 #define MC_PREWRITE 14
 int mc_prewrite_read(mc_session *s, uint16_t addr, uint8_t out[MC_PREWRITE]);
+
+/* P-27: the 1987 software calls `ser_OpenLine' TWICE, back to back, at the start of every
+ * operation, and not again within it -- measured, see mc_session_arm().  Callers run this at an
+ * operation boundary (a read, a write), NOT per command.  Returns the pulses delivered; 0 on a
+ * transport without control lines, which is not an error. */
+#define MC_ARM_PULSES 2
+int mc_session_arm(mc_session *s);
 
 /* P-25: write one 64-byte record and wait for BOTH ACKs.  Never returns before the second. */
 int mc_write_block(mc_session *s, uint16_t addr, const uint8_t in[MC_BLOCK]);

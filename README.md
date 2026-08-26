@@ -81,7 +81,7 @@ builds of the same version read it without complaint.
 | TUI | channel list, per-channel editor, PL, options, timers, save |
 | Serial transport, POSIX | used against a real radio |
 | Serial transport, Win32 | compiles; never built or run on Windows |
-| Test suite | 1382 assertions, all passing |
+| Test suite | at least 1,400 assertions, all passing |
 
 Everything not marked as hardware-verified is verified against captured hardware sessions, a fake
 radio on a pseudo-terminal, and the original software under emulation.
@@ -100,10 +100,11 @@ across nine runs. The selftest now exercises the write path *before* walking the
 That behaviour may not be universal: a disassembled EVA radio firmware returns to its command loop
 after sending the NAK rather than going deaf. No EVA has been tested, so the recovery path stays.
 
-Recovery after a full read currently requires a power cycle. `mc_serial_rearm()` implements the
-alternative the original software uses — a 500 ms RTS pulse, which reaches the radio CPU's `#NMI`
-input and restarts programming mode — but it is not wired into any path, because that decision needs
-a radio rather than a guess.
+Recovery after a full read currently requires a power cycle. The original software never faces the
+problem, because it re-opens the line at the start of every operation, and **mcprog now does the
+same**: `mc_session_arm()` runs the sequence twice before a read and before a write, as the original
+was measured doing (`spec.md` P-27). `mc_serial_rearm()` remains as an explicit single pulse, which
+is what the selftest's `P-24a` recovery probe uses.
 
 ## Models
 

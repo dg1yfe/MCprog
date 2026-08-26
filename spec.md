@@ -64,6 +64,40 @@ so DTR (bit 0) is never asserted by the original at all.
 **P-12** `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms — **before every transaction**, not once on
 open. **[S]**
 
+**P-27 The original runs that sequence TWICE, back to back, at the start of an operation — and not
+again within it. MCprog now does the same. [C]**
+
+> Measured rather than read off the prose, because "before every transaction" is easy to misread as
+> recurring mid-session. Driving `MCEZ9` under emulation with the radio's control lines
+> instrumented, a whole **read** — probe, identify, probe, four record reads, the end-of-memory NAK
+> — produces exactly four line transitions, and every one is at **TX byte zero**:
+>
+> ```
+> dtr=0 rts=0   at TX byte 0     \  ser_OpenLine
+> dtr=0 rts=1   at TX byte 0     /
+> dtr=0 rts=0   at TX byte 0     \  and again
+> dtr=0 rts=1   at TX byte 0     /
+> ```
+>
+> A **write** session — 4 records, 575 bytes — gives the same four and no more. So the boundary is
+> the *operation*, not the command and not the record.
+
+`mc_session_arm()` reproduces it, and `main.c` calls it at the head of the read and the write. The
+**pulse on `mc_serial_open()` was removed**: the 1987 software has no persistent open, and leaving
+it in would have made three pulses where the original makes two.
+
+Two consequences worth stating, because both are easy to get wrong:
+
+* **`--no-line-setup` gates the automatic arming, not an explicit request.** The transport's `rearm`
+  hook is left NULL when the flag is off, so `mc_session_arm()` does nothing — but a direct
+  `mc_serial_rearm()` still pulses. The selftest depends on that: it sets `line_setup = 0` because
+  it drives the lines itself, and `P-24a` must still be able to pulse deliberately.
+* **Arming clears `pending_ack`.** The rising edge restarts the radio's programming routine, so no
+  acknowledgement can be owed across it.
+
+Why *twice* is **[?]**. It is reproduced because the object is to be identical, and a second NMI
+costs nothing but time.
+
 > **Read out of the 1987 code, 24 Aug 2026 [S].** The routine is `ser_OpenLine`, at file offset
 > `0x6E6B` in `merged/MCEZ13M_rt.bin` (IP = offset + 0x100). Its port sequence is **byte-identical
 > in all 22 images that carry it**, the 1989 repair build included. In the EZA and `CQM*` images it
@@ -206,8 +240,8 @@ resolved but a difference between radios, so accept both. **[C]**
 
 **P-24a The end-of-memory NAK ends the session — on the radios tested.** After it the radio answers
 nothing — not the next command, and not even `*`. Measured on every radio put through the selftest so
-far: two Radius M110s (`EZ3.01.00.44` CSQ/PL and `EZ9.01.00.45` Sel 5) and an MC micro EZA 9, across
-nine runs. **[C]**
+far: four Radius M110s (two `EZ3.01.00.44` CSQ/PL, 70 cm and 2 m; two `EZ9.01.00.45` Sel 5, 70 cm
+and 2 m) and an MC micro EZA 9, across nine runs. **[C]**
 
 > **An EVA firmware does not behave this way [S], 24 Aug 2026.** In `EPROM/EZA33.BIN` the NAK path is
 > `LDAA #$15 / BSR ser_PutChar / BRA $E787`, and `E787` is `BRA $E74E` — the top of
@@ -239,11 +273,18 @@ nine runs. **[C]**
 > the ident answered — there would be nothing to recover — and on a transport with no control lines.
 
 **P-24b A second way the session dies: the Ext Alarm input.** Independently of any NAK, the radio's
-character reader checks **pin 15 (Ext Alarm)** on every call and abandons programming mode if it is
+character reader checks **pin 15** on every call and abandons programming mode if it is
 asserted — `ser_GetChar` at `E7A3` tests Port 2 bit 6, powers the EEPROM down, and jumps out. It picks
 the exit by the write-in-progress flag (`$0087` bit 6): `EDDD` if a write was underway, `FA3D`
 otherwise. So a radio can go silent **mid-record with no protocol error at all**, and the wire looks
 identical to a radio that simply stopped answering.
+
+> **What pin 15 is, corrected 27 Aug 2026.** It is the **timer-2 output** — the alert tone in normal
+> operation — and an input only while programming mode has stopped that timer. The data-direction
+> register says nothing about it either way, because a timer output pin overrides the DDR. The ROM
+> hands it over explicitly on entry: `E736 CLRA / E737 STAA $1B` stops timer 2 and `E739
+> AIM #$BF,$01` makes P2.6 an input, adjacent instructions with nothing between them. See
+> `doc/EZA33_FIRMWARE.md` §8. **[user, schematic]** + **[S]**
 
 Practical consequence: when a session dies unexpectedly, a stuck or noisy Ext Alarm line is a
 candidate alongside P-24a, and it is one the protocol cannot distinguish. Worth knowing before
@@ -768,7 +809,8 @@ distinction nothing supports.**
 
 **U-6 Record the ident the original software demands; never enforce it.** Each model carries
 `.rss_ident`, the prefix its 1987/89 software requires — `EV9.00.`, `EZ9.00.`, `EZ3.00.` for the MC
-micro families, the full `EZ9.01.00.45` / `EZ3.01.00.44` for the two M110s. It is informational.
+micro families, the full `EZ9.01.00.45` / `EZ3.01.00.44` for the two M110 **variants**
+(four radios, two idents). It is informational.
 MCprog must not refuse a radio on it, because the original software's rule is demonstrably too
 narrow: a **real EVA answers `EV9.01.00.11`**, and the 1987 **Standard** build rejects it with
 `ERROR : INVALID TYPE` while the **Master** and **Repair** builds of the same version read it

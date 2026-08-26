@@ -126,6 +126,42 @@ int mc_probe(mc_session *s, uint16_t addr, uint8_t *val)
 	return 0;
 }
 
+/* P-27: open the line the way the 1987 software opens it, at the START OF AN OPERATION.
+ *
+ * MEASURED, not inferred from the prose.  Driving MCEZ9 under emulation with the radio's control
+ * lines instrumented, a whole read session -- probe, identify, probe, four record reads, the
+ * end-of-memory NAK -- produces exactly FOUR line transitions, and every one of them is at TX byte
+ * ZERO:
+ *
+ *     dtr=0 rts=0   at TX byte 0        \  ser_OpenLine
+ *     dtr=0 rts=1   at TX byte 0        /
+ *     dtr=0 rts=0   at TX byte 0        \  and again
+ *     dtr=0 rts=1   at TX byte 0        /
+ *
+ * A WRITE session (4 records, 575 bytes) gives the same four and no more.  So `ser_OpenLine' runs
+ * TWICE, back to back, before the first byte of an operation -- and never again during it.  Not
+ * before every command, not before every record.  spec.md P-12's "before every transaction" is
+ * right but easy to misread as recurring mid-session; it does not.
+ *
+ * Why twice is not established [?].  Reproduced because the point is to be identical, and a second
+ * NMI costs nothing but time.
+ *
+ * A transport with no control lines returns -1 from rearm and that is not an error -- there is
+ * simply nothing to pulse.  Returns the number of pulses actually delivered.
+ */
+int mc_session_arm(mc_session *s)
+{
+	int n = 0, i;
+
+	if (!s || !s->t || !s->t->rearm)
+		return 0;
+	for (i = 0; i < MC_ARM_PULSES; i++)
+		if (s->t->rearm(s->t) == 0)
+			n++;
+	s->pending_ack = 0;    /* the radio restarted; no acknowledgement is owed across that */
+	return n;
+}
+
 int mc_prewrite_read(mc_session *s, uint16_t addr, uint8_t out[MC_PREWRITE])
 {
 	uint8_t cmd[7], reply[7 + MC_PREWRITE * 2], val[MC_PREWRITE];

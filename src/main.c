@@ -305,6 +305,8 @@ static long read_radio(const char *port, const mc_serial_opts *o, const char *lo
 		return -1;
 	}
 	mc_session_init(&s, t);
+	/* P-27: open the line the way the original does -- twice, before the first byte. */
+	mc_session_arm(&s);
 	if (logpath) {
 		tracef = fopen(logpath, "w");
 		if (!tracef) {
@@ -366,6 +368,8 @@ static int do_write(void *ctx, const mc_image *img, char *msg, size_t msgsz)
 		return -1;
 	}
 	mc_session_init(&s, t);
+	/* P-27: the write is its own operation, so it opens the line the same way a read does. */
+	mc_session_arm(&s);
 	if (mc_write_radio(&s, img, w->backup, &rep) != 0) {
 		snprintf(msg, msgsz, "NOT written: %s", rep.err);
 		mc_serial_close(t);

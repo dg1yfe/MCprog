@@ -331,6 +331,45 @@ static void test_p25_is_enforced(void)
 	mc_replay_close(r);
 }
 
+/* P-27: mc_session_arm() must deliver exactly MC_ARM_PULSES, because the 1987 software was
+ * measured doing exactly two -- and must be silent on a transport with no control lines, which is
+ * every transport in this test suite and every replay of a capture. */
+static int arm_calls;
+static int counting_rearm(mc_transport *t) { (void)t; arm_calls++; return 0; }
+static int failing_rearm(mc_transport *t)  { (void)t; arm_calls++; return -1; }
+
+static void test_arm(void)
+{
+	mc_transport t;
+	mc_session s;
+
+	memset(&t, 0, sizeof t);
+	mc_session_init(&s, &t);
+
+	/* no hook: nothing happens, and it is not an error */
+	arm_calls = 0;
+	ok(mc_session_arm(&s) == 0, "P-27", "a transport without control lines arms zero times");
+	ok(arm_calls == 0, "P-27", "  and the hook is not called at all");
+
+	t.rearm = counting_rearm;
+	arm_calls = 0;
+	ok(mc_session_arm(&s) == MC_ARM_PULSES, "P-27", "a serial transport arms twice");
+	ok(arm_calls == MC_ARM_PULSES, "P-27", "  calling the hook exactly that many times");
+	ok(MC_ARM_PULSES == 2, "P-27", "  and twice is what the original was measured doing");
+
+	/* a pulse that fails is counted as not delivered, but is not fatal */
+	t.rearm = failing_rearm;
+	arm_calls = 0;
+	ok(mc_session_arm(&s) == 0, "P-27", "a failing pulse reports zero delivered");
+	ok(arm_calls == MC_ARM_PULSES, "P-27", "  having still tried each time");
+
+	/* arming means the radio restarted, so no acknowledgement can be owed across it */
+	t.rearm = counting_rearm;
+	s.pending_ack = 1;
+	mc_session_arm(&s);
+	ok(s.pending_ack == 0, "P-27", "arming clears any pending acknowledgement");
+}
+
 int main(int argc, char **argv)
 {
 	if (argc > 1)
@@ -340,6 +379,7 @@ int main(int argc, char **argv)
 	test_read_2011();
 	test_write();
 	test_p25_is_enforced();
+	test_arm();
 	printf("\n%d passed, %d FAILED\n", pass, fail);
 	return fail ? 1 : 0;
 }

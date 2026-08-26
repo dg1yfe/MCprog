@@ -126,6 +126,26 @@ int mc_probe(mc_session *s, uint16_t addr, uint8_t *val)
 	return 0;
 }
 
+int mc_prewrite_read(mc_session *s, uint16_t addr, uint8_t out[MC_PREWRITE])
+{
+	uint8_t cmd[7], reply[7 + MC_PREWRITE * 2], val[MC_PREWRITE];
+	int got, want = (int)sizeof reply;
+
+	mc_put_header(cmd, ")0>", addr);
+	if (tx(s, cmd, 7) != 0)
+		return -1;
+	got = rx(s, reply, (size_t)want, MC_T_BYTE);
+	if (got != want)
+		return fail(s, "pre-write read at 0x%04X: wanted %d bytes, got %d", addr, want, got);
+	if (!hdr_matches(reply, "(0>", addr))
+		return fail(s, "pre-write read at 0x%04X: bad reply header", addr);
+	if (mc_nib_decode(reply + 7, MC_PREWRITE * 2, val) != 0)
+		return fail(s, "pre-write read at 0x%04X: bad nibble encoding", addr);
+	if (out)
+		memcpy(out, val, MC_PREWRITE);
+	return 0;
+}
+
 int mc_identify(mc_session *s, char *ident, size_t max, size_t *len)
 {
 	uint8_t star = 0x2A, b[2];

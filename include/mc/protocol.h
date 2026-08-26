@@ -122,6 +122,26 @@ int mc_connect(mc_session *s, char *ident, size_t max, size_t *len);
  */
 int mc_read_block(mc_session *s, uint16_t addr, uint8_t out[MC_BLOCK], int chain);
 
+/* P-26: the PRE-WRITE HEADER READ, `)0>' -- 14 bytes at `addr'.
+ *
+ * The command grammar is P-1's: the two characters after the sigil are nibbles giving the byte
+ * count, so `)0>' is 0x0E = 14 and `)40' is 64.  The Radius M110 software sends this immediately
+ * before programming and NOWHERE ELSE, which is why no MC micro capture contains it -- it is the
+ * M110's counterpart to the MC micro's `)02' serial check (doc/M110.md, the write-back oracle).
+ *
+ * WHY IT IS HERE.  Eight write attempts across four real M110s, in two batches, all ended the same
+ * way: every read succeeds, and the radio goes PERMANENTLY silent the instant `(40' is sent --
+ * ident included, and an RTS pulse does not revive it.  The frame is not at fault; it is
+ * byte-identical to the record the radio itself had just returned.  The one step the original
+ * performs and mcprog did not is this one.  Whether that is the cause is NOT established: it is
+ * the strongest candidate, and this exists so the next batch can test it.
+ *
+ * Returns 0 on a well-formed reply, -1 otherwise.  `out' may be NULL if the caller only wants the
+ * exchange to have happened.
+ */
+#define MC_PREWRITE 14
+int mc_prewrite_read(mc_session *s, uint16_t addr, uint8_t out[MC_PREWRITE]);
+
 /* P-25: write one 64-byte record and wait for BOTH ACKs.  Never returns before the second. */
 int mc_write_block(mc_session *s, uint16_t addr, const uint8_t in[MC_BLOCK]);
 

@@ -94,6 +94,14 @@ int mc_fake_serve(mc_fake *f, mc_transport *t, unsigned idle_ms)
 			mc_nib_encode(f->eep + ((size_t)addr + 1 < f->len ? addr : 0), 2, out + 7);
 			if (t->send(t, out, 11) != 0)
 				return handled;
+		} else if (b == 0x29 && cmd[0] == '0' && cmd[1] == '>') { /* P-26: pre-write, 14 bytes */
+			/* The count is the command itself (P-1's grammar): '>' is nibble 0x0E. */
+			memcpy(out, "(0>", 3);
+			memcpy(out + 3, cmd + 2, 4);
+			mc_nib_encode(f->eep + ((size_t)addr + MC_PREWRITE <= f->len ? addr : 0),
+			              MC_PREWRITE, out + 7);
+			if (t->send(t, out, 7 + MC_PREWRITE * 2) != 0)
+				return handled;
 		} else if (b == 0x29 && cmd[0] == '4' && cmd[1] == '0') { /* P-23 read */
 			if ((size_t)addr + MC_BLOCK <= f->len) {
 				memcpy(out, "(40", 3);

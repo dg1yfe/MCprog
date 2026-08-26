@@ -268,6 +268,21 @@ int mc_write_radio(mc_session *s, const mc_image *img, const char *backup_path,
 	v.img = &sent;
 	v.p = mc_band_p_of(img);
 	v.err[0] = 0;
+	/* P-26: the Radius M110 software sends a 14-byte `)0>' pre-write header read immediately
+	 * before programming and nowhere else, and mcprog did not.  Eight write attempts across four
+	 * real M110s all ended with the radio going permanently silent at the first `(40', so this is
+	 * the step being tested.  It is model-gated on purpose: NO MC micro build ever sends `)0>'
+	 * (doc/M110.md), and sending an MC micro a command its own software never sends would be
+	 * exactly the kind of unfaithfulness this project avoids.
+	 *
+	 * A failure here is NOT fatal.  Nothing establishes that the reply matters -- only that the
+	 * original performs the exchange -- so a radio that declines it should still be given its
+	 * chance at the write rather than refused by us. */
+	if (mc_model_is_m110(img->model)) {
+		uint8_t hdr[MC_PREWRITE];
+		if (mc_prewrite_read(s, 0, hdr) != 0)
+			s->err[0] = 0;    /* recorded on the wire log; not an error the caller must see */
+	}
 	if (mc_write_all(s, sent.bytes, mc_write_len(&sent), verify_record, &v) != 0) {
 		/* The backup path leads, because after a half-written EEPROM it is the only thing the user
 		 * strictly needs from this sentence. */

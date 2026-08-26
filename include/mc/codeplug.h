@@ -150,6 +150,10 @@ typedef struct {
 	const char *note;
 } mc_default;
 
+/* Is this one of the Radius M110 models?  Used where the two families' PROTOCOL differs rather
+ * than their layout -- notably the `)0>' pre-write read, which only the M110 software sends. */
+int mc_model_is_m110(const mc_model *m);
+
 const mc_default *mc_default_by_index(size_t i);          /* NULL past the end */
 const mc_default *mc_default_find(const char *model, int band);
 

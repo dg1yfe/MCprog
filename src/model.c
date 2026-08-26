@@ -263,6 +263,14 @@ const mc_model *mc_model_by_index(size_t i)
 /* Storno's CQM 5500 badging.  Matched on any unique case-insensitive substring so that both
  * `CQM5500 EZA 9, SELECT 5' and plain `eza 9' resolve, and an ambiguous fragment resolves to
  * nothing rather than to whichever entry happened to come first. */
+/* The family is identified by the model's own name rather than by a new flag: the two M110 entries
+ * are the only ones that begin `m110_', and inventing a field for a two-member set would be more
+ * machinery than the distinction deserves. */
+int mc_model_is_m110(const mc_model *m)
+{
+	return m && !strncmp(m->name, "m110_", 5);
+}
+
 const mc_model *mc_model_by_storno(const char *name)
 {
 	const mc_model *m, *hit = NULL;

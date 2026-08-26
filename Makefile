@@ -23,7 +23,7 @@ CFLAGS  += -D_DEFAULT_SOURCE
 endif
 
 # serial_win32.c self-excludes with #ifdef _WIN32, so it can sit in SRC on every platform.
-SRC   := src/codeplug.c src/model.c src/dump.c src/protocol.c src/replay.c \
+SRC   := src/codeplug.c src/model.c src/defaults.c src/dump.c src/protocol.c src/replay.c \
          src/fakeradio.c src/serial_posix.c src/serial_win32.c src/write.c \
          src/selftest.c
 OBJ   := $(SRC:src/%.c=build/%.o)

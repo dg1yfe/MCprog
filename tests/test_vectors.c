@@ -933,6 +933,118 @@ static void test_m110(void)
 	}
 }
 
+/* Storno's CQM 5500 badging.  There is no Storno MODEL -- the radios are the same radios, and the
+ * Storno programmer is the Motorola one relocated -- so what is tested is that the names resolve,
+ * that an ambiguous fragment resolves to NOTHING rather than to a guess, and that adding them has
+ * not made any real model name mean something else. */
+static void test_storno(void)
+{
+	const mc_model *m;
+	size_t i;
+	int branded = 0;
+
+	m = mc_model_by_storno("CQM5500 EZA 9, SELECT 5");
+	ok(m && !strcmp(m->name, "eza_sel5"), "storno", "the full CQM 5500 name resolves");
+	m = mc_model_by_storno("eza 1/3");
+	ok(m && !strcmp(m->name, "eza_cspl"), "storno", "a unique fragment resolves, case-insensitively");
+	m = mc_model_by_storno("EVA 9, 5/6 TONE");
+	ok(m && !strcmp(m->name, "eva_56"), "storno", "and the 5/6-tone EVA is distinguishable");
+	ok(mc_model_by_storno("CQM5500") == NULL, "storno",
+	   "a fragment matching several models resolves to nothing, not to the first");
+	ok(mc_model_by_storno("") == NULL && mc_model_by_storno(NULL) == NULL, "storno",
+	   "empty and NULL are not matches");
+	ok(mc_model_by_storno("no such radio") == NULL, "storno", "an unknown name is not a match");
+
+	/* Every real model name must still resolve to itself, and must NOT be reachable as a Storno
+	 * name -- the two namespaces stay separate. */
+	for (i = 0; (m = mc_model_by_index(i)) != NULL; i++) {
+		const mc_model *byname = mc_model_by_name(m->name);
+		ok(byname == m, "storno", "each model still resolves by its own name");
+		if (m->storno)
+			branded++;
+	}
+	ok(branded == 4, "storno", "four MC micro models carry Storno branding");
+	ok(mc_model_by_name("eva_sel5")->storno != NULL, "storno", "the EVA SEL5 is one of them");
+	ok(mc_model_by_name("m110_sel5")->storno == NULL, "storno",
+	   "and the M110s are not -- Storno's line did not cover them");
+
+	/* The ident the original software demands, recorded but never enforced: a real EVA answers
+	 * EV9.01 and the 1987 Standard build refuses it, which mcprog must not copy. */
+	ok(!strcmp(mc_model_by_name("eva_sel5")->rss_ident, "EV9.00."), "storno",
+	   "the EVA SEL5 records the EV9.00. prefix its 1987 software requires");
+	ok(!strcmp(mc_model_by_name("eza_cspl")->rss_ident, "EZ3.00."), "storno",
+	   "and the EZA CS/PL records EZ3.00.");
+	ok(strncmp(mc_model_by_name("m110_cspl")->rss_ident,
+	           mc_model_by_name("eza_cspl")->rss_ident, 4) == 0, "storno",
+	   "the M110 CS/PL shares the EZ3. family with the MC micro EZA");
+	ok(strcmp(mc_model_by_name("m110_cspl")->rss_ident,
+	          mc_model_by_name("eza_cspl")->rss_ident) != 0, "storno",
+	   "  but the generation digits separate them, which is why the family alone cannot detect");
+}
+
+/* The factory defaults `--new' creates from.  These are CAPTURES of the original software's
+ * INITIALIZE output, so the thing worth testing is that they are still exactly that -- every
+ * embedded image must be a valid codeplug for its model AND identical to the fixture it was
+ * generated from.  If the generator or a fixture ever drifts, that is caught here rather than by
+ * a user writing a bad codeplug into a radio. */
+static void test_defaults(void)
+{
+	static const struct { const char *model; int band; const char *fixture; } SRC[] = {
+		{ "eza_sel5", 1, "fixtures/eza9_default_band1.bin" },
+		{ "eza_sel5", 2, "fixtures/eza9_default_band2.bin" },
+		{ "eza_sel5", 3, "fixtures/eza9_default_band3.bin" },
+		{ "eza_sel5", 4, "fixtures/eza9_default_band4.bin" },
+		{ "eza_cspl", 1, "fixtures/ez13_default_band1.bin" },
+		{ "eza_cspl", 2, "fixtures/ez13_default_band2.bin" },
+		{ "eza_cspl", 3, "fixtures/ez13_default_band3.bin" },
+		{ "eza_cspl", 4, "fixtures/ez13_default_band4.bin" },
+		{ "eva_sel5", 0, "fixtures/ev9_default.bin" },
+	};
+	const mc_default *d;
+	size_t i, n = 0;
+
+	for (i = 0; (d = mc_default_by_index(i)) != NULL; i++)
+		n++;
+	ok(n == sizeof SRC / sizeof SRC[0], "new", "every captured default is compiled in");
+
+	for (i = 0; i < sizeof SRC / sizeof SRC[0]; i++) {
+		const mc_model *m = mc_model_by_name(SRC[i].model);
+		uint8_t buf[MC_IMG_MAX];
+		mc_image img;
+		size_t flen = 0;
+		char *raw;
+
+		d = mc_default_find(SRC[i].model, SRC[i].band);
+		ok(d != NULL, "new", "the default for that model and band is found");
+		if (!d || !m)
+			continue;
+		ok(d->len == m->size, "new", "it is the model's nominal size");
+
+		memset(&img, 0, sizeof img);
+		img.model = m;
+		img.bytes = buf;
+		img.len = d->len;
+		memcpy(buf, d->bytes, d->len);
+		ok(mc_image_check(&img) == 0, "new", "and a structurally valid image for it");
+		ok(mc_checksum_valid(&img), "new", "with the checksum the radio will demand");
+
+		raw = slurp(SRC[i].fixture, &flen);
+		if (raw) {
+			ok(flen == d->len && !memcmp(raw, d->bytes, d->len), "new",
+			   "and is byte-identical to the capture it was generated from");
+			free(raw);
+		}
+	}
+
+	/* Lookup behaviour: a band-less entry answers for any band, and nothing is invented. */
+	ok(mc_default_find("eva_sel5", 0) == mc_default_find("eva_sel5", 3), "new",
+	   "a capture with no band choice answers for any band");
+	ok(mc_default_find("eza_sel5", 9) == NULL, "new", "a band never captured is not invented");
+	ok(mc_default_find("m110_sel5", 0) == NULL, "new",
+	   "and neither M110 has a factory default, so none is offered");
+	ok(mc_default_find("no_such_model", 1) == NULL, "new", "an unknown model finds nothing");
+}
+
 int main(int argc, char **argv)
 {
 	static const char *CODEPLUGS[] = {
@@ -958,6 +1070,8 @@ int main(int argc, char **argv)
 	test_pl();
 	test_aak();
 	test_parity();
+	test_storno();
+	test_defaults();
 
 	printf("\n%d passed, %d FAILED\n", pass, fail);
 	return fail ? 1 : 0;

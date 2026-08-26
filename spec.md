@@ -753,6 +753,56 @@ unprogrammed slot), ERROR (not representable). **Never clamp silently.** Saving 
 allowed on confirmation; saving with ERRORs is refused.
 **U-4** A protocol log page, always recording, exportable. This is the field-support tool.
 
+**U-5 Storno CQM 5500 is the same hardware, and must not become a model.** Storno resold these
+radios rebadged, and its programmer is the Motorola one **relocated, not rewritten** — same wire
+protocol, same codeplug layout, same checksum. Driven side by side under emulation, `CQMEZ13` and
+`MCEZ13` put **byte-identical** traffic on the wire (31 bytes, same event sequence), as do `CQMEZ9`
+and `MCEZ9` (54 bytes) and `CQMEV9` and `MCEV9` (86 bytes). Every Storno build's codeplug buffer
+sits exactly `+0x22` above its Motorola sibling's, which is a difference in the *programmer's* data
+segment and nothing to do with the radio. **[C]**
+
+So the model table carries Storno's own name for each radio (`.storno`, taken verbatim from
+`STORNO.COM`'s table) and `--model` accepts it, including any unique fragment; an ambiguous fragment
+resolves to nothing rather than to a guess. **Adding a `storno` model would be inventing a
+distinction nothing supports.**
+
+**U-6 Record the ident the original software demands; never enforce it.** Each model carries
+`.rss_ident`, the prefix its 1987/89 software requires — `EV9.00.`, `EZ9.00.`, `EZ3.00.` for the MC
+micro families, the full `EZ9.01.00.45` / `EZ3.01.00.44` for the two M110s. It is informational.
+MCprog must not refuse a radio on it, because the original software's rule is demonstrably too
+narrow: a **real EVA answers `EV9.01.00.11`**, and the 1987 **Standard** build rejects it with
+`ERROR : INVALID TYPE` while the **Master** and **Repair** builds of the same version read it
+without complaint. Sweeping the ident one field at a time shows only the version decides — the model
+code and the description change nothing. **[C]**
+
+**U-7 A codeplug can be created without a radio, but only from a genuine factory default.**
+`mcprog --new MODEL [--band N] FILE` writes a new image; `--list-defaults` shows what is available.
+Everything else about file mode already works with no radio attached — `mcprog FILE` edits,
+`--dump-vec FILE` decodes.
+
+**The images are captures, not constructions, and that is the whole point.** A codeplug holds many
+bytes this project has never mapped; an image built from only the fields MCprog understands would be
+wrong in ways nothing here could detect, and the radio would take it. So `--new` does what the
+repair build's `INITIALIZE - 4 (reset to default)` does — it starts from a real factory default —
+and those defaults were captured off the wire from that build (`tools/eza.py default_codeplug()`,
+`doc/EEPROM_MAP_EZA.md`). What `--new` writes is byte-identical to what the 1987 software produced.
+**[C]**
+
+Nine are compiled in: `eza_sel5` and `eza_cspl` for RF ranges 1–4, and `eva_sel5`, whose build has
+no RF-range prompt at all so its band byte is left unset. **Neither M110 has one**, because none has
+been captured — and `--new m110_sel5` says so and lists the alternatives rather than inventing an
+image or reusing some real radio's, which would embed that radio's serial number.
+
+Three safety properties, each tested: the built-in default is **checked against its own model's
+size and checksum before being written**, so a corrupted capture cannot reach a file; an existing
+file is **never overwritten without `--force`**; and `--new` **refuses to be combined with `--port`,
+`--read`, `--write` or `--selftest`**, because creating a file and touching a radio are different
+operations and merging them is how the wrong image gets programmed.
+
+> The family prefix alone cannot identify a model, and that is why it is not used for detection:
+> `EZ3.` and `EZ9.` are shared between the MC micro EZA radios and the Radius M110s, separated only
+> by the generation digits (`EZ9.00.` against `EZ9.01.00.45`).
+
 ## 8. Write safety
 
 **W-1** Writing requires an explicit opt-in flag; absent it the action is visible but disabled, with

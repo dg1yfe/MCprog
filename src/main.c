@@ -58,6 +58,8 @@ static void usage(FILE *f)
 	        "  mcprog --port DEV --identify     print what the radio says it is\n"
 	        "  mcprog --dump-vec file.DAT       print the conformance decode of a file\n"
 	        "  mcprog --list-models             describe every model this build knows\n"
+	        "  mcprog --new MODEL [--band N] F  create F as a factory-default codeplug, no radio\n"
+	        "  mcprog --list-defaults           the factory defaults this build can create\n"
 	        "\n"
 	        "  mcprog --selftest report.md      first contact with a real radio: finds the port\n"
 	        "                                   itself, probes, measures, and writes a report\n"
@@ -104,14 +106,114 @@ static void list_models(void)
 			snprintf(pl, sizeof pl, "-");
 		printf("%-10s %5u 0x%03X %8s  %-7s %s\n", m->name, m->size, m->cksum, chans, pl,
 		       m->about ? m->about : "");
+		if (m->storno || m->rss_ident) {
+			printf("%-10s %5s %5s %8s  %-7s ", "", "", "", "", "");
+			if (m->storno)
+				printf("Storno: %s%s", m->storno, m->rss_ident ? "; " : "");
+			if (m->rss_ident)
+				printf("original software wants ident \"%s\"", m->rss_ident);
+			printf("\n");
+		}
 	}
-	printf("\nDetection is by size, checksum and -- where the format has one -- a marker in the\n"
+	printf("\nStorno sold these radios as the CQM 5500 series.  There is no separate Storno model:\n"
+	       "its programmer is the Motorola one relocated, speaking the same protocol to the same\n"
+	       "codeplug -- driven side by side the two put byte-identical traffic on the wire.  The\n"
+	       "Storno names above are so an owner of a CQM 5500 can find the right model, and --model\n"
+	       "accepts them.\n"
+	       "\nThe ident column is what the ORIGINAL software demands, and mcprog does NOT enforce it.\n"
+	       "It cannot: a real EVA answers \"EV9.01.00.11\" and the 1987 Standard build refuses it as\n"
+	       "INVALID TYPE, while the Master and Repair builds of the same version read it happily.\n"
+	       "That is a limit of that software, not of the radio.\n"
+	       "\nDetection is by size, checksum and -- where the format has one -- a marker in the\n"
 	       "bytes: the Radius M110 names its family at 0x07..0x09.  The two 512-byte EVA models\n"
 	       "have no marker and no other difference, so they cannot be told apart from a file at\n"
 	       "all; from a radio the ident settles it.  Use --model to choose.\n"
 	       "\n--model SKIPS detection entirely.  Naming a model whose layout does not match the\n"
 	       "bytes will read and write the wrong offsets, so use it to resolve an ambiguity the\n"
 	       "tool reports -- not to force a file open that it refused.\n");
+}
+
+/* `--new': create a codeplug file without a radio, the way the repair build's INITIALIZE does --
+ * from a genuine factory default, not from a blank buffer.  See mc_default in codeplug.h for why
+ * that distinction is not cosmetic. */
+static void list_defaults(FILE *f)
+{
+	const mc_default *d;
+	size_t i;
+
+	fprintf(f, "factory defaults this build carries:\n");
+	for (i = 0; (d = mc_default_by_index(i)) != NULL; i++) {
+		if (d->band)
+			fprintf(f, "  --new %-9s --band %d   %4zu bytes  (%s)\n",
+			        d->model, d->band, d->len, d->note);
+		else
+			fprintf(f, "  --new %-9s             %4zu bytes  (%s)\n",
+			        d->model, d->len, d->note);
+	}
+	fprintf(f, "\nThese are captures of what the original software's INITIALIZE produced, not\n"
+	           "synthesised images: a codeplug contains many bytes this project has never mapped,\n"
+	           "and building one from only the understood fields would be wrong undetectably.\n"
+	           "Where no capture exists -- the Radius M110s -- mcprog will not invent one.\n");
+}
+
+static int create_new(const char *model, int band, const char *path, int force)
+{
+	const mc_default *d = mc_default_find(model, band);
+	const mc_model *m;
+	uint8_t buf[MC_IMG_MAX];
+	mc_image img;
+	FILE *f;
+
+	if (!d) {
+		if (mc_model_by_name(model) || mc_model_by_storno(model))
+			fprintf(stderr, "mcprog: no factory default has been captured for %s%s\n\n",
+			        model, band ? " in that band" : "");
+		else
+			fprintf(stderr, "mcprog: unknown model %s\n\n", model);
+		list_defaults(stderr);
+		return 2;
+	}
+	m = mc_model_by_name(d->model);
+	if (!m) {
+		fprintf(stderr, "mcprog: internal: default names a model this build lacks\n");
+		return 2;
+	}
+	/* Check what we are about to emit rather than trusting the table: a default that did not
+	 * satisfy its own model's checksum would be a corrupted capture, and writing it silently
+	 * would hand the user a file the radio will reject. */
+	memset(&img, 0, sizeof img);
+	img.model = m;
+	img.len = d->len;
+	img.bytes = buf;                    /* mc_image.bytes is a POINTER, not an array */
+	if (d->len > sizeof buf) {
+		fprintf(stderr, "mcprog: internal: default larger than MC_IMG_MAX\n");
+		return 2;
+	}
+	memcpy(buf, d->bytes, d->len);
+	if (d->len != m->size || !mc_checksum_valid(&img)) {
+		fprintf(stderr, "mcprog: internal: the built-in default for %s is not a valid %s image\n",
+		        d->model, m->name);
+		return 2;
+	}
+	if (!force) {
+		FILE *t = fopen(path, "rb");
+		if (t) {
+			fclose(t);
+			fprintf(stderr, "mcprog: %s exists -- refusing to overwrite it (use --force)\n", path);
+			return 2;
+		}
+	}
+	if (!(f = fopen(path, "wb")) || fwrite(d->bytes, 1, d->len, f) != d->len) {
+		if (f) fclose(f);
+		fprintf(stderr, "mcprog: cannot write %s\n", path);
+		return 2;
+	}
+	fclose(f);
+	printf("wrote %s: %s, %zu bytes, checksum 0x%02X valid\n",
+	       path, m->name, d->len, mc_checksum_stored(&img));
+	printf("a factory default as the original INITIALIZE produced it -- %s\n", d->note);
+	printf("edit it with:  mcprog %s\n", path);
+	return 0;
 }
 
 static void wirelog(void *ctx, int tx, const uint8_t *buf, size_t n)
@@ -280,7 +382,8 @@ int main(int argc, char **argv)
 	const char *port = NULL, *readto = NULL, *want = NULL, *logpath = NULL, *file = NULL;
 	const char *backup = NULL;
 	const char *writefrom = NULL, *selftest = NULL;
-	int identify = 0, dumpvec = 0, enable_write = 0, i;
+	const char *newmodel = NULL;
+	int identify = 0, dumpvec = 0, enable_write = 0, band = 0, force = 0, i;
 	mc_serial_opts o;
 	const mc_model *model = NULL;
 	mc_image img;
@@ -309,8 +412,18 @@ int main(int argc, char **argv)
 			dumpvec = 1;
 		else if (!strcmp(argv[i], "--selftest") && i + 1 < argc)
 			selftest = argv[++i];
+		else if (!strcmp(argv[i], "--new") && i + 1 < argc)
+			newmodel = argv[++i];
+		else if (!strcmp(argv[i], "--band") && i + 1 < argc)
+			band = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--force"))
+			force = 1;
 		else if (!strcmp(argv[i], "--list-models")) {
 			list_models();
+			return 0;
+		}
+		else if (!strcmp(argv[i], "--list-defaults")) {
+			list_defaults(stdout);
 			return 0;
 		}
 		else if (!strcmp(argv[i], "--enable-write"))
@@ -326,6 +439,23 @@ int main(int argc, char **argv)
 			return 2;
 		} else
 			file = argv[i];
+	}
+	if (newmodel) {
+		const mc_model *nm;
+		if (!file) {
+			fprintf(stderr, "mcprog: --new needs a file to create, e.g. "
+			                "mcprog --new eza_sel5 --band 2 new.DAT\n");
+			return 2;
+		}
+		if (port || writefrom || readto || selftest) {
+			fprintf(stderr, "mcprog: --new creates a file and does not touch a radio\n");
+			return 2;
+		}
+		/* Storno's badging resolves here too, so `--new "CQM5500 EZA 9, SELECT 5"' works. */
+		nm = mc_model_by_name(newmodel);
+		if (!nm)
+			nm = mc_model_by_storno(newmodel);
+		return create_new(nm ? nm->name : newmodel, band, file, force);
 	}
 	if (!port && !file) {
 		usage(stderr);
@@ -377,6 +507,11 @@ int main(int argc, char **argv)
 
 	if (want) {
 		model = mc_model_by_name(want);
+		/* Accept Storno's own badging too -- `--model "CQM5500 EZA 9, SELECT 5"', or any unique
+		 * fragment of it.  Tried only after the real names, so nothing an existing script passes
+		 * can change meaning. */
+		if (!model)
+			model = mc_model_by_storno(want);
 		if (!model) {
 			fprintf(stderr, "mcprog: unknown model %s -- these are the ones this build knows:\n\n",
 			        want);

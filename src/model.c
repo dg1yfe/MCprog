@@ -28,6 +28,7 @@
  * described here and the size is checked rather than assumed.
  */
 #include <stdio.h>
+#include <ctype.h>
 #include <string.h>
 #include "mc/codeplug.h"
 
@@ -167,20 +168,25 @@ static const mc_model MODELS[] = {
 	  .pl_tone = 0x047, .pl_list = 0x047, .pl_count = 0x0CE, .pl_mode = 0x1FD,
 	  .trak = 1, .trak_ct = 0x0DA, .size_flag = 0x0CF,
 	  .pl_max = 10, .pl_k = MC_PL_K_EVA, NT(TIMERS_EVA), .wcount = 0x0AF, .wcount_clr = 0x00,
-	  .about = "EVA, SEL5 signalling -- MCEV9, MCEV9M" },
+	  .about = "EVA, SEL5 signalling -- MCEV9, MCEV9M",
+	  .rss_ident = "EV9.00.",
+	  .storno = "CQM5500 EVA 9, SELECT 5", },
 	{ .name = "eva_56", .size = 512, MC_MICRO,
 	  .cksum = 0x000, .chan = 0x0E0, .band = 0x0DC, .refdiv = 0x0D4,
 	  .nchan = 32, .stride = 8, .tx = 2, .rx = 5, .numbered = 1, NF(FLAGS_EVA),
 	  .pl_tone = 0x047, .pl_list = 0x047, .pl_count = 0x0CE, .pl_mode = 0x1FD,
 	  .trak = 1, .trak_ct = 0x0DA, .size_flag = 0x0CF,
 	  .pl_max = 10, .pl_k = MC_PL_K_EVA, NT(TIMERS_EVA),
-	  .about = "EVA, 5/6-tone signalling -- MCEV_56" },
+	  .about = "EVA, 5/6-tone signalling -- MCEV_56",
+	  .storno = "CQM5500 EVA 9, 5/6 TONE", },
 	{ .name = "eza_sel5", .size = 256, MC_MICRO,
 	  .cksum = 0x000, .chan = 0x0C8, .band = 0x082, .refdiv = 0x0C4,
 	  .nchan = 8, .stride = 6, .tx = 0, .rx = 3, NF(FLAGS_EZA9),
 	  .pl_tone = 0x02F, .pl_list = 0x031, .pl_count = 0x083, .pl_mode = 0x07F,
 	  .pl_max = 10, .pl_k = MC_PL_K_EVA, .aak = 0x076, .wcount = 0x09E, .wcount_clr = 0x80,
-	  .about = "EZA, SEL5 signalling -- MCEZ9 and its R/M builds" },
+	  .about = "EZA, SEL5 signalling -- MCEZ9 and its R/M builds",
+	  .rss_ident = "EZ9.00.",
+	  .storno = "CQM5500 EZA 9, SELECT 5", },
 	/* MCEZ13: no mode byte, an encoder table and a decoder table, and its checksum covers the
 	 * WHOLE 128 bytes -- the sum loop at CS:0x767E runs 0..size-1 with size = 128, and the editor
 	 * zeroes 0x003 and stores the complement there (watched at CS:0x7B15/0x7B34).
@@ -194,7 +200,9 @@ static const mc_model MODELS[] = {
 	  .nchan = 8, .stride = 6, .tx = 0, .rx = 3, NF(FLAGS_EZ13),
 	  .pl_tone = 0x024, .pl_list = 0x024, .pl_dec = 0x010,
 	  .pl_max = 10, .pl_k = MC_PL_K_EZ13,
-	  .about = "EZA, CS/PL -- MCEZ13, the 128-byte variant" },
+	  .about = "EZA, CS/PL -- MCEZ13, the 128-byte variant",
+	  .rss_ident = "EZ3.00.",
+	  .storno = "CQM5500 EZA 1/3, CSQ/PL", },
 
 	/* ---- Radius M110 -------------------------------------------------------------------------
 	 * A different radio that answers the same wire protocol.  Nothing else is shared: the checksum
@@ -223,7 +231,8 @@ static const mc_model MODELS[] = {
 	   * IEEE doubles: 7.9844 for the encoder and 61.107 for the decoder (MRAR0200.EXE 0x3174D).
 	   * Confirmed on hardware: 123.0 Hz stores 982 (= 123.0 x 7.9844) and 7516 (= x 61.107). */
 	  .pl_ch_enc = 0, .pl_ch_dec = 5, .pl_k = MC_PL_K_EZ13,
-	  .about = "Radius M110, CSQ/PL -- EZ3.01.00.44; 128 real bytes mirrored into 256" },
+	  .about = "Radius M110, CSQ/PL -- EZ3.01.00.44; 128 real bytes mirrored into 256",
+	  .rss_ident = "EZ3.01.00.44", },
 	{ .name = "m110_sel5", .size = 256,
 	  .cksum = 0x00F, .cksum_target = 0x01,
 	  .chan = 0x092, .band = 0x00A, .band_shift = 0, .band_mask = 0x0F,
@@ -231,7 +240,8 @@ static const mc_model MODELS[] = {
 	  .refdiv = 0x089, .nchan = M110_SEL5_NCHAN, .stride = 12, .tx = 1, .rx = 4,
 	  /* Sel 5 signalling, so no PL at all -- and 0 is a real offset, hence explicit. */
 	  .pl_ch_enc = MC_PL_NONE, .pl_ch_dec = MC_PL_NONE,
-	  .about = "Radius M110, Sel 5 -- EZ9.01.00.45" },
+	  .about = "Radius M110, Sel 5 -- EZ9.01.00.45",
+	  .rss_ident = "EZ9.01.00.45", },
 };
 static const size_t NMODELS = sizeof MODELS / sizeof MODELS[0];
 
@@ -247,6 +257,41 @@ const mc_model *mc_model_by_name(const char *name)
 const mc_model *mc_model_by_index(size_t i)
 {
 	return i < NMODELS ? &MODELS[i] : NULL;
+}
+
+
+/* Storno's CQM 5500 badging.  Matched on any unique case-insensitive substring so that both
+ * `CQM5500 EZA 9, SELECT 5' and plain `eza 9' resolve, and an ambiguous fragment resolves to
+ * nothing rather than to whichever entry happened to come first. */
+const mc_model *mc_model_by_storno(const char *name)
+{
+	const mc_model *m, *hit = NULL;
+	size_t i, n;
+
+	if (!name || !*name)
+		return NULL;
+	n = strlen(name);
+	for (i = 0; (m = mc_model_by_index(i)) != NULL; i++) {
+		const char *s = m->storno;
+		size_t k;
+
+		if (!s)
+			continue;
+		for (k = 0; s[k]; k++) {
+			size_t q = 0;
+			while (q < n && s[k + q] &&
+			       tolower((unsigned char)s[k + q]) == tolower((unsigned char)name[q]))
+				q++;
+			if (q == n)
+				break;
+		}
+		if (!s[k])
+			continue;              /* no match in this entry */
+		if (hit && hit != m)
+			return NULL;           /* ambiguous */
+		hit = m;
+	}
+	return hit;
 }
 
 const mc_flag *mc_flags(const mc_model *m, size_t *n)

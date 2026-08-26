@@ -113,10 +113,45 @@ typedef struct {
 	uint16_t wcount;   /* W-5 write counter byte; 0 = this model has no measured one    */
 	uint8_t wcount_clr;/* bits the original clears when it writes (EZA 9 clears bit 7)  */
 	const char *about; /* which radios this describes, for --list-models               */
+	/* The ident prefix the ORIGINAL 1987/89 software requires of a radio of this model, exactly
+	 * as the literal appears in that software.  Informational only -- mcprog does NOT enforce
+	 * it, and must not: a real EVA answers `EV9.01.00.11' and the 1987 Standard build refuses
+	 * it, which is a limitation of that software and not of the radio.  See `storno' below for
+	 * why this is recorded at all.  NULL = not established for this model. */
+	const char *rss_ident;
+	/* Storno sold these radios rebadged as the CQM 5500 series, and its programmer is the same
+	 * program relocated -- same wire protocol, same codeplug, byte-identical traffic.  So there
+	 * is no `storno' MODEL: this is the name the Storno software shows for the SAME model, taken
+	 * verbatim from STORNO.COM's own table, so an owner of a CQM 5500 can find their radio.
+	 * NULL = that line did not cover this model. */
+	const char *storno;
 } mc_model;
 
 const mc_model *mc_model_by_name(const char *name);
 const mc_model *mc_model_by_index(size_t i); /* NULL past the end; for enumeration */
+
+/* The model whose Storno CQM 5500 name matches, case-insensitively and on any unique substring.
+ * NULL if nothing matches or the substring is ambiguous. */
+const mc_model *mc_model_by_storno(const char *name);
+
+/* ---- factory defaults, for creating a codeplug without a radio -------------------------------
+ *
+ * A blank image is NOT a codeplug: the original software's INITIALIZE writes a great many bytes
+ * this project has never mapped, and a file built only from the fields mcprog understands would be
+ * wrong in ways nothing here could detect.  So `--new' does what the repair build does -- it starts
+ * from a genuine factory default -- and those defaults are CAPTURES of that build's output, taken
+ * off the wire (tools/eza.py default_codeplug(); doc/EEPROM_MAP_EZA.md).  Where no capture exists,
+ * mcprog says so rather than inventing one. */
+typedef struct {
+	const char *model;
+	int band;          /* the RF range chosen at INITIALIZE; 0 = this capture carries no choice */
+	const uint8_t *bytes;
+	size_t len;
+	const char *note;
+} mc_default;
+
+const mc_default *mc_default_by_index(size_t i);          /* NULL past the end */
+const mc_default *mc_default_find(const char *model, int band);
 
 /* Largest device this tool handles, so callers can size a buffer without allocating. */
 #define MC_IMG_MAX 1024

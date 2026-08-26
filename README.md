@@ -18,16 +18,57 @@ mcprog --port DEV --write f.DAT --enable-write  write a file to the radio
 mcprog --selftest report.md                     probe a radio and write a report
 mcprog --dump-vec file.DAT                      conformance decode of a file
 mcprog --list-models                            models compiled into this build
+mcprog --new MODEL [--band N] FILE              create a codeplug from scratch, no radio needed
+mcprog --list-defaults                          the factory defaults --new can create from
 ```
 
 | option | effect |
 |---|---|
-| `--model NAME` | override model detection |
+| `--model NAME` | override model detection; also accepts a Storno CQM 5500 name, or any unique fragment of one |
 | `--log FILE` | record the wire in `.trace` format (with `--port`) |
 | `--backup FILE` | name the pre-write backup; default is a timestamped file in the working directory, never overwritten |
 | `--baud N` | default 1200; `0` leaves the port speed alone |
 | `--no-line-setup` | skip the 1.8 s DTR/RTS opening sequence (`--no-modem-init` is a legacy alias) |
 | `--enable-write` | permit writing; without it no write path exists |
+
+### Working without a radio
+
+Everything file-side works with no radio attached — `mcprog FILE` edits, `--dump-vec FILE` decodes —
+and a codeplug can be created from nothing:
+
+```
+mcprog --list-defaults                          # what is available
+mcprog --new eza_sel5 --band 3 new.DAT          # create it
+mcprog new.DAT                                  # edit it
+```
+
+`--new` starts from a **genuine factory default**, the way the repair software's `INITIALIZE` does,
+not from a blank buffer. Those defaults were captured off the wire from that software, so what
+`--new` writes is byte-identical to what it produced in 1987. That matters because a codeplug holds
+many bytes this project has never mapped: an image assembled from only the understood fields would
+be wrong undetectably, and the radio would accept it.
+
+Where no default has been captured — both Radius M110s — `--new` says so and lists the alternatives
+rather than inventing one. It refuses to overwrite an existing file without `--force`, and refuses
+to be combined with any option that touches a radio.
+
+### Storno CQM 5500
+
+Storno resold these radios rebadged, and its programmer is the Motorola one **relocated, not
+rewritten**. Driven side by side, the two put byte-identical traffic on the wire. So there is no
+separate Storno model — `--list-models` shows Storno's own name against each MC micro model, and
+`--model` accepts it:
+
+```
+mcprog --model "CQM5500 EZA 9, SELECT 5" file.DAT     # resolves to eza_sel5
+mcprog --model "eza 1/3" file.DAT                     # a unique fragment is enough
+mcprog --model "CQM5500" file.DAT                     # refused: matches several
+```
+
+`--list-models` also shows the ident each radio's *original* software demands. MCprog records it and
+does not enforce it, because that rule is demonstrably too narrow: a real EVA answers
+`EV9.01.00.11`, and the 1987 Standard build rejects it as `INVALID TYPE` while the Master and Repair
+builds of the same version read it without complaint.
 
 ## What works
 

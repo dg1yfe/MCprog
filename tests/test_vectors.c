@@ -779,6 +779,7 @@ static void test_m110(void)
 		int mirrored;
 	} R[] = {
 		{ "fixtures/m110_cspl_radio.bin",    "m110_cspl", "EZA", 12, 254, 438612500u, 1 },
+		{ "fixtures/m110_cspl_2m_radio.bin", "m110_cspl", "EZA",  7,  80, 144800000u, 1 },
 		{ "fixtures/m110_sel5_radio.bin",    "m110_sel5", "EZ9", 15, 254, 439987500u, 0 },
 		{ "fixtures/m110_sel5_2m_radio.bin", "m110_sel5", "EZ9",  7,  80, 144800000u, 0 },
 	};
@@ -912,6 +913,49 @@ static void test_m110(void)
 			ok(mc_channel_pl_enc(&img, 0) == 0, "K-14a", "  and reports none");
 		}
 		free(b);
+	}
+
+	/* K-20: the band field is the same field on BOTH variants, and it is not 0x12.
+	 *
+	 * This is what the 2 m CSQ/PL image is here for.  Until it was checked in, every CSQ/PL
+	 * fixture was 70 cm, so "0x12 is the band byte" fitted the CSQ/PL evidence perfectly -- it
+	 * reads 0x50 on 70 cm and 0x32 on 2 m across both of those radios.  It is 0x00 on both Sel 5
+	 * radios INCLUDING the 2 m one, which is the case that has to read 0x32 for the rule to be
+	 * general.  What survives all four is 0x00A & 0x0F: the two 2 m radios agree on band 7 and
+	 * P 80 across the variant boundary, while their 0x12 bytes disagree. */
+	{
+		static const char *const TWO_M[] = { "fixtures/m110_cspl_2m_radio.bin",
+		                                     "fixtures/m110_sel5_2m_radio.bin" };
+		int band[2], p[2], b12[2], got = 0;
+		size_t k2;
+		for (k2 = 0; k2 < 2; k2++) {
+			size_t len = 0;
+			uint8_t *b = (uint8_t *)slurp(TWO_M[k2], &len);
+			mc_image img;
+			if (!b || len != 256) {
+				free(b);
+				continue;
+			}
+			img.model = mc_model_detect(b, len, NULL, 0);
+			img.bytes = b;
+			img.len = len;
+			if (img.model) {
+				band[got] = mc_band_index(&img);
+				p[got] = (int)mc_band_p_of(&img);
+				b12[got] = b[0x12];
+				got++;
+			}
+			free(b);
+		}
+		if (got == 2) {
+			ok(band[0] == band[1] && p[0] == p[1], "K-20",
+			   "both 2 m radios give the same band index and P across the variant boundary");
+			ok(band[0] == 7 && p[0] == 80, "K-20", "  and that band is 7, P 80");
+			ok(b12[0] != b12[1], "K-20",
+			   "  while their 0x12 bytes DISAGREE -- so 0x12 is not the band field");
+		} else {
+			failf("K-20", "the two 2 m M110 fixtures did not both load");
+		}
 	}
 
 	/* K-20: the MC micro models must not claim M110 bytes, and vice versa.  Before the marker

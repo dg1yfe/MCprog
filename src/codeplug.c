@@ -102,7 +102,24 @@ size_t mc_write_len(const mc_image *img)
 	return n > img->len ? img->len : n;
 }
 
-/* ---- band, K-10 ----------------------------------------------------------------------------- */
+/* ---- band, K-10 -----------------------------------------------------------------------------
+ *
+ * `P' IS PROGRAMMER-SIDE ARITHMETIC, AND THE RADIO HAS NO EQUIVALENT.  Worth stating, because
+ * `doc/EZA33_FIRMWARE.md' 7f records that the EVA firmware NEVER fetches codeplug 0x0DC -- no
+ * eep_Read call in that ROM takes it as an address -- which reads at first like a contradiction of
+ * this file using it to choose P.
+ *
+ * It is not.  The radio never converts hertz to anything: it hands the channel's packed 3-byte word
+ * to the synthesiser, whose N/A divider split IS that word's format, and takes its reference
+ * divider from 0x0D4/0x0D6.  P -- the coarse multiplier in (coarse * P + fine) * step -- exists
+ * only to turn that packed word into a frequency a person can read, and back.  That is a job only
+ * the programmer has, so a byte only the programmer reads is exactly right.
+ *
+ * The confusion came from a numeric collision: codeplug offset 0x0DC and the radio's RAM address
+ * $00DC are the same number and mean different things.  $00DC is where the firmware CACHES the
+ * reference dividers before shifting them to the PLL (F9D4 eep_Read -> F9D7 LDX #$00DC -> F9DC
+ * pll_Write), which is what made one instruction look like an EEPROM fetch of the band byte.
+ */
 
 int mc_band_index(const mc_image *img)
 {

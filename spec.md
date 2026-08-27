@@ -442,6 +442,20 @@ The fix is **arithmetic, not `tcdrain`**, which is what P-31 warned about above:
 > no cooperation from the adapter, and it is the same answer on every port on every platform. It is
 > what `drain()` does.
 
+> **The margin is load-bearing, measured on a TX↔RX loopback.** With the FT232's pins bridged, a
+> 135-byte frame at 1200 baud gives, reproducibly over five runs:
+>
+> | | bytes visible |
+> |---|---|
+> | at the bare floor, 1125 ms | **133 of 135** |
+> | at floor + margin, 1139 ms | **135 of 135** |
+>
+> The bare arithmetic is about **two bytes short** — 16.7 ms, which is suspiciously close to the
+> FT232's 16 ms receive latency timer, so this is probably the RX path reporting late rather than
+> the transmission finishing late. The two were **not** separated, and for this purpose they need
+> not be: what the ACK clock must not do is start before the PC could see a reply, and 1139 ms is
+> where the whole frame is reliably visible. **[C]**
+
 The floor is padded rather than exact: **+3 ms and +1 %**. Overshooting is free — a reply arriving
 during the wait is buffered by the kernel and reading it late costs nothing — while undershooting
 comes straight out of `MC_T_ACK1`, which is the defect itself. The fixed part covers the transfer

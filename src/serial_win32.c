@@ -115,8 +115,11 @@ static int sr_drain(mc_transport *t)
 {
 	serial *s = (serial *)t;
 	unsigned now = sr_now(t);
-	if (s->baud && now < s->wire_free_ms)
+	/* Against the deadline, as on POSIX, so timer granularity cannot undershoot the floor. */
+	while (s->baud && now < s->wire_free_ms) {
 		Sleep(s->wire_free_ms - now);
+		now = sr_now(t);
+	}
 	return 0;
 }
 

@@ -425,6 +425,20 @@ it. It cannot block, cannot hang, and cannot be lied to. The speed charged is th
 requested, else the port's actual speed (so `--baud 0` is not a silent hole), except on a pty, which
 has no wire and is charged nothing.
 
+> **The wait itself has to survive signals, and only half of that is verified.** `nanosleep` returns
+> `EINTR` with the unslept remainder in `rem`, and discarding it — passing `NULL` — silently
+> shortens the wait, which is the very failure this rule exists to prevent. `nap_ms` now consumes
+> `EINTR` and retries on the remainder.
+>
+> `drain()` does not actually depend on that, because it loops against a **deadline** and
+> re-corrects; putting the `nanosleep(&ts, NULL)` bug back leaves the floor test passing. Removing
+> **both** guards makes it return after **65 ms** instead of 1125, and the test catches that. **[C]**
+>
+> **The delays that do depend on it are P-12's 500 ms and 1300 ms**, which run straight through with
+> no loop — a signal there shortens the `#NMI` pulse the radio sees and nothing downstream notices.
+> That is **not verified**, and cannot be on a pty: `pulse_rts` opens with `ioctl(TIOCMSET)`, which
+> fails on a pty before either delay is reached. It needs a port with real control lines. **[?]**
+
 **P-32** Exactly **one** retry, of the attention phase only. **No retry** around read, write or
 verify — fail loudly. An automatic retry mid-write is how a glitch becomes a half-written EEPROM.
 **[S]**

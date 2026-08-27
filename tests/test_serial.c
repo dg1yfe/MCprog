@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #if defined(__APPLE__) || defined(__FreeBSD__)
@@ -229,6 +230,9 @@ static void test_port_config(void)
  * is asserted here is the CONTRACT that makes it impossible: drain() exists, and it does not return
  * before the wire could physically be free.  A transport that loses drain, or one whose drain
  * trusts a driver that lies (every USB-serial adapter), fails this. */
+static volatile sig_atomic_t ticks;
+static void tick(int sig) { (void)sig; ticks++; }
+
 static void test_drain_floor(void)
 {
 	int master, slave;
@@ -276,11 +280,63 @@ static void test_drain_floor(void)
 		   "drain() waits out the frame it was handed, not the write() call");
 		if (dt + 20 < want)
 			failf("P-31d", "drain returned after %u ms; the frame needs %u ms", dt, want);
+
+		/* And again with signals landing in the middle of it.  nanosleep hands back the
+		 * remainder on EINTR and the first version of this discarded it, so a stray SIGCHLD --
+		 * which this program generates itself, forking fake radios -- silently shortened the
+		 * wait.  A floor that a signal can undercut is not a floor. */
+		{
+			struct itimerval iv;
+			struct sigaction sa, old;
+			memset(&sa, 0, sizeof sa);
+			sa.sa_handler = tick;      /* a real handler, so the sleep is interrupted */
+			sigaction(SIGALRM, &sa, &old);
+			ticks = 0;
+			iv.it_value.tv_sec = 0;
+			iv.it_value.tv_usec = 60000;    /* first at 60 ms */
+			iv.it_interval.tv_sec = 0;
+			iv.it_interval.tv_usec = 60000; /* and every 60 ms after */
+			setitimer(ITIMER_REAL, &iv, NULL);
+
+			t0 = t->now_ms(t);
+			if (t->send(t, frame, sizeof frame) != 0 || t->drain(t) != 0)
+				failf("P-31d", "send/drain under signals failed: %s", t->err);
+			dt = t->now_ms(t) - t0;
+
+			memset(&iv, 0, sizeof iv);
+			setitimer(ITIMER_REAL, &iv, NULL);
+			sigaction(SIGALRM, &old, NULL);
+
+			ok(ticks > 1, "P-31d", "the drain really was interrupted, repeatedly");
+			ok(dt + 20 >= want, "P-31d",
+			   "and it still waited out the frame -- EINTR cannot shorten the floor");
+			if (dt + 20 < want)
+				failf("P-31d", "under signals drain returned after %u ms, needs %u (%d hits)",
+				      dt, want, ticks);
+		}
 	}
 	mc_serial_close(t);
 	close(master);
 	close(slave);
 }
+
+/* ---- P-12/P-27 line-settling delays under signals: NOT TESTABLE HERE ------------------------
+ *
+ * There is deliberately no test for this, and the reason is worth writing down rather than leaving
+ * as an absence.
+ *
+ * mc_serial_rearm() -> pulse_rts() opens with ioctl(TIOCMSET), which FAILS on a pty -- correctly,
+ * since a pty has no modem control lines -- and returns before reaching either nap_ms().  So the
+ * 500 ms and 1300 ms delays cannot be exercised on the only port a test has.  A test written
+ * against a pty measures 0 ms and 0 signals: it would pass or fail for reasons unrelated to the
+ * property, which is worse than no test.
+ *
+ * The property still matters.  Unlike the P-31d floor -- which loops against a deadline and
+ * re-corrects, and was shown to survive the nanosleep(&ts, NULL) bug being put back -- the arming
+ * delays run straight through with no loop, so a signal landing mid-sleep shortens the #NMI pulse
+ * the radio sees and nothing downstream notices.  That is why nap_ms() consumes EINTR and retries
+ * on the remainder.  Verifying it needs a port with real control lines.
+ */
 
 /* ---- a full read and write session over the pty --------------------------------------------- */
 

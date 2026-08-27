@@ -70,12 +70,23 @@ static unsigned elapsed_ms(const struct timespec *t0)
 	                  (now.tv_nsec - t0->tv_nsec) / 1000000);
 }
 
+/* Sleep the WHOLE interval, signals included.
+ *
+ * nanosleep returns EINTR with the remainder untouched in `rem' when a signal lands, and discarding
+ * that -- passing NULL, as this did -- silently shortens the wait.  Every caller here is one where
+ * short is wrong: the two P-12 line-settling delays, and the P-31d wire-time floor, where cutting
+ * the wait is precisely the bug the floor exists to prevent.  A stray SIGCHLD or SIGWINCH must not
+ * be able to reintroduce it. */
 static void nap_ms(unsigned ms)
 {
-	struct timespec ts;
+	struct timespec ts, rem;
 	ts.tv_sec = ms / 1000;
 	ts.tv_nsec = (long)(ms % 1000) * 1000000L;
-	nanosleep(&ts, NULL);
+	while (nanosleep(&ts, &rem) != 0) {
+		if (errno != EINTR)
+			break;
+		ts = rem;
+	}
 }
 
 /* P-12, and the one thing that puts a radio into programming mode: everything down for 500 ms, then
@@ -141,9 +152,9 @@ static int sr_send(mc_transport *t, const uint8_t *buf, size_t n)
 	return 0;
 }
 
-/* Block until the kernel's output queue is empty -- see mc_transport.drain (P-31d).  write() on a
- * tty returns once the bytes are buffered, so without this the caller's timeout starts more than a
- * second before a 135-byte frame reaches a 1200-baud radio. */
+/* Wait until the bytes already handed to send() can physically be off the wire -- mc_transport.drain
+ * (P-31d).  write() on a tty returns once the bytes are BUFFERED, so without this the caller's
+ * timeout starts more than a second before a 135-byte frame reaches a 1200-baud radio. */
 static int sr_drain(mc_transport *t)
 {
 	serial *s = (serial *)t;
@@ -162,8 +173,13 @@ static int sr_drain(mc_transport *t)
 	 * less than n * 10 / b seconds.  sr_send accumulates that per frame and clamps it forward to
 	 * the current time, so a port that really is busy is tracked and one that is idle costs
 	 * nothing.  It cannot block, cannot hang, and cannot be lied to. */
-	if (s->baud && now < s->wire_free_ms)
+	/* Against the DEADLINE, not a single sleep: re-reading the clock each time absorbs both timer
+	 * granularity and any sleep that still came back early.  The floor is only worth having if it
+	 * is never undershot. */
+	while (s->baud && now < s->wire_free_ms) {
 		nap_ms(s->wire_free_ms - now);
+		now = elapsed_ms(&s->t0);
+	}
 	return 0;
 }
 

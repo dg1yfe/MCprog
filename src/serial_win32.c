@@ -46,6 +46,19 @@ typedef struct {
 
 /* 1 start + 8 data + 1 stop; parity rides in bit 7 by software, so there is no ninth bit. */
 #define SR_BITS_PER_BYTE 10
+/* The floor is a LOWER bound, and overshooting it is FREE while undershooting is not.  A reply that
+ * arrives during the wait is buffered by the kernel, so reading it late costs nothing; a wait that
+ * ends early spends the difference out of MC_T_ACK1, which is the whole defect.  So the bound is
+ * padded, asymmetrically and on purpose:
+ *
+ *   - a fixed part, for the transfer crossing the link before the adapter starts shifting at all
+ *     (full-speed USB schedules on 1 ms boundaries, and there is a hub in the path here);
+ *   - a proportional part, for baud generators whose divisor is not exact.  FT232 at 1200 is exact;
+ *     not every bridge and not every rate is.
+ */
+#define SR_WIRE_MARGIN_MS  3
+#define SR_WIRE_MARGIN_PCT 1
+
 
 void mc_serial_defaults(mc_serial_opts *o)
 {
@@ -97,6 +110,7 @@ static int sr_send(mc_transport *t, const uint8_t *buf, size_t n)
 	if (s->baud) {
 		unsigned now = sr_now(t);
 		unsigned busy = (unsigned)((n * SR_BITS_PER_BYTE * 1000ul + s->baud - 1) / s->baud);
+		busy += SR_WIRE_MARGIN_MS + busy * SR_WIRE_MARGIN_PCT / 100;
 		if (s->wire_free_ms < now)
 			s->wire_free_ms = now;
 		s->wire_free_ms += busy;

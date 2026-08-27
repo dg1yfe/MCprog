@@ -335,7 +335,15 @@ static void test_drain_floor(void)
  * re-corrects, and was shown to survive the nanosleep(&ts, NULL) bug being put back -- the arming
  * delays run straight through with no loop, so a signal landing mid-sleep shortens the #NMI pulse
  * the radio sees and nothing downstream notices.  That is why nap_ms() consumes EINTR and retries
- * on the remainder.  Verifying it needs a port with real control lines.
+ * on the remainder.
+ *
+ * It IS verified, just not from here: tests/hwprobe.c does it against a port with real control
+ * lines and no radio attached --
+ *
+ *     make hwprobe PORT=/dev/cu.usbserial-XXXX
+ *
+ * On an FTDI FT232 the arming sequence takes 1809 ms under a signal every 70 ms, and 140 ms with
+ * the EINTR bug restored.  A 13x shortened #NMI pulse, measured rather than argued.
  */
 
 /* ---- a full read and write session over the pty --------------------------------------------- */

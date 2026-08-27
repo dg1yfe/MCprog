@@ -98,8 +98,14 @@ still receiving **byte 48 of 135**. No radio could have answered inside it. Ever
 sessions worked, because a read command is 7 bytes and takes 58 ms; that asymmetry is the signature.
 
 `drain()` now holds the ACK clock until the frame can physically be gone. It is computed from bytes
-and baud rather than asked of `tcdrain`, which a USB-serial bridge answers from its own queue and not
-the adapter's FIFO — and which was measured blocking for two seconds on a pty.
+and baud rather than asked of `tcdrain` — and that choice is measured, not assumed. On an FTDI FT232
+at 1200 baud, where a 135-byte frame needs **1125 ms**, `tcdrain()` returned after **0.1 ms**, and
+`TIOCOUTQ` called a 4.3-second transmission finished after 506 ms. The kernel is blind past the USB
+boundary; the arithmetic is not. `drain()` measured **1128 ms** on the same port.
+
+Run the port-side checks yourself, no radio needed:
+
+    make hwprobe PORT=/dev/cu.usbserial-XXXX
 
 Still untested on hardware. What that run must also settle is whether the radio fell silent after the
 frame: the old traces cannot say, because discarded bytes were not logged. That is fixed too.

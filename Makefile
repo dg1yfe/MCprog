@@ -68,6 +68,15 @@ build/test_write: tests/test_write.c $(OBJ) $(HDRS) | build
 build/test_serial: tests/test_serial.c $(OBJ) $(HDRS) | build
 	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LIBUTIL)
 
+# Needs a serial PORT but no radio and no write: the two properties a pty cannot check.
+#   make hwprobe PORT=/dev/cu.usbserial-XXXX
+build/hwprobe: tests/hwprobe.c $(OBJ) $(HDRS) | build
+	$(CC) $(CFLAGS) $(filter %.c %.o,$^) -o $@ $(LDFLAGS) $(LIBUTIL)
+
+hwprobe: build/hwprobe
+	@test -n "$(PORT)" || { echo "usage: make hwprobe PORT=/dev/cu.usbserial-XXXX"; exit 2; }
+	@./build/hwprobe $(PORT)
+
 test: build/test_vectors build/test_protocol build/test_serial build/test_write
 	@./build/test_vectors $(ROOT)
 	@./build/test_protocol $(ROOT)

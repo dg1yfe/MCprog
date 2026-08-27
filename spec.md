@@ -416,6 +416,40 @@ The fix is **arithmetic, not `tcdrain`**, which is what P-31 warned about above:
 - On a **USB-serial bridge** (FTDI, CH340, CP210x, PL2303) the driver knows its own queue and not
   the adapter's FIFO, so `tcdrain` can return while the frame is still going out beyond the USB
   link — reintroducing this bug invisibly, on exactly the hardware most people now use.
+
+  **Measured on an FTDI FT232 (`0403:6001`), macOS, behind a USB-C hub, at 1200 baud. It is not a
+  small error — the kernel is simply blind past the USB boundary. [C]**
+
+  | | 135-byte frame | 512-byte frame |
+  |---|---|---|
+  | the wire needs | **1125 ms** | **4267 ms** |
+  | `write()` returned after | 0.0 ms | 0.1 ms |
+  | **`tcdrain()` returned after** | **0.1 ms** | **0.1 ms** |
+  | `TIOCOUTQ` reported empty after | — | **506 ms** |
+  | `drain()`, computing the floor | **1128 ms** ✓ | — |
+
+  `tcdrain` waited for **nothing at all**, and `TIOCOUTQ` — the other obvious way to ask — calls a
+  4.3-second transmission finished after half a second. Had the `tcdrain` version shipped, P-31d
+  would have been **entirely unfixed on this adapter**, failing identically and looking like the
+  radio again.
+
+> **Why not detect the port type and use `tcdrain` on a real UART?** Because there is nothing to
+> win. On a genuine 8250/16550 `tcdrain` returns when the shift register empties — which is the same
+> instant the arithmetic predicts, since the arithmetic *is* the physics of the line. The two agree
+> by construction, so a detected switch would buy a few milliseconds of precision at 1200 baud and
+> cost a second code path that only runs on some machines. That is the worst possible shape for code
+> guarding a bug whose failure mode is invisible.
+>
+> It is also genuinely hard: `ioctl(TIOCGSERIAL)` and `serial_struct.type` on Linux, an IOKit
+> property walk on macOS, SetupAPI on Windows — three unrelated best-effort APIs, each having to
+> fail open. The margin below covers the same ground for none of that cost.
+
+The floor is padded rather than exact: **+3 ms and +1 %**. Overshooting is free — a reply arriving
+during the wait is buffered by the kernel and reading it late costs nothing — while undershooting
+comes straight out of `MC_T_ACK1`, which is the defect itself. The fixed part covers the transfer
+crossing the link before the adapter starts shifting; the proportional part covers baud generators
+whose divisor is not exact. On the FT232 at 1200 baud the 135-byte frame is charged **1139 ms**
+against a physical 1125.
 - On a **pty** it was measured **blocking for 2 s**, long enough for the peer in `test_serial.c` to
   hit its idle timeout and exit, so the ACK never came at all. **[C]**
 
@@ -436,8 +470,12 @@ has no wire and is charged nothing.
 >
 > **The delays that do depend on it are P-12's 500 ms and 1300 ms**, which run straight through with
 > no loop — a signal there shortens the `#NMI` pulse the radio sees and nothing downstream notices.
-> That is **not verified**, and cannot be on a pty: `pulse_rts` opens with `ioctl(TIOCMSET)`, which
-> fails on a pty before either delay is reached. It needs a port with real control lines. **[?]**
+>
+> **Measured, 27 Aug 2026, and it was not theoretical.** `make hwprobe PORT=…` on an FTDI FT232
+> with a `SIGALRM` every 70 ms: arming takes **1809 ms** with **25 signals** delivered. With the
+> `nanosleep(&ts, NULL)` bug put back it takes **140 ms** — a **13× shortened `#NMI` pulse**, which
+> is the one thing that puts the radio into programming mode. Under a signal storm arming would
+> have silently failed, and the radio would simply have looked dead. **[C]**
 
 **P-32** Exactly **one** retry, of the attention phase only. **No retry** around read, write or
 verify — fail loudly. An automatic retry mid-write is how a glitch becomes a half-written EEPROM.

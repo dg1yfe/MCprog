@@ -89,13 +89,20 @@ radio on a pseudo-terminal, and the original software under emulation.
 ### Writing has never succeeded on a radio
 
 The write path is complete, gated and tested against a simulated radio, but no byte has ever reached
-real hardware. Four attempts failed with `no first ACK`. The frame was well formed — exactly the 135
-bytes the protocol specifies — and nothing came back.
+real hardware. Eight sessions across four radios failed with `no first ACK`, identically.
 
-The cause is known and is not the write path: **the end-of-memory NAK ends the session.** After a
-radio answers that NAK it stops responding to everything, including the identify command, so a write
-issued after a full read goes to a radio that is already deaf. Measured on every radio tested so far,
-across nine runs. The selftest now exercises the write path *before* walking the EEPROM. Untested.
+**The cause was this program, and it was arithmetic** (`spec.md` P-31d). `send()` returns when the
+kernel has *buffered* the frame, not when it has left. A write frame is 135 bytes; at 1200 baud that
+is **1125 ms on the wire**, and `MC_T_ACK1` is **400 ms** — so the window shut while the radio was
+still receiving **byte 48 of 135**. No radio could have answered inside it. Every read in the same
+sessions worked, because a read command is 7 bytes and takes 58 ms; that asymmetry is the signature.
+
+`drain()` now holds the ACK clock until the frame can physically be gone. It is computed from bytes
+and baud rather than asked of `tcdrain`, which a USB-serial bridge answers from its own queue and not
+the adapter's FIFO — and which was measured blocking for two seconds on a pty.
+
+Still untested on hardware. What that run must also settle is whether the radio fell silent after the
+frame: the old traces cannot say, because discarded bytes were not logged. That is fixed too.
 
 That behaviour may not be universal: a disassembled EVA radio firmware returns to its command loop
 after sending the NAK rather than going deaf. No EVA has been tested, so the recovery path stays.

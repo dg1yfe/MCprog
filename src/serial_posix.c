@@ -46,8 +46,14 @@ typedef struct {
 	int fd;
 	int owned;
 	int sw_parity;
+	unsigned baud;         /* 0 = unknown, so the wire-time floor cannot be computed */
+	unsigned wire_free_ms; /* earliest this transport's clock can show an empty shift register */
 	struct timespec t0;
 } serial;
+
+/* 1 start + 8 data + 1 stop.  PARENB is cleared -- parity is carried in bit 7 by software (P-10)
+ * -- so there is no ninth bit on the wire. */
+#define SR_BITS_PER_BYTE 10
 
 void mc_serial_defaults(mc_serial_opts *o)
 {
@@ -123,6 +129,41 @@ static int sr_send(mc_transport *t, const uint8_t *buf, size_t n)
 		}
 		off += (size_t)w;
 	}
+	/* Record when these bytes can physically be gone.  write() returned as soon as the kernel
+	 * buffered them; the wire is busy for another n * 10 / baud seconds.  See sr_drain. */
+	if (s->baud) {
+		unsigned now = elapsed_ms(&s->t0);
+		unsigned busy = (unsigned)((n * SR_BITS_PER_BYTE * 1000ul + s->baud - 1) / s->baud);
+		if (s->wire_free_ms < now)
+			s->wire_free_ms = now;
+		s->wire_free_ms += busy;
+	}
+	return 0;
+}
+
+/* Block until the kernel's output queue is empty -- see mc_transport.drain (P-31d).  write() on a
+ * tty returns once the bytes are buffered, so without this the caller's timeout starts more than a
+ * second before a 135-byte frame reaches a 1200-baud radio. */
+static int sr_drain(mc_transport *t)
+{
+	serial *s = (serial *)t;
+	unsigned now = elapsed_ms(&s->t0);
+
+	/* Arithmetic, deliberately, and NOT tcdrain.
+	 *
+	 * tcdrain is the obvious call and it was tried first.  Two things are wrong with it.  On a
+	 * USB-serial adapter (FTDI, CH340, CP210x, PL2303) the kernel driver knows its own queue but
+	 * not the adapter's internal FIFO, so tcdrain can return while the frame is still being
+	 * shifted out beyond the USB link -- reintroducing the very error P-31d is about, invisibly.
+	 * And on a pty it was measured BLOCKING for two seconds, long enough for the peer in
+	 * tests/test_serial.c to hit its idle timeout and exit, so the ACK never came at all.
+	 *
+	 * The floor needs neither driver nor kernel to be honest: n bytes at b baud cannot leave in
+	 * less than n * 10 / b seconds.  sr_send accumulates that per frame and clamps it forward to
+	 * the current time, so a port that really is busy is tracked and one that is idle costs
+	 * nothing.  It cannot block, cannot hang, and cannot be lied to. */
+	if (s->baud && now < s->wire_free_ms)
+		nap_ms(s->wire_free_ms - now);
 	return 0;
 }
 
@@ -171,6 +212,26 @@ static int sr_recv(mc_transport *t, uint8_t *buf, size_t n, unsigned timeout_ms)
 	return (int)got;
 }
 
+/* speed_t is an opaque encoding, so it has to be mapped back to a number to cost a byte in
+ * milliseconds.  Anything unrecognised returns 0, which disables the floor rather than guessing:
+ * a wrong floor would be worse than none, since it would silently shorten the ACK window again. */
+static unsigned speed_to_baud(speed_t sp)
+{
+	switch (sp) {
+	case B300:    return 300;
+	case B600:    return 600;
+	case B1200:   return 1200;
+	case B2400:   return 2400;
+	case B4800:   return 4800;
+	case B9600:   return 9600;
+	case B19200:  return 19200;
+	case B38400:  return 38400;
+	case B57600:  return 57600;
+	case B115200: return 115200;
+	default:      return 0;
+	}
+}
+
 static int configure(serial *s, const mc_serial_opts *o, char *err, size_t errsz)
 {
 	struct termios tio;
@@ -201,6 +262,21 @@ static int configure(serial *s, const mc_serial_opts *o, char *err, size_t errsz
 		snprintf(err, errsz, "tcsetattr: %s", strerror(errno));
 		return -1;
 	}
+	/* What speed to charge the wire-time floor at (P-31d).
+	 *
+	 * An explicitly requested baud wins: the caller is stating what the wire runs at.  Otherwise
+	 * -- `--baud 0', which exists to leave the port alone -- ask the port, because leaving the
+	 * speed alone must not silently mean leaving the floor off; that is how P-31d would return.
+	 *
+	 * A pty is the exception and gets no floor at all: it has no wire, delivers at memory speed,
+	 * and its termios speed is a fiction.  Charging it wire time makes the client sleep past
+	 * acknowledgements the peer already sent, which shows up as a burn gap (P-31a) of zero. */
+	if (o->baud)
+		s->baud = o->baud;
+	else if (ptsname(s->fd) != NULL)
+		s->baud = 0;
+	else
+		s->baud = speed_to_baud(cfgetospeed(&tio));
 	tcflush(s->fd, TCIOFLUSH);
 
 	/* P-27: NO pulse here.  The 1987 software has no persistent "open" -- it runs ser_OpenLine
@@ -280,6 +356,7 @@ static mc_transport *wrap(int fd, int owned, const mc_serial_opts *o, char *err,
 		o = &def;
 	}
 	s->t.send = sr_send;
+	s->t.drain = sr_drain;
 	s->t.recv = sr_recv;
 	s->t.now_ms = sr_now;
 	/* NULL when the user said --no-line-setup, so the AUTOMATIC arming in mc_session_arm() does

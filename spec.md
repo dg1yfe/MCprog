@@ -362,6 +362,17 @@ that `tcdrain`/`FlushFileBuffers` on a USB bridge does not reliably mean "on the
 the observed 130/710 ms exactly is not achievable — the *ordering* requirement of P-25 is what is
 absolute. **[S]**
 
+**P-25a The radio's state after a failed write is itself a measurement.** A write that fails can mean
+the record was refused or that the radio left programming mode entirely, and those want different
+answers. The selftest asks `*` afterwards, and if that is silent runs the P-27 arming sequence and
+asks again, recording which of the three happened: survived, recovered in band, or needs hands on the
+radio. **[C]**
+
+**P-25b A frame of write length that is not a write.** Same 135 bytes, same address, same payload —
+the radio's own bytes — but a command letter nothing handles. If the session dies on this too then
+**length** is what the radio cannot survive; if it survives, the objection is to being told to write.
+One frame, and it separates two hypotheses that the write probe alone cannot. **[C]**
+
 **P-31a The burn is a timed loop, and its duration is derivable.** The radio does not poll the EEPROM
 for write completion; `eep_WriteByte` waits out a fixed delay per byte —
 `LDX #$0BF7 / DEX / BNE` = 3063 × 4 = **12252 cycles**, which at E = 4924800/4 = 1231200 Hz is
@@ -388,6 +399,31 @@ the record"** from **"it took the record and stopped partway through committing 
 between the two ACKs leaves an **unknown prefix of that record already committed**. Nothing undoes it.
 Error text must say so, and a failed write must be followed by a verifying read rather than a blind
 retry — this is the same reasoning as P-32's "no retry around write". **[S]**
+
+**P-31d The ACK clock starts when the frame has LEFT, and a driver may not be asked when that was.**
+P-31 already said "measured from completion of transmission". The implementation did not do it, and
+that divergence cost eight hardware sessions.
+
+`send()` returns when the kernel has *buffered* the frame. A write frame is 135 bytes; at 1200 baud,
+8 data bits inside a 10-bit character, that is **1125 ms on the wire**. `MC_T_ACK1` is **400 ms**. So
+the window closed while the radio was still receiving **byte 48 of 135**, and no radio could ever
+have answered inside it. Every read in the same sessions worked because a read command is 7 bytes —
+**58 ms** — and never came close to the limit. That asymmetry is the signature: four radios, eight
+sessions, every read fine and every write reporting `no first ACK`, identically. **[C]** **[S]**
+
+The fix is **arithmetic, not `tcdrain`**, which is what P-31 warned about above:
+
+- On a **USB-serial bridge** (FTDI, CH340, CP210x, PL2303) the driver knows its own queue and not
+  the adapter's FIFO, so `tcdrain` can return while the frame is still going out beyond the USB
+  link — reintroducing this bug invisibly, on exactly the hardware most people now use.
+- On a **pty** it was measured **blocking for 2 s**, long enough for the peer in `test_serial.c` to
+  hit its idle timeout and exit, so the ACK never came at all. **[C]**
+
+*n* bytes at *b* baud cannot leave in less than *n* × 10 / *b* seconds, whatever any driver claims.
+`send()` accumulates that per frame and clamps it forward to the current time; `drain()` sleeps to
+it. It cannot block, cannot hang, and cannot be lied to. The speed charged is the one explicitly
+requested, else the port's actual speed (so `--baud 0` is not a silent hole), except on a pty, which
+has no wire and is charged nothing.
 
 **P-32** Exactly **one** retry, of the attention phase only. **No retry** around read, write or
 verify — fail loudly. An automatic retry mid-write is how a glitch becomes a half-written EEPROM.

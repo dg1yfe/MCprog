@@ -79,6 +79,18 @@ struct mc_transport {
 	 * transport without control lines (replay, pty, fake radio), and callers must treat a NULL or
 	 * a failure as "nothing to do" rather than as an error. */
 	int (*rearm)(mc_transport *t);
+	/* OPTIONAL, may be NULL.  Block until every byte already handed to send() has actually left
+	 * the port.
+	 *
+	 * send() on a tty returns as soon as the kernel has BUFFERED the bytes, which at 1200 baud is
+	 * about 1.1 seconds before a 135-byte write frame reaches the radio.  Any timeout started
+	 * straight after send() is therefore measuring the local write() call, not the radio.  See
+	 * P-31d: this is why every hardware write attempt through 23 Aug 2026 reported "no first ACK"
+	 * -- the 400 ms window expired while the radio was still receiving byte 48 of 135.
+	 *
+	 * NULL on transports with no wire (replay, fake radio, pty), where send() is already
+	 * synchronous; callers treat NULL as "nothing to wait for". */
+	int (*drain)(mc_transport *t);
 	char err[160];
 };
 

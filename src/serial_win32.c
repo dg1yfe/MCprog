@@ -39,8 +39,13 @@ typedef struct {
 	mc_transport t; /* first member: a transport pointer casts back to this */
 	HANDLE h;
 	int sw_parity;
+	unsigned baud;         /* 0 = no wire time chargeable */
+	unsigned wire_free_ms; /* earliest this clock can show an empty shift register (P-31d) */
 	DWORD t0;
 } serial;
+
+/* 1 start + 8 data + 1 stop; parity rides in bit 7 by software, so there is no ninth bit. */
+#define SR_BITS_PER_BYTE 10
 
 void mc_serial_defaults(mc_serial_opts *o)
 {
@@ -87,6 +92,31 @@ static int sr_send(mc_transport *t, const uint8_t *buf, size_t n)
 		}
 		off += wrote;
 	}
+	/* P-31d: WriteFile returns once the driver has the bytes, so record when they can actually
+	 * be gone.  See sr_drain. */
+	if (s->baud) {
+		unsigned now = sr_now(t);
+		unsigned busy = (unsigned)((n * SR_BITS_PER_BYTE * 1000ul + s->baud - 1) / s->baud);
+		if (s->wire_free_ms < now)
+			s->wire_free_ms = now;
+		s->wire_free_ms += busy;
+	}
+	return 0;
+}
+
+/* mc_transport.drain -- see P-31d.  WriteFile on a COM handle returns once the bytes are in the
+ * driver's queue, exactly as write() does on a tty, so the same 1125 ms-frame / 400 ms-window
+ * mismatch applies here.
+ *
+ * Arithmetic, not FlushFileBuffers, for the reason the POSIX side does not use tcdrain: a
+ * USB-serial driver knows its own queue and not the adapter's FIFO, so the call can return while
+ * the frame is still going out.  n bytes at b baud cannot leave in under n * 10 / b seconds. */
+static int sr_drain(mc_transport *t)
+{
+	serial *s = (serial *)t;
+	unsigned now = sr_now(t);
+	if (s->baud && now < s->wire_free_ms)
+		Sleep(s->wire_free_ms - now);
 	return 0;
 }
 
@@ -191,6 +221,8 @@ mc_transport *mc_serial_open(const char *device, const mc_serial_opts *o, char *
 		pulse_rts(h);
 	s = calloc(1, sizeof *s);
 	s->t.send = sr_send;
+	s->t.drain = sr_drain;
+	s->baud = o->baud; /* a COM handle is never a pty, so the requested speed is the wire speed */
 	s->t.recv = sr_recv;
 	s->t.now_ms = sr_now;
 	s->h = h;

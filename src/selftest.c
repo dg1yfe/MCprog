@@ -149,12 +149,29 @@ static const struct linecase LINES[] = {
 	{ 1, 0, "DTR asserted,    RTS de-asserted" },
 };
 
+/* Wait, discarding whatever turns up -- and LOG what was discarded.
+ *
+ * This used to drop bytes silently, straight through t->recv, which never reaches the wire log.
+ * That left the capture unable to distinguish "the radio said nothing" from "the radio answered
+ * and we threw it away" -- and that is precisely the distinction the write investigation of 27 Aug
+ * 2026 turned on, with eight traces showing no RX after the write frame and no way to tell which
+ * of the two it was.  A discarded byte is still evidence. */
 static void nap(mc_transport *t, unsigned ms)
 {
 	unsigned end = t->now_ms(t) + ms;
 	uint8_t junk[16];
-	while (t->now_ms(t) < end)
-		t->recv(t, junk, sizeof junk, 50); /* drains as it waits, so stale bytes do not confuse */
+	while (t->now_ms(t) < end) {
+		int n = t->recv(t, junk, sizeof junk, 50);
+		if (n > 0 && R.trace) {
+			unsigned now = t->now_ms(t);
+			int i;
+			fprintf(R.trace, "DROP %-3d %-6u %-6u ", R.logseq++, now, now);
+			for (i = 0; i < n; i++)
+				fprintf(R.trace, "%02x", junk[i]);
+			fputc('\n', R.trace);
+			fflush(R.trace);
+		}
+	}
 }
 
 /* Try one combination.  On success the port is left OPEN and returned through `keep`, because
@@ -475,7 +492,7 @@ static void probe_decode(const uint8_t *img, size_t len, const mc_model *model, 
 
 /* ---- 5. the write path, on the radio's own bytes (P-25, P-42) --------------------------------- */
 
-static void probe_write(const uint8_t *img, size_t len)
+static int probe_write(const uint8_t *img, size_t len)
 {
 	uint8_t back[MC_BLOCK];
 	unsigned t_start, dt;
@@ -489,7 +506,7 @@ static void probe_write(const uint8_t *img, size_t len)
 	if (rc != 0) {
 		note("P-25", "write one record (its own bytes, unchanged)", R_FAIL,
 		     "two ACKs: one on acceptance, one when the burn finishes", "%s", R.s.err);
-		return;
+		return -1;
 	}
 	note("P-25", "write one record (its own bytes, unchanged)", R_PASS,
 	     "two ACKs, the second after the burn",
@@ -521,6 +538,80 @@ static void probe_write(const uint8_t *img, size_t len)
 		     "the record reads back byte for byte",
 		     memcmp(back, img, MC_BLOCK) == 0 ? "identical" : "DIFFERS from what was written");
 	(void)len;
+	return 0;
+}
+
+/* ---- 5b. the write ladder: several answers from one evening ----------------------------------
+ *
+ * A hardware evening costs somebody else's time and yields at most four radios, so a probe that
+ * returns one bit -- "the write failed" -- is close to worthless, and a probe that kills the
+ * session takes every later probe down with it.  Eight sessions were spent that way.
+ *
+ * Everything below is non-destructive by construction: every frame carries the bytes the radio
+ * already holds, so even a burn that runs to completion writes the radio's own contents back.
+ * That is what makes it safe to provoke the failure repeatedly instead of once.
+ */
+
+/* Does the radio still answer?  `*' is the cheapest question there is and it is answered at any
+ * point in programming mode, so it is the liveness test. */
+static int alive(void)
+{
+	char id[MC_IDENT_MAX];
+	size_t n = 0;
+	return mc_identify(&R.s, id, sizeof id, &n) == 0;
+}
+
+/* Liveness, and if it is gone, the P-27 arming sequence -- which is how the 1987 software starts
+ * every operation and therefore the only in-band recovery there is.  Returns 2 if it never died,
+ * 1 if arming brought it back, 0 if it needs hands on the radio. */
+static int revive(void)
+{
+	if (alive())
+		return 2;
+	mc_session_arm(&R.s);
+	return alive() ? 1 : 0;
+}
+
+static void note_liveness(const char *id, const char *what, int st)
+{
+	note(id, what, st ? R_INFO : R_FAIL, "the radio still answers `*', or arming brings it back",
+	     st == 2 ? "still answering; the session survived"
+	     : st == 1 ? "went silent, and the P-27 arming sequence brought it back -- recoverable"
+	               : "silent, and arming did NOT recover it; this one needs a power cycle");
+}
+
+/* A frame the same length as a write, addressed the same way, but with a command letter the radio
+ * has no handler for.  It separates two hypotheses that the write probe alone cannot:
+ *   - the radio cannot survive 135 bytes arriving back to back, whatever they say;
+ *   - the radio objects to being told to WRITE.
+ * It carries the radio's own bytes, so if it somehow is executed, nothing changes. */
+static void probe_long_frame_control(const uint8_t *rec0)
+{
+	uint8_t frame[7 + MC_BLOCK * 2];
+	int st;
+
+	if (!revive()) {
+		note("P-25b", "a 135-byte frame that is not a write", R_SKIP,
+		     "separates frame length from the write command", "the radio was already silent");
+		return;
+	}
+	mc_put_header(frame, "(40", 0x0000);
+	mc_nib_encode(rec0, MC_BLOCK, frame + 7);
+	frame[0] = 0x2B; /* '+', which no documented command uses */
+	if (R.s.t->send(R.s.t, frame, sizeof frame) != 0) {
+		note("P-25b", "a 135-byte frame that is not a write", R_FAIL,
+		     "separates frame length from the write command", "%s", R.s.t->err);
+		return;
+	}
+	if (R.s.t->drain)
+		R.s.t->drain(R.s.t);
+	st = revive();
+	note("P-25b", "a 135-byte frame that is not a write", st == 2 ? R_INFO : R_DIFFERS,
+	     "if length alone is fatal, this kills the session too",
+	     st == 2 ? "survived 135 bytes that were not a write -- so length alone is NOT the cause"
+	     : st == 1 ? "went silent on 135 non-write bytes too -- the LENGTH is implicated, not the "
+	                 "write command; arming recovered it"
+	              : "went silent on 135 non-write bytes too, and needed a power cycle");
 }
 
 /* ---- the report -------------------------------------------------------------------------------
@@ -651,6 +742,7 @@ int mc_selftest(const mc_selftest_opts *o)
 		if (R.trace) {
 			fprintf(R.trace, "# mcprog selftest capture from %s\n", o->port);
 			fprintf(R.trace, "# <dir> <seq> <t_first_ms> <t_last_ms> <hex>\n");
+			fprintf(R.trace, "# dir: TX sent, RX received, DROP received and discarded\n");
 			fprintf(R.trace, "TRACE mcprog-selftest\n");
 			R.s.log = wirelog;
 			R.s.logctx = &R.s;
@@ -664,26 +756,33 @@ int mc_selftest(const mc_selftest_opts *o)
 	probe_single();
 	probe_02();
 
-	/* The write probe runs BEFORE the full read, and that ordering is load-bearing.
+	/* The write probes run BEFORE the full read, and that ordering is load-bearing: a sequential
+	 * read ends when the radio NAKs past the last record, and on every radio seen so far the
+	 * session ends with that NAK (P-24a).  So take one record on its own (chain = 0,
+	 * unacknowledged per P-26), exercise the write path with it, and only then walk the EEPROM.
 	 *
-	 * A sequential read ends when the radio NAKs past the last record, and on every radio seen so
-	 * far the session ends with it: after that NAK the radio answers nothing at all, not even `*'.
-	 * Four write-enabled runs against two Radius M110s all reported "write 0x0000: no first ACK",
-	 * and the wire log shows why -- the frame was well formed, exactly the 135 bytes P-25
-	 * specifies, and nothing replied because nothing was listening.  The read-only runs settle
-	 * that the NAK is the cause rather than the write: they lose the radio at the same point
-	 * having written nothing.
-	 *
-	 * So take one record on its own (chain = 0, unacknowledged per P-26), exercise the write path
-	 * with it, and only then walk the whole EEPROM. */
+	 * The eight write-enabled sessions of 23 Aug 2026 all reported "no first ACK", and it was NOT
+	 * the radio: MC_T_ACK1 is 400 ms and a 135-byte frame at 1200 baud occupies the wire for
+	 * 1125, so the window shut while the radio was still receiving byte 48 (P-31d).  Those runs
+	 * measured mcprog.  What follows is built so that an evening cannot be spent that way again:
+	 * each experiment records whether the radio SURVIVED it, and recovers the session in band
+	 * before the next one, so one failure no longer discards everything after it. */
 	if (o->write_back) {
 		uint8_t rec0[MC_BLOCK];
-		if (mc_read_block(&R.s, 0x0000, rec0, 0) == 1)
-			probe_write(rec0, MC_BLOCK);
-		else
+		if (mc_read_block(&R.s, 0x0000, rec0, 0) == 1) {
+			int wrote = probe_write(rec0, MC_BLOCK);
+			int st = revive();
+			note_liveness("P-25a", "the radio after the write attempt", st);
+			/* Only worth asking when the write did not work: it is the control that says
+			 * whether 135 bytes are fatal in themselves. */
+			if (wrote != 0)
+				probe_long_frame_control(rec0);
+			revive(); /* hand the full read a live radio, whatever happened above */
+		} else {
 			note("P-25", "write one record (its own bytes, unchanged)", R_FAIL,
 			     "two ACKs, the second roughly 710 ms after the first",
 			     "could not read record 0 to write back: %s", R.s.err);
+		}
 	}
 
 	len = probe_read(img, sizeof img, &model, det, sizeof det, ident, ilen);

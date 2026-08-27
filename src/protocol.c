@@ -283,6 +283,13 @@ int mc_write_block(mc_session *s, uint16_t addr, const uint8_t in[MC_BLOCK])
 	mc_nib_encode(in, MC_BLOCK, frame + 7);
 	if (tx(s, frame, sizeof frame) != 0)
 		return -1;
+	/* P-31d.  The ACK clock must start when the frame has LEFT, not when it was queued.  135
+	 * bytes at 1200 baud is 1125 ms on the wire; MC_T_ACK1 is 400.  Without this the window
+	 * closed mid-frame and no radio could ever have answered inside it -- which is exactly what
+	 * eight hardware sessions across four radios reported, identically, while every read (7
+	 * bytes, 58 ms) worked.  Reads never needed it; only the write frame is long enough to care. */
+	if (s->t->drain && s->t->drain(s->t) != 0)
+		return fail(s, "write 0x%04X: the frame never left the port: %s", addr, s->t->err);
 
 	/* P-25.  Two bare ACKs: the command was accepted, then the EEPROM burn finished.  Returning
 	 * after the first and sending the next record desynchronises the radio immediately, so this

@@ -216,6 +216,72 @@ static void test_port_config(void)
 	close(slave);
 }
 
+/* ---- P-31d: the ACK clock must not start before the frame has left ---------------------------
+ *
+ * This is the test that eight hardware sessions across four radios paid for.  Every one of them
+ * reported "write: no first ACK" and every read in the same session worked, because send() returns
+ * when the kernel has BUFFERED the frame: 135 bytes at 1200 baud is 1125 ms on the wire and
+ * MC_T_ACK1 is 400, so the window shut while the radio was receiving byte 48 of 135.  No radio
+ * could have answered inside it, which means those runs measured mcprog and told us nothing about
+ * the radio.
+ *
+ * The pty cannot reproduce it -- a pty moves bytes at memory speed whatever baud is set -- so what
+ * is asserted here is the CONTRACT that makes it impossible: drain() exists, and it does not return
+ * before the wire could physically be free.  A transport that loses drain, or one whose drain
+ * trusts a driver that lies (every USB-serial adapter), fails this. */
+static void test_drain_floor(void)
+{
+	int master, slave;
+	mc_transport *t;
+	uint8_t frame[7 + MC_BLOCK * 2];
+	unsigned t0, dt, want;
+
+	/* What the wire physically costs: 1 start + 8 data + 1 stop per byte, parity being in bit 7. */
+	want = (unsigned)(sizeof frame * 10 * 1000ul / 1200);
+	ok(want > MC_T_ACK1, "P-31d",
+	   "a write frame takes longer to send than MC_T_ACK1 allows for the ACK");
+
+	if (openpty(&master, &slave, NULL, NULL, NULL) != 0) {
+		failf("P-31d", "openpty failed");
+		return;
+	}
+	{	/* Explicitly 1200, unlike client(), because the floor is derived from the port's real
+		 * speed -- which is the whole point of deriving it there rather than from the option. */
+		mc_serial_opts o;
+		char err[160];
+		mc_serial_defaults(&o);
+		o.baud = 1200;
+		o.line_setup = 0;
+		t = mc_serial_attach(master, &o, err, sizeof err);
+		if (!t) {
+			failf("P-31d", "attach: %s", err);
+			close(master);
+			close(slave);
+			return;
+		}
+	}
+	ok(t->drain != NULL, "P-31d", "a serial transport provides drain()");
+	memset(frame, 0x30, sizeof frame);
+	t0 = t->now_ms(t);
+	if (t->send(t, frame, sizeof frame) != 0) {
+		failf("P-31d", "send failed: %s", t->err);
+	} else if (!t->drain) {
+		failf("P-31d", "no drain to test");
+	} else {
+		if (t->drain(t) != 0)
+			failf("P-31d", "drain failed: %s", t->err);
+		dt = t->now_ms(t) - t0;
+		/* Allow a little slack for timer granularity, but nothing like a frame's worth. */
+		ok(dt + 20 >= want, "P-31d",
+		   "drain() waits out the frame it was handed, not the write() call");
+		if (dt + 20 < want)
+			failf("P-31d", "drain returned after %u ms; the frame needs %u ms", dt, want);
+	}
+	mc_serial_close(t);
+	close(master);
+	close(slave);
+}
+
 /* ---- a full read and write session over the pty --------------------------------------------- */
 
 static void test_session(int nak_header)
@@ -368,6 +434,7 @@ int main(int argc, char **argv)
 	if (argc > 1)
 		ROOT = argv[1];
 	test_port_config();
+	test_drain_floor();
 	test_session(1); /* P-24 header-NAK form */
 	test_session(0); /* P-24 bare NAK form */
 	test_parity_mismatch();

@@ -16,7 +16,8 @@
  * interval is a property of nanosleep and arithmetic, not of the adapter, so a "does drain() wait
  * 1125 ms" assertion passes on any device and measures nothing -- it is covered where it belongs,
  * on a pty, in tests/test_serial.c.  The one thing real hardware DID settle about P-31d -- that no
- * portable way exists to ask whether the transmit register is empty -- was a one-off investigation,
+ * portable way exists to ask whether the transmit register is empty, so the reliable method is to
+ * wait out the frame from the moment it was handed to the kernel -- was a one-off investigation,
  * and its numbers are recorded in spec.md P-31d rather than re-measured on every run.
  *
  * Nothing is transmitted that a radio would act on and nothing is read back, so this is safe with

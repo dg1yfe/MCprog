@@ -122,9 +122,11 @@ static int sr_send(mc_transport *t, const uint8_t *buf, size_t n)
  * driver's queue, exactly as write() does on a tty, so the same 1125 ms-frame / 400 ms-window
  * mismatch applies here.
  *
- * Arithmetic, not FlushFileBuffers, for the reason the POSIX side does not use tcdrain: a
- * USB-serial driver knows its own queue and not the adapter's FIFO, so the call can return while
- * the frame is still going out.  n bytes at b baud cannot leave in under n * 10 / b seconds. */
+ * Waiting, not FlushFileBuffers, for the reason the POSIX side does not use tcdrain: there is no
+ * portable way to ask whether the transmit register is empty, and the calls that look like they
+ * answer that report on the driver's own queue instead.  Waiting out the frame from the moment it
+ * was handed to the kernel needs nothing from the driver and is the same answer on every port.
+ * n bytes at b baud cannot leave in under n * 10 / b seconds. */
 static int sr_drain(mc_transport *t)
 {
 	serial *s = (serial *)t;

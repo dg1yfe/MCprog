@@ -97,11 +97,13 @@ is **1125 ms on the wire**, and `MC_T_ACK1` is **400 ms** — so the window shut
 still receiving **byte 48 of 135**. No radio could have answered inside it. Every read in the same
 sessions worked, because a read command is 7 bytes and takes 58 ms; that asymmetry is the signature.
 
-`drain()` now holds the ACK clock until the frame can physically be gone. It is computed from bytes
-and baud rather than asked of `tcdrain` — and that choice is measured, not assumed. On an FTDI FT232
-at 1200 baud, where a 135-byte frame needs **1125 ms**, `tcdrain()` returned after **0.1 ms**, and
-`TIOCOUTQ` called a 4.3-second transmission finished after 506 ms. The kernel is blind past the USB
-boundary; the arithmetic is not. `drain()` measured **1128 ms** on the same port.
+`drain()` now holds the ACK clock until the frame can physically be gone, by **waiting out the frame
+from the moment it was handed to the kernel**. There is no portable way to ask whether the transmit
+register is really empty: `tcdrain` and `TIOCOUTQ` are what the platform offers and both report on
+the kernel's own queue. On an FTDI FT232 at 1200 baud, where a 135-byte frame needs **1125 ms**,
+`tcdrain()` returned after **0.1 ms** and `TIOCOUTQ` called a 4.3-second transmission finished after
+**506 ms**. Waiting needs no driver, no ioctl and no cooperation from the adapter, and gives the same
+answer on every port on every platform.
 
 Run the port-side checks yourself, no radio needed:
 

@@ -433,16 +433,14 @@ The fix is **arithmetic, not `tcdrain`**, which is what P-31 warned about above:
   would have been **entirely unfixed on this adapter**, failing identically and looking like the
   radio again.
 
-> **Why not detect the port type and use `tcdrain` on a real UART?** Because there is nothing to
-> win. On a genuine 8250/16550 `tcdrain` returns when the shift register empties — which is the same
-> instant the arithmetic predicts, since the arithmetic *is* the physics of the line. The two agree
-> by construction, so a detected switch would buy a few milliseconds of precision at 1200 baud and
-> cost a second code path that only runs on some machines. That is the worst possible shape for code
-> guarding a bug whose failure mode is invisible.
+> **There is no portable way to ask whether the transmit register is empty.** `tcdrain` and
+> `TIOCOUTQ` are the two the platform offers, and both were measured answering about the kernel's
+> own queue rather than about the wire. Nothing else is available across Linux, macOS and Windows.
 >
-> It is also genuinely hard: `ioctl(TIOCGSERIAL)` and `serial_struct.type` on Linux, an IOKit
-> property walk on macOS, SetupAPI on Windows — three unrelated best-effort APIs, each having to
-> fail open. The margin below covers the same ground for none of that cost.
+> So the most compatible and reliable way to know a frame has been sent is to **wait, for as long as
+> the frame takes, from the moment it was handed to the kernel.** That needs no driver, no ioctl and
+> no cooperation from the adapter, and it is the same answer on every port on every platform. It is
+> what `drain()` does.
 
 The floor is padded rather than exact: **+3 ms and +1 %**. Overshooting is free — a reply arriving
 during the wait is buffered by the kernel and reading it late costs nothing — while undershooting

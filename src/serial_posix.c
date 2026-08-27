@@ -174,19 +174,19 @@ static int sr_drain(mc_transport *t)
 	serial *s = (serial *)t;
 	unsigned now = elapsed_ms(&s->t0);
 
-	/* Arithmetic, deliberately, and NOT tcdrain.
+	/* Wait out the frame, timed from when it was handed to the kernel.
 	 *
-	 * tcdrain is the obvious call and it was tried first.  Two things are wrong with it.  On a
-	 * USB-serial adapter (FTDI, CH340, CP210x, PL2303) the kernel driver knows its own queue but
-	 * not the adapter's internal FIFO, so tcdrain can return while the frame is still being
-	 * shifted out beyond the USB link -- reintroducing the very error P-31d is about, invisibly.
-	 * And on a pty it was measured BLOCKING for two seconds, long enough for the peer in
-	 * tests/test_serial.c to hit its idle timeout and exit, so the ACK never came at all.
+	 * There is no portable way to ask whether the transmit register is actually empty.  tcdrain
+	 * and TIOCOUTQ are what the platform offers and both answer about the kernel's own queue, not
+	 * about the wire: on an FTDI FT232 tcdrain returned after 0.1 ms against a 1125 ms frame, and
+	 * TIOCOUTQ called a 4267 ms transmission finished after 506.  On a pty tcdrain went the other
+	 * way and BLOCKED for two seconds.  Nothing better exists across Linux, macOS and Windows.
 	 *
-	 * The floor needs neither driver nor kernel to be honest: n bytes at b baud cannot leave in
-	 * less than n * 10 / b seconds.  sr_send accumulates that per frame and clamps it forward to
-	 * the current time, so a port that really is busy is tracked and one that is idle costs
-	 * nothing.  It cannot block, cannot hang, and cannot be lied to. */
+	 * So waiting is the method, not a workaround for one bad adapter.  n bytes at b baud cannot
+	 * leave in less than n * 10 / b seconds, whoever is driving the port; sr_send accumulates that
+	 * per frame and clamps it forward to the current time, so a port that really is busy is
+	 * tracked and an idle one costs nothing.  It needs no driver, no ioctl and no cooperation from
+	 * the adapter, it is the same answer everywhere, and it cannot block, hang, or be lied to. */
 	/* Against the DEADLINE, not a single sleep: re-reading the clock each time absorbs both timer
 	 * granularity and any sleep that still came back early.  The floor is only worth having if it
 	 * is never undershot. */

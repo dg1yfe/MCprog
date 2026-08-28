@@ -771,7 +771,17 @@ int mc_selftest(const mc_selftest_opts *o)
 		uint8_t rec0[MC_BLOCK];
 		if (mc_read_block(&R.s, 0x0000, rec0, 0) == 1) {
 			int wrote = probe_write(rec0, MC_BLOCK);
-			int st = revive();
+			int st;
+			/* If the record was ACCEPTED and the burn never confirmed, the radio may still be
+			 * committing bytes.  Asking it anything at that moment is the worst thing to do,
+			 * and on 28 Aug 2026 it is what happened: the first ACK arrived, the burn ACK did
+			 * not, and the selftest immediately sent `*' six times.  The radio never spoke
+			 * again and needed a power cycle.  Whether the traffic caused that or merely
+			 * coincided with it is NOT established -- but there is no reason to poke a radio
+			 * that has told us it is writing, so settle first. */
+			if (wrote != 0)
+				nap(R.s.t, MC_T_BURN);
+			st = revive();
 			note_liveness("P-25a", "the radio after the write attempt", st);
 			/* Only worth asking when the write did not work: it is the control that says
 			 * whether 135 bytes are fatal in themselves. */

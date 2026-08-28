@@ -489,6 +489,35 @@ has no wire and is charged nothing.
 > is the one thing that puts the radio into programming mode. Under a signal storm arming would
 > have silently failed, and the radio would simply have looked dead. **[C]**
 
+**P-31e A radio accepted a record on 28 Aug 2026 — the first ever — and then did not confirm the
+burn.** `reports/write-runs3/report1`, an `EZ3.01.00.44` M110. The wire log settles P-31d beyond
+argument:
+
+| | |
+|---|---|
+| write frame queued | `t = 6691 ms` |
+| **first ACK (`06`) received** | **`t = 7831 ms`** |
+| gap | **1140 ms** |
+
+1140 ms is the 1125 ms the frame occupies at 1200 baud plus the radio's turnaround. The old 400 ms
+window could not have seen it, and every earlier run reported `no first ACK` for that reason alone.
+**[C]**
+
+What failed instead is the **second** ACK. `MC_T_BURN` was 2000 ms — ~3× the 697 ms P-31a derives —
+and nothing arrived in 2001 ms. But 697 ms is an **EVA** figure, read out of `EZA33.BIN`'s timed
+loop; the M110 runs `EZ3.01.00.44`, whose burn constant nobody has read. 2000 ms allows only **31 ms
+per byte** and was never measured for this radio. It is now **8000 ms** — 125 ms per byte, past any
+plausible EEPROM — because a receive timeout costs nothing when the radio answers.
+
+The radio then went silent for the rest of the session and `P-24a`'s arming pulse did not revive it;
+it needed a power cycle. **What is not established** is whether the six `*` probes the selftest sent
+immediately afterwards contributed to that, or merely followed it. There is no reason to poke a
+radio that has just said it is writing, so the selftest now settles for a full burn timeout before
+asking anything. **[?]**
+
+> Nothing was risked by this: the record written was the radio's **own bytes**, so even a burn that
+> committed a partial record wrote back what was already there.
+
 **P-32** Exactly **one** retry, of the attention phase only. **No retry** around read, write or
 verify — fail loudly. An automatic retry mid-write is how a glitch becomes a half-written EEPROM.
 **[S]**

@@ -50,7 +50,21 @@
  * recorded, because a spurious timeout on the write path is expensive to diagnose and a generous
  * one costs only the time to notice a genuinely dead radio.  See spec.md P-31a. */
 #define MC_T_ACK1 400      /* ms for the first ACK -- pre-burn, so it is prompt (P-31a) */
-#define MC_T_BURN 2000     /* ms for the second ACK -- covers the burn with room for other firmware */
+/* ms for the second ACK.  Was 2000, which is ~3x the 697 ms the EVA firmware's burn loop predicts
+ * for 64 bytes (P-31a) and looked generous -- until 28 Aug 2026, when an M110 ACCEPTED a record for
+ * the first time and then never confirmed the burn.  The wire log shows the first ACK arriving
+ * 1140 ms after the frame was queued, exactly where P-31d says it should, and nothing in the
+ * 2001 ms that followed.
+ *
+ * 697 ms is an EVA number, derived from EZA33.BIN's timed loop.  The M110 runs different firmware
+ * (EZ3.01.00.44) whose burn constant nobody has read, so 2000 ms was never measured for it -- it
+ * was an EVA figure with margin, applied to a radio it does not describe.  At 64 bytes, 2000 ms
+ * allows only 31 ms per byte.
+ *
+ * A receive timeout costs nothing when the radio answers, and P-31 already argues that a spurious
+ * timeout here is expensive to diagnose while a generous one costs only the wait on a genuinely
+ * dead radio.  8000 ms allows 125 ms per byte, which is well past any plausible EEPROM. */
+#define MC_T_BURN 8000
 
 /* Microseconds of burn per byte, from the EVA firmware (spec.md P-31a).  Only that one radio's
  * constant is known, so this predicts rather than requires: the selftest compares it against the

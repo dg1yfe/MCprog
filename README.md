@@ -1,16 +1,16 @@
 # MCprog
 
 Programmer for the **Motorola MC micro** land-mobile family (EVA and EZA) and the **Radius M110**.
-Same `.DAT` codeplugs and same wire protocol as the 1987 DOS Radio Service Software.
+Reads, edits and writes the same `.DAT` codeplugs over the same wire protocol as the 1987 DOS Radio
+Service Software.
 
 C99, one binary, no runtime dependencies beyond ncurses. A file and a radio are two sources of the
 same object and open the same editor. Naming an output file makes the run non-interactive.
 
-Normative contract: **`spec.md`**. Requirements are numbered `P-n` protocol, `K-n` codeplug,
-`U-n` interface, `W-n` write safety, each carrying provenance — **[C]** measured, **[S]**
-disassembly, **[?]** assumed. This file is a summary; `spec.md` is what tests cite.
+Normative contract: **`spec.md`** — numbered requirements (`P-n` protocol, `K-n` codeplug,
+`U-n` interface, `W-n` write safety) with provenance marks. Tests cite the numbers.
 
-## 1. Synopsis
+## 1. Usage
 
 ```
 mcprog file.DAT                                 edit a codeplug file
@@ -34,6 +34,10 @@ mcprog --list-defaults                          the factory defaults --new can c
 | `--baud N` | default 1200; `0` leaves the port speed alone |
 | `--no-line-setup` | skip the 1.8 s DTR/RTS opening sequence (`--no-modem-init` is a legacy alias) |
 | `--enable-write` | permit writing; without it no write path exists |
+| `--force` | allow `--new` to overwrite an existing file |
+
+Port naming: `/dev/ttyUSB0`, `/dev/ttyS0` on Linux; **`/dev/cu.usbserial-*`** on macOS, not
+`/dev/tty.*`, which blocks on carrier detect. On Linux the user must be in the `dialout` group.
 
 ### Working without a radio
 
@@ -45,20 +49,16 @@ mcprog --new eza_sel5 --band 3 new.DAT          # create it
 mcprog new.DAT                                  # edit it
 ```
 
-| property | behaviour |
-|---|---|
-| source | a **genuine factory default**, captured off the wire from the repair software's `INITIALIZE`; byte-identical to what it produced in 1987 |
-| why not a blank buffer | a codeplug holds many bytes this project has never mapped; an image built only from understood fields would be wrong undetectably and the radio would accept it |
-| no default captured | both Radius M110s — `--new` says so and lists alternatives rather than inventing one |
-| existing file | refused without `--force` |
-| radio options | refused in combination |
+`--new` starts from a genuine factory default captured off the wire from the repair software's
+`INITIALIZE`. No default exists for either Radius M110; `--new` refuses and lists the alternatives.
+It refuses to overwrite an existing file without `--force`, and refuses combination with any option
+that touches a radio.
 
 ### Storno CQM 5500
 
-Storno resold these radios rebadged. Its programmer is the Motorola one **relocated, not rewritten**:
-driven side by side, the two put byte-identical traffic on the wire. There is therefore no separate
-Storno model. `--list-models` shows Storno's own name against each MC micro model and `--model`
-accepts it.
+Storno resold these radios rebadged; the codeplugs and wire protocol are identical, so there is no
+separate Storno model. `--list-models` shows Storno's own name against each MC micro model, and
+`--model` accepts either.
 
 ```
 mcprog --model "CQM5500 EZA 9, SELECT 5" file.DAT     # resolves to eza_sel5
@@ -66,85 +66,42 @@ mcprog --model "eza 1/3" file.DAT                     # a unique fragment is eno
 mcprog --model "CQM5500" file.DAT                     # refused: matches several
 ```
 
-`--list-models` also shows the ident each radio's *original* software demands. MCprog records it and
-does not enforce it: a real EVA answers `EV9.01.00.11`, which the 1987 Standard build rejects as
-`INVALID TYPE` while the Master and Repair builds of the same version accept.
+`--list-models` also shows the ident each radio's original software demands. MCprog records it and
+does not enforce it.
 
 ## 2. Status
 
 | capability | state |
 |---|---|
 | Decode, edit, re-encode, checksum | six models — four MC micro, two Radius M110 |
-| Read a codeplug from a radio | **works on hardware** — EZA 9, 256 bytes, every mapped field as predicted |
-| Write a codeplug to a radio | **works on hardware** — four radios covering both M110 variants; record read back identical — §3 |
+| Read a codeplug from a radio | **works on hardware** |
+| Write a codeplug to a radio | **works on hardware** — every record read back and verified |
 | Protocol library | replays all three recorded hardware sessions byte for byte |
 | TUI | channel list, per-channel editor, PL, options, timers, save |
 | Serial transport, POSIX | used against a real radio |
 | Serial transport, Win32 | compiles; never built or run on Windows |
 | Test suite | at least 1,400 assertions, all passing |
 
-Anything not marked hardware-verified is verified against captured hardware sessions, a fake radio on
-a pseudo-terminal, and the original software under emulation.
+Hardware-verified on an MC micro EZA 9 and four Radius M110s. Everything else is verified against
+captured hardware sessions, a fake radio on a pseudo-terminal, and the original software under
+emulation.
 
-## 3. Write status
+### What to expect on the wire
 
-Writing works on hardware as of **28 Aug 2026** — `reports/write-runs4`, four radios covering both M110 variants:
-record accepted, burn confirmed, record read back **identical**, radio still answering afterwards,
-full EEPROM read completing in the same session. Report 1 is 15 probes, 12 as documented, 0 differ,
-0 failed.
+At 1200 baud:
 
-Three faults had to be cleared, in this order.
-
-| | fault | fix |
+| operation | EVA / EZA | Radius M110 |
 |---|---|---|
-| P-31d | ACK clock started when the frame was *queued*, not when it left | `drain()` waits out the frame |
-| P-31e | `MC_T_BURN` 2000 ms — an EVA figure applied to M110 firmware | **8000 ms**, from measurement |
-| — | the selftest interrogated a radio that was still burning | settles for a full burn timeout first |
+| read, per 64-byte record | ~1.2 s | ~1.2 s |
+| full 256-byte read | ~4.9 s | ~4.9 s |
+| write, per record, accepted to burn-confirmed | ~0.7 s | **3.3–3.9 s** |
 
-**P-31d.** `send()` returns when the kernel has *buffered* a frame, not when it has left. A write
-frame is 135 bytes = **1125 ms** at 1200 baud; `MC_T_ACK1` was **400 ms**, so the window shut while
-the radio was receiving byte 48 of 135. Reads (7 bytes, 58 ms) were never at risk — that asymmetry
-was the signature. Eight sessions across four radios had failed with `no first ACK` for this reason
-alone.
+The M110's EEPROM burn is about five times slower than the EVA's.
 
-There is no portable way to ask whether the transmit register is empty. Measured on an FTDI FT232 at
-1200 baud, 135-byte frame needing 1125 ms:
+A radio that stops answering needs a power cycle. Recovery behaviour may not be universal — no EVA
+has been tested against it, so the in-band recovery path is retained.
 
-| mechanism | reported complete after |
-|---|---|
-| `tcdrain()` | **0.1 ms** |
-| `TIOCOUTQ` (512-byte frame, 4267 ms needed) | **506 ms** |
-| computed floor + margin | 1139 ms |
-
-Waiting needs no driver, no ioctl and no cooperation from the adapter. Port-side checks, no radio
-required:
-
-```
-make hwprobe PORT=/dev/cu.usbserial-XXXX
-```
-
-**P-31e — the M110 burn constant, measured.**
-
-| radio | burn gap, 64 bytes | per byte |
-|---|---|---|
-| `EZ3.01.00.44` CSQ/PL | 3939 ms, 3937 ms | 61.5 ms |
-| `EZ9.01.00.45` Sel 5 | 3252 ms, 3252 ms | 50.8 ms |
-| EVA, predicted from `EZA33.BIN` | 696 ms | 10.89 ms |
-
-Five times the EVA's. `MC_T_BURN` at 2000 ms was short by a factor of two and could never have
-worked on this family; 8000 ms leaves 2.03× over the slowest observed. Two readings per radio differ
-by 2 ms and 0 ms — a fixed timed loop, as P-31a says.
-
-Written records carry the radio's **own bytes**, so a partially committed burn writes back what was
-already there.
-
-Session recovery: the original software re-opens the line at the start of every operation, and
-`mc_session_arm()` does the same — the P-27 sequence, twice, before a read and before a write.
-`mc_serial_rearm()` remains as an explicit single pulse, used by the selftest's `P-24a` probe. That
-behaviour may not be universal: a disassembled EVA firmware returns to its command loop after the
-end-of-memory NAK rather than going deaf, and no EVA has been tested, so the recovery path stays.
-
-## 4. Models
+## 3. Models
 
 | name | bytes | channels | checksum | PL | radios |
 |---|---|---|---|---|---|
@@ -155,17 +112,13 @@ end-of-memory NAK rather than going deaf, and no EVA has been tested, so the rec
 | `m110_cspl` | 256 (128 real) | 10 × 10 | `0x00F` → **0x01** | enc + dec, per channel | **Radius M110** CSQ/PL, `EZ3.01.00.44` |
 | `m110_sel5` | 256 | 9 × 12 | `0x00F` → **0x01** | — | **Radius M110** Sel 5, `EZ9.01.00.45` |
 
-**Detection** is by size, checksum, and a marker in the bytes where the format has one. The M110
-names its family at `0x07..0x09` (`EZA` or `EZ9`), a documented field from the 1989 software's
-radio-type descriptor table, so it is identified positively rather than by elimination.
+Detection is by size, checksum, and a marker in the bytes where the format has one. The M110 names
+its family at `0x07..0x09` (`EZA` or `EZ9`).
 
 The two 512-byte models are the same hardware differing only in signalling, so nothing in a *file*
 separates them; detection assumes `eva_sel5`. From a radio the ident decides — `5/6 Tone` selects
-`eva_56`. There is no SEL5 marker, so its absence falls back to the default rather than concluding
-anything.
-
-`--model` skips detection but **not** the marker: a model contradicting the marker is refused, since
-that is never resolving an ambiguity — it would read and write the wrong offsets.
+`eva_56`. `--model` overrides detection but not the marker: a model contradicting the marker in the
+bytes is refused.
 
 | model | difference that matters |
 |---|---|
@@ -181,17 +134,16 @@ Answers the same wire protocol; nothing else is shared.
 |---|---|
 | checksum | sums to **`0x01`**, byte at `0x0F` |
 | band | four bits at the bottom of `0x0A` |
-| MC micro offsets | **none lands on a real field** — `eza_sel5`'s reference dividers read as zeros, its counter at `0x09E` is live channel data |
-| CSQ/PL device | returns 256 bytes = **two identical 128-byte copies**; the codeplug is the first 128, only those are written, hence the 256-byte total of `0x02` |
-| CSQ/PL PL | **per channel, in the record** — encode `+0`, decode `+5` |
-| PL scales | 123.0 Hz stores `982` to encode (× 7.9844) and `7516` to decode (× 61.107); the 1989 RSS carries both as IEEE doubles |
+| MC micro offsets | none lands on a real field |
+| CSQ/PL device | returns 256 bytes = two identical 128-byte copies; the codeplug is the first 128, and only those are written |
+| CSQ/PL PL | per channel, in the record — encode `+0`, decode `+5`; 123.0 Hz stores `982` (× 7.9844) and `7516` (× 61.107) |
 | Sel 5 PL | none |
+| ident length | 40 bytes, against the EVA's 41 |
 
-**Not established, so absent rather than guessed:** the channel flag bits and the timer block.
-Channel counts are the size of the region the table occupies — inference from four radios that leave
-the rest zero, not a measurement.
+**Not implemented, because not established:** the channel flag bits and the timer block. Channel
+counts are the size of the region the table occupies.
 
-## 5. Control lines
+## 4. Control lines
 
 Neither line is modem control; there is no handshake.
 
@@ -200,14 +152,13 @@ Neither line is modem control; there is no handshake.
 | DTR | **de-asserted** | negative | supplies the interface's level shifter (BC557 PNP through 27 k, conducting only with its base negative) |
 | RTS | **asserted** | positive | reaches the radio CPU's `#NMI`; the rising edge restarts programming mode |
 
-A line sits negative when de-asserted, so `MCR=0` puts negative on DTR. Opening sequence: `MCR=0`,
-500 ms, assert RTS, 1300 ms — 1.8 s, skipped by `--no-line-setup`. RTS asserted decides whether the
-radio answers; DTR polarity did not change the outcome in testing.
+Opening sequence: `MCR=0`, 500 ms, assert RTS, 1300 ms — 1.8 s total, skipped by `--no-line-setup`.
+RTS asserted is what decides whether the radio answers.
 
-**A radio that has gone quiet needs a power cycle.** De-asserting RTS for several seconds took a
-radio out of programming mode permanently within that session.
+De-asserting RTS for several seconds takes the radio out of programming mode for the rest of the
+session.
 
-## 6. Write safety
+## 5. Write safety
 
 A write is refused unless every rule holds. Specified `W-1`..`W-6` in `spec.md`; each has tests
 citing the number.
@@ -219,9 +170,9 @@ citing the number.
 | W-3 | Pre-write gates, all fatal: valid checksum, band not 7, model and size match, and every byte differing from what the radio just returned is one MCprog itself writes. A write that would change nothing is refused. |
 | W-4 | Every record is read back and verified. A mismatch aborts, naming record and offset. |
 | W-5 | The write counter increments on radio writes only, never on file saves; the checksum is then recomputed. |
-| W-6 | Records go out in order 0..N, as the original does. |
+| W-6 | Records go out in order 0..N. |
 
-## 7. Build
+## 6. Build
 
 ```
 make            # build
@@ -239,12 +190,6 @@ make check      # conformance suite, pty smoke test, Windows cross-compile
 sudo apt install build-essential libncurses-dev python3 mingw-w64
 ```
 
-`-std=c99` defines `__STRICT_ANSI__`; glibc then hides `strtok_r`, `cfmakeraw`, `openpty`,
-`nanosleep`, `clock_gettime`, and GCC 14 treats the implicit declarations as errors — hence
-`-D_DEFAULT_SOURCE`. Darwin must **not** get `_POSIX_C_SOURCE`, which hides `cfmakeraw` and `openpty`
-there, so the define is conditioned on `uname`. `pkg-config` locates an `ncursesw`-only distro's
-headers when present; otherwise `-lncurses`.
-
 Built and tested on macOS, Debian 13 (GCC 14.2 / glibc 2.41) and Ubuntu 24.04.
 
 ### Running without a radio
@@ -258,10 +203,17 @@ make build/ptyserv
 ./build/mcprog --port /dev/ttys004 --no-line-setup --baud 0 --enable-write
 ```
 
-`--baud 0` and `--no-line-setup` are needed only because a pty has neither line speed nor control
-lines.
+`--baud 0` and `--no-line-setup` are needed because a pty has neither line speed nor control lines.
 
-## 8. Selftest
+### Checking a port without a radio
+
+```
+make hwprobe PORT=/dev/cu.usbserial-XXXX
+```
+
+Verifies control-line timing on a real port with nothing attached.
+
+## 7. Selftest
 
 Development aid, not part of normal use. Most useful against a model that has never been read.
 
@@ -273,45 +225,28 @@ mcprog --selftest report.md
 |---|---|
 | port | found automatically — USB adapters first, then motherboard ports. On failure prints an **ACTION REQUIRED** block, waits up to 60 s, retries |
 | default | read-only |
-| with `--enable-write` | writes one record back — the radio's *own* bytes, unchanged, after saving a copy — exercising framing and the double ACK without altering radio behaviour |
+| with `--enable-write` | writes one record back — the radio's own bytes, unchanged, after saving a copy |
 | output | `report.md`, `report.md.trace` (wire log in conformance format), `report.md.dat` (codeplug read) |
-| line probing | tries the DTR/RTS combinations and reports which answered; stops at the first that answers and keeps that port open, because dropping RTS can end the session |
+| line probing | tries the DTR/RTS combinations, stops at the first that answers and keeps that port open |
 
 **Power-cycle the radio before each run.**
 
-## 9. Verification
+Reports go to `reports/`, which is **not committed**: they contain radio serial numbers and user
+codeplug contents.
 
-The reverse engineering is not in this repository; the *evidence* is, in re-runnable form.
+## 8. Repository
 
-| artefact | purpose |
+| path | contents |
 |---|---|
-| `spec.md` | Normative contract, numbered and provenance-marked. Tests cite the numbers. |
-| `testdata/` | Language-neutral vectors: line-oriented, integer Hz and ms, lowercase hex. No expected value appears in test source, so a second implementation runs the identical suite and any disagreement localises to one vector. `testdata/gen.py` regenerates byte-identically. |
-| `captures/` | Two independent recordings of the original software against a real radio, 2009 and 2011. `traces/read_eva9_2009.trace` replayed through the protocol library reconstructs `fixtures/eva9_real.bin` exactly. |
-| `--log` | Writes the wire in the `.trace` format `testdata/` consumes, so a real session drops straight into the conformance suite. |
+| `spec.md` | normative contract; numbered requirements with provenance marks |
+| `testdata/` | language-neutral conformance vectors. No expected value appears in test source, so a second implementation runs the identical suite. `testdata/gen.py` regenerates byte-identically |
+| `captures/` | protocol recordings of the original software against a real radio, 2009 and 2011 |
+| `samples/` | user codeplug files |
+| `fixtures/` | codeplug images, most of them factory defaults recovered from the original software under emulation — `fixtures/README.md` gives per-file provenance |
 
-Every law in `spec.md` has been deliberately broken to confirm the suite notices.
+`--log` writes the wire in the `.trace` format `testdata/` consumes, so a real session drops straight
+into the conformance suite.
 
-## 10. Invariants for a second implementation
-
-Read `spec.md` first. Most often got wrong:
-
-| | invariant |
-|---|---|
-| Write handshake | **Two ACKs.** First = accepted, second (~710 ms on EVA) = burned. Proceeding on the first desynchronises the radio on the next record. |
-| Frequency encoding | **Not canonical.** `b2` is a full byte but `P` ≤ 254, so `b2 >= P` is a legal alternate spelling and the original emits some. Encode canonically, decode permissively, compare by decoded frequency — never by bytes. |
-| Channel table | **Terminated, not sparse.** Stop at the first record whose `+0` is `0xFF`. Records past it are stale and must be written back untouched. |
-| Channel flag bits | **Not portable between models.** Bit 3 is clock shift on the EVA and auto-acknowledge on the EZA 9; the EZA 9 splits bit 7 by half; the EZA 1/3 clock shift is inverted. |
-| Timers | **Round, do not truncate.** Four of the twelve are narrower than the word they occupy. |
-| Write counter | **Four bits.** `0x1F` → `0x10`, not `0x20`: the low nibble counts, bit 4 is *set* on wrap. Incrementing the whole byte corrupts bits 5–7. |
-| Ident | Comes from `*`, **not** `)01`. `)01` returns a single codeplug byte. Reversing the two yields a tool that cannot identify a radio. |
-
-## 11. Licence and provenance
+## 9. Licence
 
 GPL-3.0-or-later — see [COPYING](COPYING). Independent implementation; contains no Motorola code.
-
-| directory | contents |
-|---|---|
-| `captures/` | protocol recordings |
-| `samples/` | user codeplug files |
-| `fixtures/` | codeplug images, most factory defaults recovered by driving the original software's initialise function under emulation — `fixtures/README.md` gives per-file provenance |

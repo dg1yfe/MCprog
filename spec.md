@@ -8,19 +8,9 @@ Provenance of every statement here is one of:
 **[S]** read from the disassembly, spot-checked ·
 **[?]** assumed, and flagged.
 
-**Citations that point outside this repository.** MCprog is published on its own; the
-reverse-engineering work it came out of is a separate, unpublished repository. Three kinds of
-reference name files there rather than here, and are given so a statement can be traced to what
-established it — not because the reader can open them:
-
-| form | what it is |
-|---|---|
-| `doc/…md`, `../doc/…md` | reverse-engineering notes — the evidence behind a `[C]` or `[S]` mark |
-| `tools/…py` | the emulation and analysis harness that produced a measurement |
-| `reports/run…` | a hardware run record, kept locally: they carry radio serial numbers and user codeplug contents |
-
-Where this file and those notes disagree, the disagreement is a bug in one of them — say so rather
-than picking one.
+References of the form `doc/…md`, `tools/…py` and `reports/run…` name files in the separate
+reverse-engineering repository and in local hardware run records. Where this file and those notes
+disagree, the disagreement is a bug in one of them.
 
 ---
 
@@ -45,11 +35,6 @@ Rationale: USB-serial bridges vary in their handling of 7-bit modes; none of the
 **P-3 Frame.** A command is **3 ASCII command characters** followed by **4 nibble-characters** of
 16-bit address, high byte first. Write commands append 128 nibble-characters of payload. **[C]**
 
-> Every address in all three captures is 64-byte aligned and below 0x1000, so the highest and
-> lowest address nibbles are **always `0`** there. A transposed encoder replays perfectly. The
-> `proto/header.vec` vectors pin all four nibbles independently; this was found by mutation, not by
-> reading. **[C]**
-
 **P-5 Line noise.** `0x00` and `0x01` bytes appear in the PC stream at the start of a capture and
 again where the 2011 log changes phase. No protocol byte is below `0x06`, so a receiver must skip
 them rather than treat them as a frame. Their origin is the capture rig or the line settling; it is
@@ -65,37 +50,24 @@ set is `0x06` ACK, `0x15` NAK, `0x28` `(`, `0x29` `)`, `0x2A` `*`, `0x30`–`0x3
 clear, `CSTOPB` clear, `CRTSCTS` clear, and `ISTRIP`/`INPCK`/`PARMRK`/`IXON`/`IXOFF` all clear —
 `ISTRIP` in particular would strip the very bit P-2 puts there.
 
-> A pty loopback is 8-bit clean whatever `CSIZE` says, so it **cannot** detect a port opened `CS7`;
-> that would only show up against real hardware, as silent corruption. The settings are therefore
-> asserted directly by reading the termios back, not inferred from a successful round trip. **[C]**
 **P-11** **DTR de-asserted, RTS asserted.** Most USB adapters assert both on open; clear DTR
 explicitly. **[S]** — confirmed from the code: `ser_OpenLine` writes only `MCR=0x00` and `MCR=0x02`,
-so DTR (bit 0) is never asserted by the original at all.
+so DTR (bit 0) is never asserted by the original at all. That RTS reaches the radio CPU's `#NMI`
+is **corroboration, not proof** — the NMI vector is where the disassembly puts the programming
+entry, but **only a radio** can confirm the line actually drives that pin.
 
 **P-12** `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms — **before every transaction**, not once on
 open. **[S]**
 
 **P-27 The original runs that sequence TWICE, back to back, at the start of an operation — and not
-again within it. MCprog now does the same. [C]**
+again within it. MCprog does the same. [C]**
+Measured as four line transitions, all at **TX byte zero**, for both read and write.
 
-> Measured rather than read off the prose, because "before every transaction" is easy to misread as
-> recurring mid-session. Driving `MCEZ9` under emulation with the radio's control lines
-> instrumented, a whole **read** — probe, identify, probe, four record reads, the end-of-memory NAK
-> — produces exactly four line transitions, and every one is at **TX byte zero**:
->
-> ```
-> dtr=0 rts=0   at TX byte 0     \  ser_OpenLine
-> dtr=0 rts=1   at TX byte 0     /
-> dtr=0 rts=0   at TX byte 0     \  and again
-> dtr=0 rts=1   at TX byte 0     /
-> ```
->
-> A **write** session — 4 records, 575 bytes — gives the same four and no more. So the boundary is
-> the *operation*, not the command and not the record.
-
-`mc_session_arm()` reproduces it, and `main.c` calls it at the head of the read and the write. The
-**pulse on `mc_serial_open()` was removed**: the 1987 software has no persistent open, and leaving
-it in would have made three pulses where the original makes two.
+`mc_session_arm()` reproduces it, and `main.c` calls it at the head of the read and the write, so
+the transport's `rearm` hook **is** reached from both paths. The pulse on `mc_serial_open()` was
+removed: the 1987 software has no persistent open, and leaving it would make three pulses where the
+original makes two. `mc_serial_rearm()` remains callable as a single explicit pulse, which is what
+the selftest's `P-24a` probe uses.
 
 Two consequences worth stating, because both are easy to get wrong:
 
@@ -109,76 +81,6 @@ Two consequences worth stating, because both are easy to get wrong:
 Why *twice* is **[?]**. It is reproduced because the object is to be identical, and a second NMI
 costs nothing but time.
 
-> **Read out of the 1987 code, 24 Aug 2026 [S].** The routine is `ser_OpenLine`, at file offset
-> `0x6E6B` in `merged/MCEZ13M_rt.bin` (IP = offset + 0x100). Its port sequence is **byte-identical
-> in all 22 images that carry it**, the 1989 repair build included. In the EZA and `CQM*` images it
-> sits in the merged binary; in the EVA / EV56 / centro family it lives only in the **overlay**
-> (`M5/MCEV_56.001` +`0x1EDB`, `M4/MCCENTRM.000` +`0x32E5`, `M5/MCEV9M.000` +`0x6C9`), which is why
-> a static scan of the merged images finds nothing at all. In order:
->
-> ```
-> LCR = 0x80          DLAB on
-> DLH = 0x00 ; DLL = 0x60      divisor 96 = 1200 baud
-> LCR = 0x0A          7 data bits, odd parity, 1 stop  (built as `mov ax,8 / add ax,2`)
-> IER = 0x00          no interrupts, polled
-> MCR = 0x00          DTR and RTS both DOWN
->     wait 0x32 = 50
-> MCR = 0x02          RTS UP, DTR still down
->     wait 0x82 = 130
-> ```
->
-> The delay unit is a **centisecond**, which is what makes the two constants 500 ms and 1300 ms:
-> the clock helper (`0x6D8D`) calls `INT 21h AH=2Ch` and returns `DH*100 + (DL/10)*10` — seconds
-> and hundredths within the current minute — and the deadline helper (`0x6DD5`) wraps it modulo
-> **6000** (`cmp 0x1766` / `sub 0x1770`), i.e. 60 s at 100 Hz. The expiry test (`0x6E19`) is
-> `(now - deadline) >= 0 && < 100`, the upper bound guarding that same wrap. Resolution is 100 ms,
-> so the real waits are 500 and 1300 ms ±100 ms. P-12's timings were previously marked **[S]**
-> without this chain; they are now derived from the constants themselves.
->
-> `LCR = 0x0A` is an independent confirmation of **P-2**: the original drives the UART at 7O1 in
-> hardware, exactly the frame MCprog synthesises in software on an 8N1 port.
->
-> Only the sequence itself is common. The clock helpers around it are **not**: MCEZ9R (1989)
-> rewrote them to return `DH*100 + DL` with a two-minute signed span instead of truncating to
-> tenths, so its resolution is 10 ms rather than 100 ms. The unit stays a centisecond, so `0x32`
-> and `0x82` still mean 500 and 1300 ms there. That a repair build shipped a 10× finer clock is
-> worth remembering against the fast-PC problem.
->
-> **The RSS never reuses an open link.** Driving each build under emulation, the whole sequence
-> runs once per radio operation: one bounce per read, and one before a write (the EV56 write emits
-> 8 record-writes after a single bounce, so it is per *operation*, not per record). Confirmed
-> independently from the call graph rather than the wire: `ser_OpenLine` is invoked by
-> `proto_AttentionBody`, which both the read driver and the write driver call. MCprog did it
-> **only on open** until `mc_serial_rearm()`. See the note under P-24a.
-
-> **First hardware run, 17 Aug 2026 [C].** A real radio answered on `DTR=0 RTS=1` *and* on
-> `DTR=1 RTS=1`, and was silent on both combinations with RTS de-asserted. So **RTS asserted is
-> what matters** — consistent with it driving HUB/PGM — and the DTR polarity did not decide
-> whether the radio replied. Two cables were tried; one worked, one was silent throughout.
->
-> The same run showed something sharper: after the probe de-asserted RTS, **the radio never spoke
-> again** — not to the remaining probe, and not to the session that followed, which re-asserted RTS
-> and waited the full 1.8 s. Whatever the mechanism, taking RTS away appears to end the programming
-> session for good. The selftest therefore stops at the first combination that answers and keeps
-> that port open. **If a radio goes quiet, power-cycle it before retrying.** The mechanism itself is
-> not established — one run, one radio. **[?]**
->
-> `mcprog --port DEV --selftest report.md` is what produced this.
->
-> Neither line is doing modem control, and nothing here is a handshake. In the interface of
-> `doc/ANALYSIS.md` §3, **DTR supplies the level shifter's negative rail** and **RTS drives the
-> radio's HUB/PGM input, which is what puts the radio into programming mode** -- reported by the
-> user, who has built the interface. More precisely, and from the same source: that line reaches
-> the **`#NMI` input of the radio's CPU**, and taking RTS *high* issues the NMI that (re-)starts
-> programming mode. **[user]** So RTS is an edge-triggered *command*, not a level the radio sits
-> in, which is exactly why P-12 pulses it rather than merely holding it -- and why the original can
-> re-enter programming mode at will. Consistent with the schematic: DTR drives a BC557 (a PNP,
-> so it conducts when its base is pulled negative) through 27 k, and RTS runs straight through.
-> An RS-232 line that is *de-asserted* sits at its negative level, so `MCR=0` is what puts a
-> negative voltage on DTR. That reading reconciles P-12 with the hardware, but it has not been
-> measured on a radio: if the shifter instead needs DTR **raised**, P-12 is wrong and the first
-> hardware contact will show it. **[?]**
-
 ## 3. Commands
 
 **P-20** `*` (0x2A) — **identify**. Returns the ident string nibble-encoded, terminated by `0x1A`.
@@ -187,11 +89,7 @@ costs nothing but time.
 | radio | bytes | ident |
 |---|---|---|
 | EVA 9, 5/6-tone (2009 capture) | 41 | `EV9.01.00.11 455M11-3     5/6 Tone radio` |
-| EZA 9 (hardware, 17 Aug 2026) | 37 | `EZ9.00.02.03 Copr,1987 Motorola GmbH` |
-
-> This is *not* once per power-up. The EVA capture sends `*` twice, 36 s apart, and both are
-> answered; the EZA 9 answered four times in one session, including after a full 256-byte read, and
-> all four replies were identical. Never cache the assumption. **[C]**
+| EZA 9 (hardware) | 37 | `EZ9.00.02.03 Copr,1987 Motorola GmbH` |
 
 **P-21** `)01`+addr — **attention / probe**. Returns `(01`+addr + **one byte**, `eeprom[addr]`. The
 capture's two calls return `0x36` then `0x73` — different values, so plainly codeplug data. **[C]**
@@ -201,16 +99,10 @@ appears in none of the three captures, so it was a guess from the disassembly un
 answered it: `)020000` returned `FB 02`, and `)010000` / `)010001` on the same radio returned `FB`
 and `02`. It is a two-byte read, not a serial-number command. **[C]**
 
-> Still **never gate a write on it** — a full pre-write read is strictly stronger, and W-3 does
-> exactly that.
-
 **P-23** `)40`+addr — read 64 bytes, reply `(40`+addr + 128 nibble-characters. During a sequential
 read every record after the first is requested with a leading `0x06`, the acknowledgement of the
 previous one — confirmed on hardware, where all four EZA 9 records after the first carried it.
 **[C]**
-
-> A record takes about 1.25 s at 1200 baud: 135 characters out and back, plus the turnaround. A
-> whole 256-byte EZA 9 read measured 5015 ms. **[C]**
 
 **P-23a The address space is 10 bits, and overrun aliases instead of failing.** Two limits, both
 enforced in firmware and both worth respecting client-side:
@@ -225,63 +117,24 @@ enforced in firmware and both worth respecting client-side:
 
 `mc_read_block` refuses `addr + 64 - 1 > 0x03FF` rather than accept silently wrong bytes. **[S]**
 
-> This also explains **where the end-of-memory NAK comes from**. The firmware is willing to address
-> 1024 bytes, but the fitted part is smaller — 128 on an EZA CSQ/PL, 256 on an EZA Sel5 and both
-> M110s, 512 on an EVA. Reading into a bank that is not populated gets **no ACK from any device**,
-> which the firmware reports as the NAK of P-24. "End of memory" is the bus going unanswered, not a
-> firmware limit being reached. **[S]**
-
 **P-24** Past the end of memory the radio NAKs, in one of **two forms — both real**:
 
 | form | seen on |
 |---|---|
 | echoed 7-byte header, then `0x15` | the EVA captures |
-| a bare `0x15` | an EZA 9, on hardware (17 Aug 2026) |
+| a bare `0x15` | an EZA 9, on hardware |
 
 Accepting only one misparses the end of every read on the other. This is not a spec ambiguity to be
 resolved but a difference between radios, so accept both. **[C]**
-
-> **Where the first form comes from [S], 24 Aug 2026.** The EVA radio firmware (`EPROM/EZA33.BIN`,
-> `doc/EZA33_FIRMWARE.md` §5a) echoes the parsed header — `(`, count, both address bytes — at
-> `E763`–`E771`, *before* it reads the first EEPROM byte. A NAK raised later, in the byte loop, is
-> therefore preceded by the complete 7-character echo; a NAK raised in the header parser
-> (`proto_ReadHeader`, `E7CF`, which rejects a count over `0x40` or an address high byte over `0x03`)
-> comes bare. That accounts for the EVA row exactly. It does **not** account for the bare `0x15` from
-> the EZA 9, whose addresses were in range — different firmware, not disassembled. **[?]**
 
 **P-24a The end-of-memory NAK ends the session — on the radios tested.** After it the radio answers
 nothing — not the next command, and not even `*`. Measured on every radio put through the selftest so
 far: four Radius M110s (two `EZ3.01.00.44` CSQ/PL, 70 cm and 2 m; two `EZ9.01.00.45` Sel 5, 70 cm
 and 2 m) and an MC micro EZA 9, across nine runs. **[C]**
 
-> **An EVA firmware does not behave this way [S], 24 Aug 2026.** In `EPROM/EZA33.BIN` the NAK path is
-> `LDAA #$15 / BSR ser_PutChar / BRA $E787`, and `E787` is `BRA $E74E` — the top of
-> `nmi_ProgramMode`'s command loop. It sends the `0x15` and goes straight back to waiting for the
-> next sigil, with the stack reset. Both NAK sources behave this way: a rejected header and an
-> EEPROM that fails to ACK.
->
-> **None of the three radios measured above is an EVA**, so this is not a contradiction — it is
-> evidence that P-24a is **model-specific rather than universal**. The `[C]` measurements stand for
-> the radios they were taken on. Nothing here should be assumed for an EVA until one is on the bench,
-> and nothing in the client may drop the recovery path on the strength of one disassembly. **[?]**
-
-> **This is why nothing has been written to a radio yet.** Four write-enabled runs on 23 Aug 2026
-> all reported `write 0x0000: no first ACK`. The wire log shows the write frame was well formed —
-> exactly the 135 bytes P-25 specifies, `(40` + address + 128 characters — and that **no bytes came
-> back at all**. The read-only runs settle the cause: they lose the radio at the same point having
-> written nothing, so it is the NAK and not the write.
->
-> The selftest sent the write *after* walking the whole EEPROM, so the radio had already gone quiet.
-> It now takes one record on its own first (`mc_read_block(..., chain = 0)`), exercises the write
-> path with that, and walks the EEPROM afterwards. **Untested on hardware** — the next radio through
-> is what settles whether the write path works at all.
->
-> **And that same run now tests the recovery.** The selftest's last act is a `*` after the full
-> session, which on every radio so far has gone unanswered. When it does, the selftest pulses RTS
-> (`mc_serial_rearm()`) and asks again, reporting `P-24a` as PASS if the radio comes back. It runs
-> last, on a radio that is already unresponsive and after the codeplug has been read and saved, so
-> failure costs nothing and success retires the power-cycle requirement outright. It is skipped when
-> the ident answered — there would be nothing to recover — and on a transport with no control lines.
+The disassembled EVA firmware returns to its command loop after sending the NAK rather than going
+deaf, so this may be **model-specific rather than universal**. No EVA has been put through it, so
+the in-band recovery path is retained **until one is on the bench**. **[S]** **[?]**
 
 **P-24b A second way the session dies: the Ext Alarm input.** Independently of any NAK, the radio's
 character reader checks **pin 15** on every call and abandons programming mode if it is
@@ -289,13 +142,6 @@ asserted — `ser_GetChar` at `E7A3` tests Port 2 bit 6, powers the EEPROM down,
 the exit by the write-in-progress flag (`$0087` bit 6): `EDDD` if a write was underway, `FA3D`
 otherwise. So a radio can go silent **mid-record with no protocol error at all**, and the wire looks
 identical to a radio that simply stopped answering.
-
-> **What pin 15 is, corrected 27 Aug 2026.** It is the **timer-2 output** — the alert tone in normal
-> operation — and an input only while programming mode has stopped that timer. The data-direction
-> register says nothing about it either way, because a timer output pin overrides the DDR. The ROM
-> hands it over explicitly on entry: `E736 CLRA / E737 STAA $1B` stops timer 2 and `E739
-> AIM #$BF,$01` makes P2.6 an input, adjacent instructions with nothing between them. See
-> `doc/EZA33_FIRMWARE.md` §8. **[user, schematic]** + **[S]**
 
 Practical consequence: when a session dies unexpectedly, a stuck or noisy Ext Alarm line is a
 candidate alongside P-24a, and it is one the protocol cannot distinguish. Worth knowing before
@@ -305,53 +151,9 @@ Anything that needs the radio after a full read must re-establish the session fi
 is the only method **known** to work — but the 1987 software suggests a second one that has never
 been tried.
 
-> **What the original does instead of a power-cycle [S], 24 Aug 2026.** It re-establishes the
-> session *by construction*: it runs the whole P-12 sequence — full 8250 re-init, `MCR=0` for
-> 500 ms, RTS back up, 1300 ms — **before every single transaction**. It therefore never faces the
-> question P-24a poses, because it never carries a session across a read boundary. Under emulation
-> the second read of a two-read session is preceded by exactly this bounce, at the instruction the
-> first read's last byte leaves off.
->
-> **And there is a mechanism for it. [user]** RTS reaches the radio CPU's **`#NMI` input** through
-> the interface circuitry, and taking RTS **high** issues that NMI — which is what (re-)starts
-> programming mode. So the `MCR=0` → `MCR=2` bounce is not a handshake and not line housekeeping:
-> it is the RSS **deliberately firing an NMI at the radio** to put it back into the programming
-> routine, and the 500 ms low is just long enough to guarantee a clean edge. That is why the
-> original can afford to ignore P-24a entirely — it re-enters programming mode from scratch before
-> every transaction, so a session that ended at the NAK never needs to survive.
->
-> This makes the RTS pulse the **first thing to try** after the end-of-memory NAK, in place of the
-> power-cycle: on the still-open port, drop RTS, wait 500 ms, raise it, wait 1300 ms, then ask for
-> `*`. A power-cycle and an NMI both land the CPU back at the same entry point, which would explain
-> why the power-cycle works.
->
-> **`mc_serial_rearm()`** implements exactly this pulse on an already-open port, for both the POSIX
-> and Win32 transports. It is not wired into the read or write path: the call belongs wherever the
-> session has to survive, and on current evidence that decision needs a radio, not a guess.
->
-> The emulator can now at least ask whether the *RSS* is consistent with the account.
-> `radiosim.Radio(nmi=True)` makes the simulated radio deaf until it sees a rising edge on RTS and
-> deaf again at the end-of-memory NAK; `tools/nmitest.py` drives every build against it. All four
-> survive unchanged — same commands served as with the rule off, each arming the radio itself
-> (1–4 times, matching the transaction count) — while the negative control, a radio that never
-> hears the NMI, is served **nothing at all**. So the rule bites and the RSS satisfies it unaided.
-> That is corroboration, not proof: the model is built from the account it tests, and only a radio
-> can confirm that RTS reaches `#NMI`.
->
-> What remains **[?]**: the P-12 hardware note still reports a radio going
-> permanently deaf after RTS was de-asserted, in a run that *did* re-assert it. That is not the
-> same experiment — the probe left RTS **down across two whole line-combinations**, several seconds
-> including a port close and reopen, and one of those combinations asserted DTR, which by §3 is the
-> level shifter's negative rail; with the rail collapsed the edge may never have reached the CPU at
-> all. The RSS, by contrast, drops RTS for exactly 500 ms and never asserts DTR (its only two `MCR`
-> values are `0x00` and `0x02`, which is also P-11 confirmed from the code).
-
 **P-25** `(40`+addr+128 chars — write 64 bytes. The reply is **two bare ACK bytes, no header**: the
 first ~130 ms after the last data byte (command accepted), the second **~710 ms** later (EEPROM burn
 complete). Measured across all 8 blocks of the write capture, consistent to 3 ms. **[C]**
-
-> **P-25 is the single easiest requirement to get wrong.** An implementation that proceeds on the
-> first ACK desynchronises on the very next block. Never send block N+1 before ACK2.
 
 **P-26 Acknowledgement is contextual.** A `0x06` ACK follows a *read* record, and it is transmitted
 **in front of the next command**, not as a message of its own — the wire shows `06 29 34 30 30 30 34
@@ -389,16 +191,6 @@ for write completion; `eep_WriteByte` waits out a fixed delay per byte —
 `LDX #$0BF7 / DEX / BNE` = 3063 × 4 = **12252 cycles**, which at E = 4924800/4 = 1231200 Hz is
 **9.95 ms**. With the bit-banged I²C transaction on top it is ≈ **10.89 ms per byte**, so a 64-byte
 record predicts a **≈ 697 ms** gap between the two ACKs. **[S]**
-
-> **This independently confirms the capture.** P-25 measured ~710 ms on hardware **[C]**; the
-> disassembly predicts 697 ms **[S]** — **1.9 % apart**, from two completely unrelated methods. That
-> agreement also validates the cycle model behind it (the 1-cycle `DEX`, the 4924800/4 clock, and the
-> `0x0BF7` constant), which is why the tone-decoder timings in `doc/EZA33_FIRMWARE.md` can be trusted.
->
-> It also shows the **old 800 ms timeout was too tight** — 15 % over the derived figure, 13 % over the
-> measured one, for a path that has never once succeeded on hardware. A spurious timeout there is
-> expensive to diagnose; a generous one costs only the time to notice a genuinely dead radio. Hence
-> 2000 ms, and a separate short timeout for the first ACK.
 
 **P-31b The two ACKs need different timeouts.** The first is sent when the record has been taken into
 RAM, *before any byte reaches the EEPROM* (firmware `E7F6`, before the burn loop at `E7FE`), so it
@@ -444,29 +236,6 @@ The fix is **arithmetic, not `tcdrain`**, which is what P-31 warned about above:
   would have been **entirely unfixed on this adapter**, failing identically and looking like the
   radio again.
 
-> **There is no portable way to ask whether the transmit register is empty.** `tcdrain` and
-> `TIOCOUTQ` are the two the platform offers, and both were measured answering about the kernel's
-> own queue rather than about the wire. Nothing else is available across Linux, macOS and Windows.
->
-> So the most compatible and reliable way to know a frame has been sent is to **wait, for as long as
-> the frame takes, from the moment it was handed to the kernel.** That needs no driver, no ioctl and
-> no cooperation from the adapter, and it is the same answer on every port on every platform. It is
-> what `drain()` does.
-
-> **The margin is load-bearing, measured on a TX↔RX loopback.** With the FT232's pins bridged, a
-> 135-byte frame at 1200 baud gives, reproducibly over five runs:
->
-> | | bytes visible |
-> |---|---|
-> | at the bare floor, 1125 ms | **133 of 135** |
-> | at floor + margin, 1139 ms | **135 of 135** |
->
-> The bare arithmetic is about **two bytes short** — 16.7 ms, which is suspiciously close to the
-> FT232's 16 ms receive latency timer, so this is probably the RX path reporting late rather than
-> the transmission finishing late. The two were **not** separated, and for this purpose they need
-> not be: what the ACK clock must not do is start before the PC could see a reply, and 1139 ms is
-> where the whole frame is reliably visible. **[C]**
-
 The floor is padded rather than exact: **+3 ms and +1 %**. Overshooting is free — a reply arriving
 during the wait is buffered by the kernel and reading it late costs nothing — while undershooting
 comes straight out of `MC_T_ACK1`, which is the defect itself. The fixed part covers the transfer
@@ -482,25 +251,7 @@ it. It cannot block, cannot hang, and cannot be lied to. The speed charged is th
 requested, else the port's actual speed (so `--baud 0` is not a silent hole), except on a pty, which
 has no wire and is charged nothing.
 
-> **The wait itself has to survive signals, and only half of that is verified.** `nanosleep` returns
-> `EINTR` with the unslept remainder in `rem`, and discarding it — passing `NULL` — silently
-> shortens the wait, which is the very failure this rule exists to prevent. `nap_ms` now consumes
-> `EINTR` and retries on the remainder.
->
-> `drain()` does not actually depend on that, because it loops against a **deadline** and
-> re-corrects; putting the `nanosleep(&ts, NULL)` bug back leaves the floor test passing. Removing
-> **both** guards makes it return after **65 ms** instead of 1125, and the test catches that. **[C]**
->
-> **The delays that do depend on it are P-12's 500 ms and 1300 ms**, which run straight through with
-> no loop — a signal there shortens the `#NMI` pulse the radio sees and nothing downstream notices.
->
-> **Measured, 27 Aug 2026, and it was not theoretical.** `make hwprobe PORT=…` on an FTDI FT232
-> with a `SIGALRM` every 70 ms: arming takes **1809 ms** with **25 signals** delivered. With the
-> `nanosleep(&ts, NULL)` bug put back it takes **140 ms** — a **13× shortened `#NMI` pulse**, which
-> is the one thing that puts the radio into programming mode. Under a signal storm arming would
-> have silently failed, and the radio would simply have looked dead. **[C]**
-
-**P-31e The write works on hardware, 28 Aug 2026 — and the M110 burn constant is now measured.**
+**P-31e The write works on hardware; the M110 burn constant is measured.**
 Four radios, two models, `reports/write-runs4`: record accepted, burn confirmed, record read back
 **identical**, radio still answering afterwards, full EEPROM read completing in the same session.
 Report 1 is **15 probes, 12 as documented, 0 differ, 0 failed**. **[C]**
@@ -521,12 +272,6 @@ records 37 on the EZA 9).
 
 **What it took, in order:** P-31d (start the ACK clock when the frame has left, not when it was
 queued), then this timeout, then not interrogating a radio that is still burning.
-
-> **The superseded reading, kept because it was wrong in an instructive way.** When the first ACK
-> arrived and the burn did not, the radio went silent and needed a power cycle, and it was not
-> established whether the liveness probes fired immediately afterwards had caused that. They had
-> not, or not only: the radio was still burning, three to four seconds into a wait that ended at
-> two. Nothing was wrong with the radio.
 
 **P-31e (superseded) A radio accepted a record and did not confirm the burn.** `reports/write-runs3/report1`, an `EZ3.01.00.44` M110. The wire log settles P-31d beyond
 argument:
@@ -553,9 +298,6 @@ immediately afterwards contributed to that, or merely followed it. There is no r
 radio that has just said it is writing, so the selftest now settles for a full burn timeout before
 asking anything. **[?]**
 
-> Nothing was risked by this: the record written was the radio's **own bytes**, so even a burn that
-> committed a partial record wrote back what was already there.
-
 **P-32** Exactly **one** retry, of the attention phase only. **No retry** around read, write or
 verify — fail loudly. An automatic retry mid-write is how a glitch becomes a half-written EEPROM.
 **[S]**
@@ -568,10 +310,6 @@ probe, identify, probe. A write session opens with the probe alone. **[C]**
 **P-41 Read all.** For `addr = 0, 0x40, 0x80, …`: send `)40`+addr; on a valid header read 128 payload
 characters and ACK with `0x06`; on NAK (either form, P-24) stop. Device size = records × 64. Cap the
 walk at 64 records. Verify the checksum (K-2) and **report** a failure without refusing the data.
-
-> Not hypothetical: the 2011 capture's radio returns a codeplug whose checksum is `0x80`, not
-> `0xFF`. A tool that refuses invalid data cannot read that radio at all — which is exactly the
-> radio whose owner most needs to read it. **[C]**
 
 **P-42 Write all.** Per record: `(40`+addr+payload → wait ACK1 → **wait ACK2** → `)40`+addr read-back
 → compare. Comparison is byte-exact **except** channel frequency fields, which compare by **decoded
@@ -587,23 +325,6 @@ so old files load unchanged. **[C]**
 target is `0xFF` and the extent is the whole device, MCEZ13 included; the sum loop at `CS:0x767E`
 runs `0 .. size-1` and `size` is 128 there — watched at runtime, not inferred. **[C]**
 
-> **The Radius M110 uses a different constant**: its covered bytes sum to **`0x01`**, with the byte
-> at **`0x0F`**. Read out of `M110/MRAR0200.EXE`: the writer at file `0x1BD82` zeroes the cell, sums,
-> then computes `1 - sum`; the verifier at `0x1BBF6` does `sum / dec / je`. Measured on four radios,
-> and the negative controls are decisive — an image doctored to sum to `0xFF`, the MC micro's own
-> constant, is **rejected by the M110's own software**. **[C][S]**
->
-> Assuming a single global target is therefore not a simplification but a corruption: applying the
-> MC micro rule to an M110 rewrites `0x000`, which on that format is **serial-number byte 0**.
-
-> **This corrects a documented law.** MCEZ13's checksum was recorded as covering "126 of 128, all
-> but the last two bytes". It does not; that reading came from a fixture whose two leading bytes had
-> been stripped, which turned a 128-byte sum into a 126-byte one over a shifted array and moved
-> every MCEZ13 offset down by two. The strip was compensating for a malformed synthetic ident
-> rather than for anything the radio does — `../doc/EEPROM_MAP_EZA.md` has the whole chain. MCEZ13's
-> checksum byte is **`0x003`**: the editor zeroes it and stores the complement there, watched at
-> `CS:0x7B15` and `CS:0x7B34`.
-
 **K-10 Frequency.** Each 3-byte field:
 
 ```
@@ -616,13 +337,6 @@ The RX field holds the local oscillator; the displayed RX frequency is **field +
 first IF). `P` = 80, 80, 128, 254 for bands 1–4. Band index 7 means unprogrammed — ask the user,
 do not error. **[C]**
 
-> **`b0` bit 2 does a second job: it also picks the reference divider.** The radio at `EZA33` `F9C3`
-> does `TIM #$04,0,X` on the channel record's byte 0 and loads the PLL's reference divider from
-> `0x0D6` when set, `0x0D4` when clear — the same bit that selects the 3125/2500 Hz step. And 3125 =
-> 6.25 kHz ÷ 2, 2500 = 5 kHz ÷ 2, so **the step is exactly half the channel spacing** and one bit
-> selects both. A programmer that changed the step without regard for the divider would be
-> inconsistent with the radio. MCprog does not write either, so this is a reading, not a bug. **[S]**
-
 **K-10a The reference dividers are checkable.** `REF_DIV.001`, shipped beside the RSS on every disk
 set, is the operator's reference card, and its four values decode exactly as
 **`word = 2 × (Fref ÷ spacing) + 1`**:
@@ -633,7 +347,8 @@ set, is the operator's reference card, and its four values decode exactly as
 | 12.8 MHz (SP) | `0x1401` | `0x1001` |
 
 So `refdiv[0]` is the **5 kHz** divider and `refdiv[1]` the **6.25 kHz** one — they are not
-interchangeable. All eleven EVA sample codeplugs carry the standard pair. `mc_refdiv_spacing()`
+interchangeable. The band byte's raster bit therefore has **a second job**: besides the channel
+raster it selects which of the pair is in force. All eleven EVA sample codeplugs carry the standard pair. `mc_refdiv_spacing()`
 returns the implied spacing for a word, or 0 if it is not one of the four.
 
 This does **not** license computing them — K-30 still says preserve verbatim, because a radio may
@@ -697,13 +412,6 @@ differential sweep caught it turning `0xE7` into `0x60`, clearing the nibble. **
 | selectable | `0xE0 \| index`, the operator's own choice, **clamped** below the populated count |
 | off | `0x00` |
 
-> **How this was found.** The radio-side read path (`doc/EZA33_FIRMWARE.md` §7f) traced the full PL
-> chain — channel → trakmode → trakmode byte `0x18` → `cp_pl_list` — and that byte is `0x1FD` on a
-> 512-byte EVA. The RSS-derived map had already named `0x1FD` "PL encode mode" and recorded the
-> `0xE7 → 0x60` transition; what it could not say was *why* the nibble mattered. The firmware says
-> why. The regression test plants `0xE7` and requires `0x60`, and it fails against the old masking
-> implementation.
-
 **K-31 The trakmode block is derived from the codeplug size, not hardcoded.** A *trakmode* is
 Motorola's term for a shared signalling personality — one **27-byte** record holding the basecall
 code, repeater-access sequence, groupcall positions, PL encode mode, AAK/secret bits and the
@@ -724,13 +432,6 @@ MCprog previously hardcoded. For a 1024-byte codeplug it moves to **`0x3FD`**, a
 would have edited the wrong byte. `mc_pl_mode_off()` is now authoritative and `pl_mode` is its
 512-byte fallback; the write gate asks the same function, so it cannot guard one address while the
 editor writes another. **[S]**
-
-> The 1987 RSS computes the same thing: `TrakBase(n) = [0x810] - 27*(n+1) + 1` at `0x3A78`, which with
-> its stored top index `0x1FF` also gives `0x1E5`. Two implementations, one formula. **[C]**
->
-> **No model is 1024 bytes today**, so this is a latent correctness fix rather than an observed bug.
-> It is worth making anyway: it removes an assumption we now know the radio does not share, and the
-> accessor refuses a block that would fall outside the image instead of running off the end.
 
 Accessors: `mc_codeplug_top()`, `mc_trak_base()`, `mc_trak_count()` (bits 0–3 of `0x0DA`),
 `mc_trak_enabled()` (bit 7), `mc_channel_trak()`. **PL uses trakmode 0 deliberately** — a 512-byte
@@ -754,49 +455,10 @@ already uses for its `0x010` table — so **the two constants are not per-model 
 and the decoder simply scale differently**, and MCEZ13 and the M110 are the two radios that expose
 both. Measurement on MCEZ13 had only bounded the decoder constant to `[61.1063, 61.1087]`.
 
-> The 1989 M110 RSS settles it exactly, carrying both as IEEE doubles side by side with `0.5` and
-> `10` — round-half-up on deci-Hz — at `M110/MRAR0200.EXE` file `0x3174D`, and again at `0x315E8`
-> and `0x3176C`. `8.208`, the K-16 duration constant, sits in the same block at `0x31E13`. **[S]**
->
-> Confirmed on hardware: both CSQ/PL radios carry `982` and `7516` on channel 2, which the RSS
-> prints as `,PLE 123.0` and `,PLD 123.0`, and channel 1 is zero in both fields (`N`).
->
-> And confirmed against the original software across the whole range: `tools/plsweep.py` hands the
-> 1989 RSS each tone in a `.CP`, lets it program a simulated radio, and reads back what it stored —
-> **19 encode and 19 decode tones, every one matching these two laws exactly**, with `N` storing 0.
-> The measured table is kept in `tools/verify_docs.py`, deliberately not generated from the laws it
-> checks. **[C]**
->
-> **118.8 Hz is the only tone that separates `7.9844` from `7.9840`** (949 against 948), so it is
-> the single point of evidence that the M110 uses the MCEZ13 constant rather than the EVA one — the
-> same tone that already distinguishes the two MC micro scales. The sweep measured it: the RSS
-> stored **949**. **[C]**
->
-> The Sel 5 M110 has no PL at all. Note `+0` is a **real** offset here, so a model with no
-> per-channel PL must say so explicitly rather than leave the field zero.
-
 **K-15 Auto-acknowledge delay.** One byte, `round(ms / 15.625)` — a count of 1/64 second — range
 1–127, i.e. 16–1984 ms. Radio-wide. Only the EZA 9 map has it, at `0x076`. Bit 7 is never set by
 the original software and its meaning is unknown, so it is preserved (K-30) and the value is the
 low seven bits. Values outside 16–1984 ms are refused, never clamped (U-3). **[C]**
-
-> Measured in both directions against `MCEZ9R`: seven values written and read back through the
-> radio, six planted and displayed, exact at every point including the software's own stated bounds
-> of 16 and 1984 ms; 2000 ms is refused and writes nothing. See `../doc/EEPROM_MAP_EZA.md`.
->
-> **Only the repair build exposes this field.** The standard and master builds never ask for it,
-> which is why it went unmapped for so long — and why "the editor never mentions that byte" is
-> evidence about the *build*, not about the byte (`../doc/BUILD_VARIANTS.md`). What the radio's
-> firmware does with `0x076` is inferred, not shown: the firmware is internal mask ROM. **[?]**
-
-> **MCEZ13 is deliberately absent.** Its PL decoder and encoder tables at `0x010` and `0x024` are
-> known, but whether they are indexed per channel is not established, and the model's read is still
-> blocked (see `../doc/EEPROM_MAP_EZA.md`). A programmer that guessed here could write a codeplug
-> no radio wants. It exposes nothing until that is settled.
->
-> **The EZA 9 nearly went the same way.** An earlier pass concluded it had no PL at all, having
-> tested only the base build — the one of four where the menu entry is inert. `MCEZ9R` and both
-> `MCEZ9M` builds prompt for a frequency. Check every build before concluding a feature is absent.
 
 **K-16 Radio-wide timers.** The original's `T' sub-screen, twelve fields at `0x0B3`–`0x0C4`. It
 does not compute them one at a time. It walks **four parallel word arrays of twelve entries** —
@@ -847,43 +509,21 @@ Four things in that table are easy to get wrong:
 MCprog stores milliseconds, which is what the codeplug holds, so it can be finer than the screen it
 came from. A value the law cannot spell is refused, never rounded (U-3).
 
-**K-20 Model descriptor.** These genuinely vary and must be data, not assumptions:
+**K-20 Model descriptor.** These genuinely vary and must be data, not assumptions.
+
+The three-byte family tag at `0x07..0x09` identifies the *family*, not the model: `EZ3.` and `EZ9.`
+are **shared between the MC micro EZA radios and the Radius M110s**, separated only by the version
+that follows. Detection keys on size, checksum and marker; the prefix alone cannot do it.
 
 | model | size | checksum byte / extent | channels | band | ref dividers |
 |---|---|---|---|---|---|
 | `MCEV_56` 5/6-tone | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 
-> The two 512-byte models are the same hardware — EVA 9 — differing only in signalling, and nothing
-> in the image separates them. Detection reports the ambiguity and prefers `eva_sel5`; that is a
-> preference, not a determination. **The radio's ident settles it**: a real EVA names its
-> signalling (`... 5/6 Tone radio`), so `mc_model_detect_ident()` selects `eva_56` on that marker.
-> No SEL5 marker has ever been captured, so its absence concludes nothing. **[C]** for the marker,
-> **[?]** for anything the absence might mean.
 | `MCEV9` / `MCEV9M` SEL5 EVA | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEZ9` SEL5 EZA | 256 | 0x000 | 0x0C8, 8 × 6 | 0x082 b4-6 | 0x0C4 |
 | `MCEZ13` CS/PL | 128/256/512/1024 | **0x003**, whole device | 0x03B, 8 × 6 | 0x039 b4-6 | 0x004 |
 | **M110** CSQ/PL `EZ3.01.00.44` | 256 device / **128 codeplug** | **0x00F**, first 128, target **0x01** | 0x01B, 10 × 10 | **0x00A b0-3** | 0x013 |
 | **M110** Sel 5 `EZ9.01.00.45` | 256 | **0x00F**, whole device, target **0x01** | 0x092, 15 × 7 | **0x00A b0-3** | 0x089 |
-
-> The M110 is a different radio that answers the same wire protocol, and **no MC micro offset lands
-> on a real field**: `eza_sel5`'s reference dividers read `00 00 00 00` and its write counter at
-> `0x09E` is live channel data on both families — channel 1's TX middle byte on the CSQ/PL, channel
-> 2's RX middle byte on the Sel 5. It is two models, not a variant. **[C]**
->
-> Detection therefore needs a **positive marker**, not just size and checksum. Bytes `0x07..0x09`
-> hold the family tag `"EZA"` or `"EZ9"` — a documented field, from the RSS's own radio-type
-> descriptor table at `MRAR0200.EXE` file `0x31798`, which is also where the checksum offset `0x0F`
-> is confirmed statically for both families. **[S]**
->
-> The band is **four** bits, not three: `doc/M110_MNEMONICS.md` recorded bits 0-2, but its samples
-> were all `VLO`(4) and `VHI`(7), which have bit 3 clear. `ULO`(12) and `UHI`(15) need the fourth.
-> Measured P: `VHI` → 80, `ULO` → 254, `UHI` → 254. `VLO`, `MIB`, `UX1`, `UX2` are **[?]** and the
-> table holds zero for them, which reads as "not computable" rather than as a wrong answer.
->
-> **Unestablished, hence absent from both models:** the PL encoding (the CSQ/PL record carries PLE
-> at `+0` and PLD at `+5`, but the tone scale has not been measured), the channel flag bits, and the
-> timer block. The channel *counts* are the size of the region the table occupies, which is
-> inference from four radios that leave the rest of it zero — see K-25. **[?]**
 
 **K-21 Channel record.** EVA: `+0` BCD number, `+1` trakmode, `+2..4` TX, `+5..7` RX. EZA: `+0..2`
 TX, `+3..5` RX, with no number and no trakmode byte. **[C]**
@@ -922,18 +562,6 @@ that are **two identical 128-byte copies** (`bytes[:128] == bytes[128:]` on both
 the codeplug is the first 128, and the 1989 programmer writes **only those 128** — its emitted
 record list is `[(0,64), (64,64)]`, against `[(0,64), (64,64), (128,64), (192,64)]` for the Sel 5.
 So the write extent is per-model. **[C]**
-
-> This is also the whole of the "sums to `0x02`" puzzle: each 128-byte copy independently sums to
-> `0x01`, so the 256-byte total is `0x02`. Never an offset error, never a damaged codeplug.
->
-> Writing all 256 to a CSQ/PL would be actively harmful. The write-counter bump guarantees the two
-> halves differ, and whether the upper half is separate storage or an address alias of the lower is
-> **[?]** — both readings are bad. Separate storage leaves two disagreeing copies with no way to
-> know which the firmware reads; an alias means record order makes **the second half win**, so the
-> radio ends up holding the copy that was *not* checked.
->
-> Channel *counts* on both M110 models are the size of the region the table occupies, which is
-> inference from four radios that leave the rest of it zero, not a measurement. **[?]**
 
 **K-24a Programming an empty slot defaults clock shift OFF.** An unprogrammed record's flag bits
 are leftovers, not settings. That matters because MCEZ13 stores clock shift **inverted**, so a
@@ -1008,10 +636,6 @@ file is **never overwritten without `--force`**; and `--new` **refuses to be com
 `--read`, `--write` or `--selftest`**, because creating a file and touching a radio are different
 operations and merging them is how the wrong image gets programmed.
 
-> The family prefix alone cannot identify a model, and that is why it is not used for detection:
-> `EZ3.` and `EZ9.` are shared between the MC micro EZA radios and the Radius M110s, separated only
-> by the generation digits (`EZ9.00.` against `EZ9.01.00.45`).
-
 ## 8. Write safety
 
 **W-1** Writing requires an explicit opt-in flag; absent it the action is visible but disabled, with
@@ -1019,17 +643,10 @@ the reason shown.
 **W-2** A full read of the radio is dumped to a backup file before the first write byte. Failure to
 read or to write the backup aborts the write.
 
-> The caller may name the file (`--backup`). The generated default is
-> `mcprog-backup-<date>-<time>.dat` in the working directory, and **an existing backup is never
-> overwritten**: the timestamp has one-second resolution, so two writes in the same second would
-> otherwise land on one file and the second would destroy the only copy of what the radio held
-> before the first. A `-1`, `-2`, … suffix is appended until the name is free.
 **W-3** Pre-write gates, all fatal: checksum valid; band not 7; model and size match; every byte
 that differs from what the radio just returned is one MCprog itself writes (K-30). A write that
 would change nothing is refused rather than performed.
 
-> The serial number is covered by the K-30 gate rather than by a check of its own: if it differs
-> from the pre-write read, the write is refused along with every other unaccountable difference.
 **W-4** Verify every record after writing (P-42). Abort on mismatch, naming the record, the offset
 and the backup path.
 **W-5** Increment the write counter on radio writes only, never on file saves, then recompute the
@@ -1042,43 +659,6 @@ checksum. **Implemented**, per model, from measurement.
 | `eva_56` | — | keeps its programming *date* at `0x0AF`-`0x0B1`; no counter — see below |
 | `eza_cspl` | — | not measured; that build refuses to write under emulation |
 
-> Measured by chaining read-write cycles against the 1987 software and the simulated radio
-> (`../tools/wcounter.py`). A read followed by a write with **no edit in between** moves exactly
-> two bytes — this one and the checksum compensating for it (K-2) — and repeating with the
-> emulated clock moved gives the identical diff, which is what separates a counter from a date.
->
-> **It is not an eight-bit increment, and that matters.** `0x1F` becomes `0x10`, not `0x20`: on
-> wrap the low nibble resets and bit 4 is *set*, so bit 4 reads as a sticky "reprogrammed more than
-> fifteen times" flag rather than a fifth counter bit. Seventeen planted values pin it on the EVA
-> and twelve on the EZA (`testdata/wcount/wcount.vec`). A programmer that adds one to the whole
-> byte corrupts whatever bits 5-7 hold.
->
-> The bump lands only in the bytes handed to the radio: `mc_write_radio` copies the image, bumps
-> the copy and fixes its checksum, so the caller's codeplug — and therefore any file it saves — is
-> byte-for-byte unchanged. It happens after every W-3 gate has passed, so a refused write never
-> advances it.
->
-> **The 5/6-tone build genuinely has none, and that is worth stating twice** because it is the
-> surprising half: same radio, same 512-byte EEPROM, and the SEL5 build keeps a counter in the byte
-> the 5/6-tone build keeps a year in. Behaviour says so (three chained writes on a fixed date move
-> nothing) and so does the code — the byte-pair that reads the counter nibble, `push 0x00AF` then
-> `push 0x000F`, is in **every** EV9 `.000` overlay and in **no** MCEV_56 file. Where MCEV_56
-> touches `0x0AF` it writes the whole byte from a variable. Whether the radio's firmware reads
-> either is unknown; it is mask ROM. **[?]**
->
-> **`eva_56` is the trap.** `0x0AF` is a write counter on the SEL5 EVA and the *year* of the
-> programming date on the 5/6-tone build — same offset, two 512-byte models MCprog cannot tell
-> apart by size. Moving the emulator's clock proves it: 1987-03-15 writes `87 03 15`, 2026-12-31
-> writes `C6 12 31`, the year being `((y-1900) div 10)*16 + ((y-1900) mod 10)`. MCprog writes
-> neither on that model. **[C]**
->
-> **MCEZ13 has none, and that is now measured rather than assumed.** It used to stop at `WRITING`
-> with `ERROR : UNITS EXCHANGED`; with a correctly shaped ident and an unshifted codeplug it reads
-> and writes end to end, and three chained cycles change **not one byte** — no counter, no date.
-> **[C]**
 **W-6** Record order 0..N faithful to the original. `--checksum-last` may be offered, but the
 faithful order is the only one known to work on hardware.
 
-> W-1 to W-4 and W-6 are implemented in `src/write.c` and asserted in `tests/test_write.c`, each
-> gate proven by being made to fire. The whole path runs against the forked fake radio over a pty;
-> **it has never run against a physical radio.** **[C]** for the code, **[?]** for the hardware.

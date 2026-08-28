@@ -63,6 +63,12 @@ typedef struct {
  *     (full-speed USB schedules on 1 ms boundaries, and there is a hub in the path here);
  *   - a proportional part, for baud generators whose divisor is not exact.  FT232 at 1200 is exact;
  *     not every bridge and not every rate is.
+ *
+ * Measured on an FT232 with TX bridged to RX, 135-byte frame at 1200 baud, five runs, identical:
+ * at the bare 1125 ms floor 133 of 135 bytes are visible; at floor+margin, 1139 ms, 135 of 135.
+ * The bare arithmetic is two bytes short -- 16.7 ms, close to the FT232's 16 ms receive latency
+ * timer, so this is probably the RX path reporting late rather than transmission finishing late.
+ * The two were not separated; for this purpose they need not be.
  */
 #define SR_WIRE_MARGIN_MS  3
 #define SR_WIRE_MARGIN_PCT 1

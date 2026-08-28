@@ -8,12 +8,19 @@ Provenance of every statement here is one of:
 **[S]** read from the disassembly, spot-checked ·
 **[?]** assumed, and flagged.
 
-The reverse-engineering evidence lives in `../doc/`. Where this file and `../doc/` disagree, the
-disagreement is a bug in one of them — say so rather than picking one.
+**Citations that point outside this repository.** MCprog is published on its own; the
+reverse-engineering work it came out of is a separate, unpublished repository. Three kinds of
+reference name files there rather than here, and are given so a statement can be traced to what
+established it — not because the reader can open them:
 
-Citations of the form `reports/run…` are **hardware run records kept locally and not committed** —
-they carry radio serial numbers and user codeplug contents. They are identified so a measurement can
-be traced to the session that produced it, not because the reader can open them.
+| form | what it is |
+|---|---|
+| `doc/…md`, `../doc/…md` | reverse-engineering notes — the evidence behind a `[C]` or `[S]` mark |
+| `tools/…py` | the emulation and analysis harness that produced a measurement |
+| `reports/run…` | a hardware run record, kept locally: they carry radio serial numbers and user codeplug contents |
+
+Where this file and those notes disagree, the disagreement is a bug in one of them — say so rather
+than picking one.
 
 ---
 

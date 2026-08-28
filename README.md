@@ -247,6 +247,11 @@ codeplug contents.
 `--log` writes the wire in the `.trace` format `testdata/` consumes, so a real session drops straight
 into the conformance suite.
 
+Comments and `spec.md` cite `doc/…md`, `tools/…py` and `reports/run…`. Those name files in the
+separate, unpublished reverse-engineering repository this program came out of, and in local hardware
+run records; they identify what established a statement rather than pointing anywhere in this
+repository.
+
 ## 9. Licence
 
 GPL-3.0-or-later — see [COPYING](COPYING). Independent implementation; contains no Motorola code.

@@ -11,6 +11,10 @@ Provenance of every statement here is one of:
 The reverse-engineering evidence lives in `../doc/`. Where this file and `../doc/` disagree, the
 disagreement is a bug in one of them — say so rather than picking one.
 
+Citations of the form `reports/run…` are **hardware run records kept locally and not committed** —
+they carry radio serial numbers and user codeplug contents. They are identified so a measurement can
+be traced to the session that produced it, not because the reader can open them.
+
 ---
 
 ## 1. Wire encoding

@@ -76,7 +76,7 @@ does not enforce it: a real EVA answers `EV9.01.00.11`, which the 1987 Standard 
 |---|---|
 | Decode, edit, re-encode, checksum | six models — four MC micro, two Radius M110 |
 | Read a codeplug from a radio | **works on hardware** — EZA 9, 256 bytes, every mapped field as predicted |
-| Write a codeplug to a radio | **never landed on hardware** — §3 |
+| Write a codeplug to a radio | **works on hardware** — four radios covering both M110 variants; record read back identical — §3 |
 | Protocol library | replays all three recorded hardware sessions byte for byte |
 | TUI | channel list, per-channel editor, PL, options, timers, save |
 | Serial transport, POSIX | used against a real radio |
@@ -88,18 +88,24 @@ a pseudo-terminal, and the original software under emulation.
 
 ## 3. Write status
 
-No write has completed on a radio. The history is two distinct faults, one fixed and one open.
+Writing works on hardware as of **28 Aug 2026** — `reports/write-runs4`, four radios covering both M110 variants:
+record accepted, burn confirmed, record read back **identical**, radio still answering afterwards,
+full EEPROM read completing in the same session. Report 1 is 15 probes, 12 as documented, 0 differ,
+0 failed.
 
-| date | outcome | cause |
+Three faults had to be cleared, in this order.
+
+| | fault | fix |
 |---|---|---|
-| to 23 Aug 2026 | 8 sessions, 4 radios, all `no first ACK` | **MCprog** — `spec.md` P-31d |
-| 28 Aug 2026 | record **accepted**; no burn confirmation; radio then silent | open — `spec.md` P-31e |
+| P-31d | ACK clock started when the frame was *queued*, not when it left | `drain()` waits out the frame |
+| P-31e | `MC_T_BURN` 2000 ms — an EVA figure applied to M110 firmware | **8000 ms**, from measurement |
+| — | the selftest interrogated a radio that was still burning | settles for a full burn timeout first |
 
 **P-31d.** `send()` returns when the kernel has *buffered* a frame, not when it has left. A write
 frame is 135 bytes = **1125 ms** at 1200 baud; `MC_T_ACK1` was **400 ms**, so the window shut while
-the radio was receiving byte 48 of 135. Reads (7 bytes, 58 ms) were never at risk — that asymmetry is
-the signature. `drain()` now holds the ACK clock by waiting out the frame from the moment it was
-handed to the kernel.
+the radio was receiving byte 48 of 135. Reads (7 bytes, 58 ms) were never at risk — that asymmetry
+was the signature. Eight sessions across four radios had failed with `no first ACK` for this reason
+alone.
 
 There is no portable way to ask whether the transmit register is empty. Measured on an FTDI FT232 at
 1200 baud, 135-byte frame needing 1125 ms:
@@ -117,12 +123,17 @@ required:
 make hwprobe PORT=/dev/cu.usbserial-XXXX
 ```
 
-**P-31e.** `reports/write-runs3`, an `EZ3.01.00.44` M110: first ACK at **1140 ms** after the frame
-was queued — where P-31d predicts — so the record was accepted. No second ACK inside `MC_T_BURN`,
-then silence; the arming pulse did not recover it. `MC_T_BURN` was 2000 ms, an EVA figure (P-31a
-derives 697 ms from `EZA33.BIN`) applied to firmware nobody has read; it is now **8000 ms**, 125 ms
-per byte. Whether the liveness probes fired immediately afterwards contributed to the silence is
-**not established**; the selftest now settles for a full burn timeout first.
+**P-31e — the M110 burn constant, measured.**
+
+| radio | burn gap, 64 bytes | per byte |
+|---|---|---|
+| `EZ3.01.00.44` CSQ/PL | 3939 ms, 3937 ms | 61.5 ms |
+| `EZ9.01.00.45` Sel 5 | 3252 ms, 3252 ms | 50.8 ms |
+| EVA, predicted from `EZA33.BIN` | 696 ms | 10.89 ms |
+
+Five times the EVA's. `MC_T_BURN` at 2000 ms was short by a factor of two and could never have
+worked on this family; 8000 ms leaves 2.03× over the slowest observed. Two readings per radio differ
+by 2 ms and 0 ms — a fixed timed loop, as P-31a says.
 
 Written records carry the radio's **own bytes**, so a partially committed burn writes back what was
 already there.

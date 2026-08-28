@@ -489,8 +489,35 @@ has no wire and is charged nothing.
 > is the one thing that puts the radio into programming mode. Under a signal storm arming would
 > have silently failed, and the radio would simply have looked dead. **[C]**
 
-**P-31e A radio accepted a record on 28 Aug 2026 — the first ever — and then did not confirm the
-burn.** `reports/write-runs3/report1`, an `EZ3.01.00.44` M110. The wire log settles P-31d beyond
+**P-31e The write works on hardware, 28 Aug 2026 — and the M110 burn constant is now measured.**
+Four radios, two models, `reports/write-runs4`: record accepted, burn confirmed, record read back
+**identical**, radio still answering afterwards, full EEPROM read completing in the same session.
+Report 1 is **15 probes, 12 as documented, 0 differ, 0 failed**. **[C]**
+
+| radio | burn gap, 64 bytes | per byte |
+|---|---|---|
+| `EZ3.01.00.44` CSQ/PL | **3939 ms**, 3937 ms | 61.5 ms |
+| `EZ9.01.00.45` Sel 5 | **3252 ms**, 3252 ms | 50.8 ms |
+| EVA, predicted by P-31a from `EZA33.BIN` | 696 ms | 10.89 ms |
+
+The M110 burn is **five times the EVA's**. `MC_T_BURN` at 2000 ms was short by a factor of two and
+could never have worked on this family; at 8000 it leaves 2.03× over the slowest observed. The two
+readings per radio differ by 2 ms and 0 ms, so this is a fixed timed loop, as P-31a says it is.
+
+Two `DIFFERS` in that batch are both benign: an unprogrammed radio reporting band index 7, and a
+**40-byte ident** on the M110 Sel 5 against the EVA's 41 — ident length is per-model (P-20 already
+records 37 on the EZA 9).
+
+**What it took, in order:** P-31d (start the ACK clock when the frame has left, not when it was
+queued), then this timeout, then not interrogating a radio that is still burning.
+
+> **The superseded reading, kept because it was wrong in an instructive way.** When the first ACK
+> arrived and the burn did not, the radio went silent and needed a power cycle, and it was not
+> established whether the liveness probes fired immediately afterwards had caused that. They had
+> not, or not only: the radio was still burning, three to four seconds into a wait that ended at
+> two. Nothing was wrong with the radio.
+
+**P-31e (superseded) A radio accepted a record and did not confirm the burn.** `reports/write-runs3/report1`, an `EZ3.01.00.44` M110. The wire log settles P-31d beyond
 argument:
 
 | | |

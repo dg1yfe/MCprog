@@ -63,7 +63,13 @@
  *
  * A receive timeout costs nothing when the radio answers, and P-31 already argues that a spurious
  * timeout here is expensive to diagnose while a generous one costs only the wait on a genuinely
- * dead radio.  8000 ms allows 125 ms per byte, which is well past any plausible EEPROM. */
+ * dead radio.  8000 ms allows 125 ms per byte, which is well past any plausible EEPROM.
+ *
+ * MEASURED on 28 Aug 2026, four radios, and the guess was not generous by much.  The M110 burn is
+ * five times the EVA's: 3939 and 3937 ms on two EZ3.01.00.44 (61.5 ms/byte), 3252 ms twice on
+ * EZ9.01.00.45 (50.8 ms/byte), against the 696 ms P-31a predicts for an EVA.  The old 2000 ms was
+ * short by a factor of two and could never have worked on this family.  8000 leaves 2.03x over the
+ * slowest seen. */
 #define MC_T_BURN 8000
 
 /* Microseconds of burn per byte, from the EVA firmware (spec.md P-31a).  Only that one radio's

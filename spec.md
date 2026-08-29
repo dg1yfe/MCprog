@@ -52,9 +52,17 @@ clear, `CSTOPB` clear, `CRTSCTS` clear, and `ISTRIP`/`INPCK`/`PARMRK`/`IXON`/`IX
 
 **P-11** **DTR de-asserted, RTS asserted.** Most USB adapters assert both on open; clear DTR
 explicitly. **[S]** — confirmed from the code: `ser_OpenLine` writes only `MCR=0x00` and `MCR=0x02`,
-so DTR (bit 0) is never asserted by the original at all. That RTS reaches the radio CPU's `#NMI`
-is **corroboration, not proof** — the NMI vector is where the disassembly puts the programming
-entry, but **only a radio** can confirm the line actually drives that pin.
+so DTR (bit 0) is never asserted by the original at all.
+
+**RTS drives the radio CPU's `#NMI`, and that is established**, by three independent lines that
+agree: the schematic routes RTS through the level shifter to pin 8, `#NMI` **[user]**; the NMI
+vector at `FFFC` runs `nmi_ProgramMode`, which has **exactly one xref — the vector itself**, so
+there is no other way into programming mode **[S]**; and every radio tested answers with RTS
+asserted and is silent without it **[C]**. Asserting RTS does not *signal* programming mode, it
+**runs** it, which is why the original pulses rather than holds (P-12, P-27).
+
+The disassembled firmware is the EZA33 ROM; the radios measured are an MC micro EZA 9 and four
+Radius M110s, whose ROMs have not been read. The behaviour is identical across all of them.
 
 **P-12** `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms — **before every transaction**, not once on
 open. **[S]**

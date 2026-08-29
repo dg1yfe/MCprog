@@ -54,15 +54,20 @@ clear, `CSTOPB` clear, `CRTSCTS` clear, and `ISTRIP`/`INPCK`/`PARMRK`/`IXON`/`IX
 explicitly. **[S]** — confirmed from the code: `ser_OpenLine` writes only `MCR=0x00` and `MCR=0x02`,
 so DTR (bit 0) is never asserted by the original at all.
 
-**RTS drives the radio CPU's `#NMI`, and that is established**, by three independent lines that
-agree: the schematic routes RTS through the level shifter to pin 8, `#NMI` **[user]**; the NMI
-vector at `FFFC` runs `nmi_ProgramMode`, which has **exactly one xref — the vector itself**, so
-there is no other way into programming mode **[S]**; and every radio tested answers with RTS
-asserted and is silent without it **[C]**. Asserting RTS does not *signal* programming mode, it
-**runs** it, which is why the original pulses rather than holds (P-12, P-27).
+**RTS drives the radio CPU's `#NMI`, and pulling `#NMI` is the only way into programming mode on
+an MC micro.** Three independent lines:
 
-The disassembled firmware is the EZA33 ROM; the radios measured are an MC micro EZA 9 and four
-Radius M110s, whose ROMs have not been read. The behaviour is identical across all of them.
+| | |
+|---|---|
+| **[user]** | the schematics route RTS through the level shifter to pin 8, `#NMI`. Same wiring and the **same programming adaptor across the family**, including the EVA5 trunking variant |
+| **[S]** | the NMI vector at `FFFC` runs `nmi_ProgramMode`, which has **exactly one xref — the vector itself** |
+| **[C]** | every radio tested answers with RTS asserted and is silent without it |
+
+Asserting RTS does not *signal* programming mode, it **runs** it — which is why the original pulses
+rather than holds (P-12, P-27).
+
+The entry is a property of the wiring and the CPU's vector table, not of one ROM, so it holds for
+the whole family. `EZA33.BIN` is the ROM that was read; it is confirmation, not the basis.
 
 **P-12** `MCR=0`, wait 500 ms, assert RTS, wait 1300 ms — **before every transaction**, not once on
 open. **[S]**
@@ -77,17 +82,13 @@ removed: the 1987 software has no persistent open, and leaving it would make thr
 original makes two. `mc_serial_rearm()` remains callable as a single explicit pulse, which is what
 the selftest's `P-24a` probe uses.
 
-Two consequences worth stating, because both are easy to get wrong:
-
-* **`--no-line-setup` gates the automatic arming, not an explicit request.** The transport's `rearm`
-  hook is left NULL when the flag is off, so `mc_session_arm()` does nothing — but a direct
-  `mc_serial_rearm()` still pulses. The selftest depends on that: it sets `line_setup = 0` because
-  it drives the lines itself, and `P-24a` must still be able to pulse deliberately.
+* **`--no-line-setup` gates automatic arming only.** The transport's `rearm` hook is NULL when the
+  flag is off, so `mc_session_arm()` does nothing; a direct `mc_serial_rearm()` still pulses, which
+  is what the selftest's `P-24a` probe requires.
 * **Arming clears `pending_ack`.** The rising edge restarts the radio's programming routine, so no
-  acknowledgement can be owed across it.
+  acknowledgement is owed across it.
 
-Why *twice* is **[?]**. It is reproduced because the object is to be identical, and a second NMI
-costs nothing but time.
+Why the original pulses *twice* is **[?]**; it is reproduced for identity.
 
 ## 3. Commands
 
@@ -211,100 +212,35 @@ between the two ACKs leaves an **unknown prefix of that record already committed
 Error text must say so, and a failed write must be followed by a verifying read rather than a blind
 retry — this is the same reasoning as P-32's "no retry around write". **[S]**
 
-**P-31d The ACK clock starts when the frame has LEFT, and a driver may not be asked when that was.**
-P-31 already said "measured from completion of transmission". The implementation did not do it, and
-that divergence cost eight hardware sessions.
+**P-31d The ACK clock starts when the frame has left the port, not when `send()` returns.**
+`send()` returns once the kernel has buffered the frame; at 1200 baud a 135-byte write frame is
+**1125 ms** on the wire against `MC_T_ACK1` of 400 ms, so a clock started at `send()` expires
+mid-frame. A 7-byte read command is 58 ms and is never at risk. **[C]** **[S]**
 
-`send()` returns when the kernel has *buffered* the frame. A write frame is 135 bytes; at 1200 baud,
-8 data bits inside a 10-bit character, that is **1125 ms on the wire**. `MC_T_ACK1` is **400 ms**. So
-the window closed while the radio was still receiving **byte 48 of 135**, and no radio could ever
-have answered inside it. Every read in the same sessions worked because a read command is 7 bytes —
-**58 ms** — and never came close to the limit. That asymmetry is the signature: four radios, eight
-sessions, every read fine and every write reporting `no first ACK`, identically. **[C]** **[S]**
+**The wire time is computed, not asked of the driver.** *n* bytes at *b* baud take *n* × 10 / *b*
+seconds. `send()` accumulates that per frame and clamps it forward to the current time; `drain()`
+sleeps to it, padded **+3 ms and +1 %** for link latency and inexact baud divisors. Deriving it is
+the most compatible answer across systems, adapters and drivers: no call reports the transmit
+register empty portably, and the ones that appear to — `tcdrain`, `TIOCOUTQ` — report on the
+kernel's own queue, which on a USB bridge is not the wire. Overshoot is free; undershoot comes out
+of `MC_T_ACK1`.
 
-The fix is **arithmetic, not `tcdrain`**, which is what P-31 warned about above:
+The speed charged is the one explicitly requested, else the port's actual speed, so `--baud 0` is
+not a silent hole. A pty has no wire and is charged nothing.
 
-- On a **USB-serial bridge** (FTDI, CH340, CP210x, PL2303) the driver knows its own queue and not
-  the adapter's FIFO, so `tcdrain` can return while the frame is still going out beyond the USB
-  link — reintroducing this bug invisibly, on exactly the hardware most people now use.
+**P-31e The M110 EEPROM burn is five times the EVA's.** For 64 bytes:
 
-  **Measured on an FTDI FT232 (`0403:6001`), macOS, behind a USB-C hub, at 1200 baud. It is not a
-  small error — the kernel is simply blind past the USB boundary. [C]**
-
-  | | 135-byte frame | 512-byte frame |
-  |---|---|---|
-  | the wire needs | **1125 ms** | **4267 ms** |
-  | `write()` returned after | 0.0 ms | 0.1 ms |
-  | **`tcdrain()` returned after** | **0.1 ms** | **0.1 ms** |
-  | `TIOCOUTQ` reported empty after | — | **506 ms** |
-  | `drain()`, computing the floor | **1128 ms** ✓ | — |
-
-  `tcdrain` waited for **nothing at all**, and `TIOCOUTQ` — the other obvious way to ask — calls a
-  4.3-second transmission finished after half a second. Had the `tcdrain` version shipped, P-31d
-  would have been **entirely unfixed on this adapter**, failing identically and looking like the
-  radio again.
-
-The floor is padded rather than exact: **+3 ms and +1 %**. Overshooting is free — a reply arriving
-during the wait is buffered by the kernel and reading it late costs nothing — while undershooting
-comes straight out of `MC_T_ACK1`, which is the defect itself. The fixed part covers the transfer
-crossing the link before the adapter starts shifting; the proportional part covers baud generators
-whose divisor is not exact. On the FT232 at 1200 baud the 135-byte frame is charged **1139 ms**
-against a physical 1125.
-- On a **pty** it was measured **blocking for 2 s**, long enough for the peer in `test_serial.c` to
-  hit its idle timeout and exit, so the ACK never came at all. **[C]**
-
-*n* bytes at *b* baud cannot leave in less than *n* × 10 / *b* seconds, whatever any driver claims.
-`send()` accumulates that per frame and clamps it forward to the current time; `drain()` sleeps to
-it. It cannot block, cannot hang, and cannot be lied to. The speed charged is the one explicitly
-requested, else the port's actual speed (so `--baud 0` is not a silent hole), except on a pty, which
-has no wire and is charged nothing.
-
-**P-31e The write works on hardware; the M110 burn constant is measured.**
-Four radios, two models, `reports/write-runs4`: record accepted, burn confirmed, record read back
-**identical**, radio still answering afterwards, full EEPROM read completing in the same session.
-Report 1 is **15 probes, 12 as documented, 0 differ, 0 failed**. **[C]**
-
-| radio | burn gap, 64 bytes | per byte |
+| radio | burn gap | per byte |
 |---|---|---|
-| `EZ3.01.00.44` CSQ/PL | **3939 ms**, 3937 ms | 61.5 ms |
-| `EZ9.01.00.45` Sel 5 | **3252 ms**, 3252 ms | 50.8 ms |
+| `EZ3.01.00.44` CSQ/PL | 3939 ms, 3937 ms | 61.5 ms |
+| `EZ9.01.00.45` Sel 5 | 3252 ms, 3252 ms | 50.8 ms |
 | EVA, predicted by P-31a from `EZA33.BIN` | 696 ms | 10.89 ms |
 
-The M110 burn is **five times the EVA's**. `MC_T_BURN` at 2000 ms was short by a factor of two and
-could never have worked on this family; at 8000 it leaves 2.03× over the slowest observed. The two
-readings per radio differ by 2 ms and 0 ms, so this is a fixed timed loop, as P-31a says it is.
+Two readings per radio differ by 2 ms and 0 ms: a fixed timed loop, as P-31a states. `MC_T_BURN` is
+**8000 ms** — 125 ms per byte, 2.03× the slowest observed. **[C]**
 
-Two `DIFFERS` in that batch are both benign: an unprogrammed radio reporting band index 7, and a
-**40-byte ident** on the M110 Sel 5 against the EVA's 41 — ident length is per-model (P-20 already
-records 37 on the EZA 9).
-
-**What it took, in order:** P-31d (start the ACK clock when the frame has left, not when it was
-queued), then this timeout, then not interrogating a radio that is still burning.
-
-**P-31e (superseded) A radio accepted a record and did not confirm the burn.** `reports/write-runs3/report1`, an `EZ3.01.00.44` M110. The wire log settles P-31d beyond
-argument:
-
-| | |
-|---|---|
-| write frame queued | `t = 6691 ms` |
-| **first ACK (`06`) received** | **`t = 7831 ms`** |
-| gap | **1140 ms** |
-
-1140 ms is the 1125 ms the frame occupies at 1200 baud plus the radio's turnaround. The old 400 ms
-window could not have seen it, and every earlier run reported `no first ACK` for that reason alone.
-**[C]**
-
-What failed instead is the **second** ACK. `MC_T_BURN` was 2000 ms — ~3× the 697 ms P-31a derives —
-and nothing arrived in 2001 ms. But 697 ms is an **EVA** figure, read out of `EZA33.BIN`'s timed
-loop; the M110 runs `EZ3.01.00.44`, whose burn constant nobody has read. 2000 ms allows only **31 ms
-per byte** and was never measured for this radio. It is now **8000 ms** — 125 ms per byte, past any
-plausible EEPROM — because a receive timeout costs nothing when the radio answers.
-
-The radio then went silent for the rest of the session and `P-24a`'s arming pulse did not revive it;
-it needed a power cycle. **What is not established** is whether the six `*` probes the selftest sent
-immediately afterwards contributed to that, or merely followed it. There is no reason to poke a
-radio that has just said it is writing, so the selftest now settles for a full burn timeout before
-asking anything. **[?]**
+A radio that has acknowledged a record is committing it; send nothing until the burn timeout has
+elapsed. Whether traffic during a burn ends the session is **[?]**.
 
 **P-32** Exactly **one** retry, of the attention phase only. **No retry** around read, write or
 verify — fail loudly. An automatic retry mid-write is how a glitch becomes a half-written EEPROM.

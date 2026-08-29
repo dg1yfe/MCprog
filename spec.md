@@ -462,12 +462,16 @@ that follows. Detection keys on size, checksum and marker; the prefix alone cann
 | model | size | checksum byte / extent | channels | band | ref dividers |
 |---|---|---|---|---|---|
 | `MCEV_56` 5/6-tone | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
-
 | `MCEV9` / `MCEV9M` SEL5 EVA | 512 | 0x000 | 0x0E0, 32 × 8 | 0x0DC b4-6 | 0x0D4 |
 | `MCEZ9` SEL5 EZA | 256 | 0x000 | 0x0C8, 8 × 6 | 0x082 b4-6 | 0x0C4 |
 | `MCEZ13` CS/PL | 128/256/512/1024 | **0x003**, whole device | 0x03B, 8 × 6 | 0x039 b4-6 | 0x004 |
 | **M110** CSQ/PL `EZ3.01.00.44` | 256 device / **128 codeplug** | **0x00F**, first 128, target **0x01** | 0x01B, 10 × 10 | **0x00A b0-3** | 0x013 |
 | **M110** Sel 5 `EZ9.01.00.45` | 256 | **0x00F**, whole device, target **0x01** | 0x092, 15 × 7 | **0x00A b0-3** | 0x089 |
+
+The two 512-byte models are the same hardware differing only in signalling, and **nothing in a file
+separates them**. Detection reports the ambiguity and returns `eva_sel5`. From a radio the ident
+decides: `5/6 Tone` selects `eva_56`; there is no SEL5 marker, so its absence falls back to the
+default rather than concluding anything. **[C]**
 
 **K-21 Channel record.** EVA: `+0` BCD number, `+1` trakmode, `+2..4` TX, `+5..7` RX. EZA: `+0..2`
 TX, `+3..5` RX, with no number and no trakmode byte. **[C]**

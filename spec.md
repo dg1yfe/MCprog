@@ -371,11 +371,14 @@ TrakBase(t)= top - 27*(t+1)
 PL mode    = TrakBase(t) + 0x18
 ```
 
-For a 512-byte EVA that gives `TrakBase(0) = 0x1E5` and a PL mode byte at **`0x1FD`** — which is what
-MCprog previously hardcoded. For a 1024-byte codeplug it moves to **`0x3FD`**, and the hardcoded value
-would have edited the wrong byte. `mc_pl_mode_off()` is now authoritative and `pl_mode` is its
-512-byte fallback; the write gate asks the same function, so it cannot guard one address while the
-editor writes another. **[S]**
+| codeplug | `TrakBase(0)` | PL mode byte |
+|---|---|---|
+| 512 bytes | `0x1E5` | `0x1FD` |
+| 1024 bytes | `0x3E5` | `0x3FD` |
+
+**Never hardcode either.** `mc_pl_mode_off()` is authoritative; `pl_mode` is its 512-byte fallback.
+The write gate calls the same function, so it cannot guard one address while the editor writes
+another. **[S]**
 
 Accessors: `mc_codeplug_top()`, `mc_trak_base()`, `mc_trak_count()` (bits 0–3 of `0x0DA`),
 `mc_trak_enabled()` (bit 7), `mc_channel_trak()`. **PL uses trakmode 0 deliberately** — a 512-byte
@@ -476,9 +479,7 @@ default rather than concluding anything. **[C]**
 **K-21 Channel record.** EVA: `+0` BCD number, `+1` trakmode, `+2..4` TX, `+5..7` RX. EZA: `+0..2`
 TX, `+3..5` RX, with no number and no trakmode byte. **[C]**
 
-**K-22 Channel flag bits are NOT portable between models.** The editor writes most flags into
-**both** halves of the record; so must we. The full set, each pinned by driving the original editor
-and diffing what it wrote (`../doc/EEPROM_MAP_EV9.md`, `../doc/EEPROM_MAP_EZA.md`):
+**K-22 Channel flag bits are NOT portable between models.**
 
 | model | bit 3 | bit 4 | bit 5 | bit 6 | bit 7 |
 |---|---|---|---|---|---|
@@ -486,16 +487,15 @@ and diffing what it wrote (`../doc/EEPROM_MAP_EV9.md`, `../doc/EEPROM_MAP_EZA.md
 | EZA 9 | auto acknowledge | decode | TX inhibit | encode | clock shift (**RX half**), RF power (**TX half**, **[S]**) |
 | EZA 1/3 | — | — | — | clock shift, **TX half, stored inverted** | preserved, never exposed **[S]** |
 
-Three traps in one table: bit 3 means different things on the two families, EZA 9 splits bit 7 by
-half, and the EZA 1/3 clock shift is stored **inverted** — the bit is *set* when the screen shows
-`N`. The EVA row is pinned on the SEL5 build **and independently reproduced on the
-5/6-tone one**: driving `MCEV_56`'s editor and diffing what the radio received moves bit 3 for
-clock shift, 4 for decode, 5 for TX inhibit, 6 for encode and 7 for RF power — every one in **both
-halves** of the record, and only in the channel addressed. It also shows that the two builds differ in
-*which half they read*: `MCEV9M` writes clock shift into bit 3 of both halves, `MCEV_56` displays
-the TX half's bit 3 alone. Write both halves and the difference cannot bite you
-(`../doc/EEPROM_MAP.md`). **[C]** MCEZ13 has no per-channel encode/decode/TX-inhibit at all; its PL lives in tables and TX
-inhibit is a single global bit. **[C]** except as marked.
+* Flags go in **both halves** of the record; write both. A change affects only the addressed
+  channel.
+* `MCEV9M` writes clock shift into bit 3 of both halves; `MCEV_56` reads the TX half's alone.
+  Writing both halves makes the difference irrelevant.
+* EZA 1/3 clock shift is **inverted**: the bit is set when the screen shows `N`.
+* MCEZ13 has no per-channel encode, decode or TX inhibit. Its PL is in tables and TX inhibit is a
+  single global bit.
+
+**[C]** except as marked.
 
 **K-23 The channel table is terminated, not sparse.** Stop at the first record whose `+0` is `0xFF`.
 Records past the terminator are stale and **must be written back unchanged**. **[C]**
@@ -537,13 +537,12 @@ unprogrammed slot), ERROR (not representable). **Never clamp silently.** Saving 
 allowed on confirmation; saving with ERRORs is refused.
 **U-4** A protocol log page, always recording, exportable. This is the field-support tool.
 
-**U-5 Storno CQM 5500 is the same hardware, and must not become a model.** Storno resold these
-radios rebadged, and its programmer is the Motorola one **relocated, not rewritten** — same wire
-protocol, same codeplug layout, same checksum. Driven side by side under emulation, `CQMEZ13` and
-`MCEZ13` put **byte-identical** traffic on the wire (31 bytes, same event sequence), as do `CQMEZ9`
-and `MCEZ9` (54 bytes) and `CQMEV9` and `MCEV9` (86 bytes). Every Storno build's codeplug buffer
-sits exactly `+0x22` above its Motorola sibling's, which is a difference in the *programmer's* data
-segment and nothing to do with the radio. **[C]**
+**U-5 Storno CQM 5500 is the same hardware, and must not become a model.** Its programmer is the
+Motorola one **relocated, not rewritten** — same wire protocol, same codeplug layout, same
+checksum. Each Storno build and its Motorola sibling put **byte-identical** traffic on the wire:
+`CQMEZ13`/`MCEZ13` 31 bytes, `CQMEZ9`/`MCEZ9` 54, `CQMEV9`/`MCEV9` 86, same event sequence. The
+`+0x22` offset between their codeplug buffers is in the programmer's data segment, not the radio.
+**[C]**
 
 So the model table carries Storno's own name for each radio (`.storno`, taken verbatim from
 `STORNO.COM`'s table) and `--model` accepts it, including any unique fragment; an ambiguous fragment

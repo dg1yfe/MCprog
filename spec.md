@@ -214,7 +214,9 @@ Both captures agree, and the write capture's eight verification reads carry no A
 **P-30** 190 ms per received byte. Measured margin: the worst inter-byte gap *within* a reply is
 43 ms and the median is 8 ms, matching the 8.33 ms character time. **[C]**
 
-**P-31** **2000 ms** for the write's second reply, measured from completion of transmission. Note
+**P-31** **8000 ms** for the write's second reply, measured from completion of transmission.
+(2000 ms was an EVA figure carried onto radios it did not describe; the EZA 9 and M110 burns are
+five times the EVA's — see P-31a — and 2000 ms could never have worked on them.) Note
 that `tcdrain`/`FlushFileBuffers` on a USB bridge does not reliably mean "on the wire", so matching
 the observed 130/710 ms exactly is not achievable — the *ordering* requirement of P-25 is what is
 absolute. **[S]**
@@ -236,10 +238,20 @@ for write completion; `eep_WriteByte` waits out a fixed delay per byte —
 **9.95 ms**. With the bit-banged I²C transaction on top it is ≈ **10.89 ms per byte**, so a 64-byte
 record predicts a **≈ 697 ms** gap between the two ACKs. **[S]**
 
+> **A second radio's constant, and it is five times larger.** The EZA 9 mask ROM's burn loop is
+> `LDX #$3C00 / DEX / BNE` = 15360 × 4 = **61440 cycles**, i.e. **49.90 ms per byte** at the same E,
+> predicting **3194 ms** for a 64-byte record against the EVA's 637. The hardware bears it out: the
+> write runs of 28 Aug 2026 measured **50.8 ms/byte** on an `EZ9.01.00.45`. The 0.9 ms difference is
+> the bit-banged I²C transaction on top — the same 0.94 ms this clause already allows for the EVA.
+>
+> So `MC_BURN_US_PER_BYTE` (10890) describes the EVA and **only** the EVA; an EZA 9 is ~50800. A
+> predictor that is not per-model will mis-predict by 5x on half the family. `../doc/EZA9_MASKROM.md`
+> §2. **[S]**
+
 **P-31b The two ACKs need different timeouts.** The first is sent when the record has been taken into
 RAM, *before any byte reaches the EEPROM* (firmware `E7F6`, before the burn loop at `E7FE`), so it
 arrives within a character time — the captures show ~130 ms. Only the second waits out the burn.
-`MC_T_ACK1` = 400 ms and `MC_T_BURN` = 2000 ms. Separating them distinguishes **"the radio never took
+`MC_T_ACK1` = 400 ms and `MC_T_BURN` = **8000 ms**. Separating them distinguishes **"the radio never took
 the record"** from **"it took the record and stopped partway through committing it"**. **[S]**
 
 **P-31c There is no rollback.** The radio burns byte by byte and ACKs only at the end, so a failure
@@ -357,6 +369,13 @@ is `150 × 2^16 / (4.9248 MHz / 4)` = 7.98441, so 7.9844 is the *truer* of the t
 1987 authors' four-significant-figure rounding of it. Of the 39 EIA tones exactly one separates
 them — **118.8 Hz**, 948 against 949 — which is why the split went unnoticed for so long. Carry `k`
 per model (`mc_model.pl_k`, in units of 1/10000); do not hard-code either value. **[C]**
+
+> **The 150 is not an inference.** The EZA 9 mask ROM carries it literally: `F544: LDD #$0096` then
+> `ADDD $0B / STD $0B`, reloading the output compare by 150 cycles a pass. At E = 4.9248 MHz / 4
+> that is 8208.0 Hz **exactly**, so a second radio family, on different silicon, runs the same
+> sample clock that `k` and the 8.208 duration constant both come from. Its other two
+> output-compare rates are 400 cycles (3078 Hz, the signalling *decoder*) and 766 (1607 Hz).
+> `../doc/EZA9_MASKROM.md`. **[S]**
 
 **K-13 Signalling-format tone tables are COPIED, never computed.** The per-format tables have an
 internal scale of 5.28 which appears nowhere in the original software — it only copies them. An
@@ -551,6 +570,15 @@ TX, `+3..5` RX, with no number and no trakmode byte. **[C]**
 * EZA 1/3 clock shift is **inverted**: the bit is set when the screen shows `N`.
 * MCEZ13 has no per-channel encode, decode or TX inhibit. Its PL is in tables and TX inhibit is a
   single global bit.
+
+> **Why one bit carries two names on the EZA 9.** It drives one wire. `tune_channel` clears shadow
+> bits 2 and 3, sets **bit 3 when channel flag bit 7 is CLEAR** (inverted), sets **bit 2 when the
+> radio is transmitting**, and latches both into the control shift register — whose output the
+> schematic labels **"High Power / Clock Shift"** [user]. One codeplug bit, one output, and which of
+> the two things it means depends on whether the radio is keyed. That is the mechanism behind this
+> row reading "clock shift (RX half), RF power (TX half)", and it is why the TX-half reading was only
+> ever **[S]**: nothing in the editor exposes it because nothing in the radio distinguishes it.
+> `../doc/EZA9_MASKROM.md` §1a. **[S]**
 
 **[C]** except as marked.
 

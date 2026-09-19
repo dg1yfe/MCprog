@@ -27,6 +27,12 @@ transmit:  out = (b & 0x7F) | (odd_parity(b & 0x7F) << 7)
 receive:   if popcount(in) is even -> PARITY error;  value = in & 0x7F
 ```
 
+> **The radio does exactly the same thing.** The EZA 9 mask ROM runs its SCI at 8 bits and computes
+> parity in software: `sci_add_odd_parity` (`FA81`) sets bit 7 so the total number of ones is odd,
+> and `proto_getc` puts every **received** byte back through it and NAKs on a mismatch. So the radio
+> both generates and verifies parity itself — this is not a trick the PC side invented.
+> `doc/EZA9_MASKROM.md` §2. **[C]**
+
 A 7O1 frame and an 8N1 frame are both 10 bit times, so the line waveform is identical and the radio
 cannot tell. Every protocol byte is ≤ 0x7F, so seven bits suffice. **[C]**
 
@@ -61,10 +67,17 @@ an MC micro.** Three independent lines:
 |---|---|
 | **[user]** | the schematics route RTS through the level shifter to pin 8, `#NMI`. Same wiring and the **same programming adaptor across the family**, including the EVA5 trunking variant |
 | **[S]** | the NMI vector at `FFFC` runs `nmi_ProgramMode`, which has **exactly one xref — the vector itself** |
+| **[S]** | **a second firmware agrees.** The EZA 9's 4 KB mask ROM vectors `FFFC` to `FEE9`, which resets the stack and falls straight into the command loop — a different radio, a different ROM, the same route (`doc/EZA9_MASKROM.md`) |
 | **[C]** | every radio tested answers with RTS asserted and is silent without it |
 
 Asserting RTS does not *signal* programming mode, it **runs** it — which is why the original pulses
 rather than holds (P-12, P-27).
+
+And it is watched continuously, not just at entry: the EZA 9 mask ROM's `proto_getc` tests Port 1
+bit 1 **on every received character** and leaves through `proto_leave_programming_mode`, which
+either resets the CPU or resumes normal radio operation. That is why dropping RTS mid-session does
+not merely idle the link — the radio has gone, and on the bench it needed a power cycle to come
+back. **[S]**
 
 The entry is a property of the wiring and the CPU's vector table, not of one ROM, so it holds for
 the whole family. `EZA33.BIN` is the ROM that was read; it is confirmation, not the basis.
@@ -100,6 +113,9 @@ Why the original pulses *twice* is **[?]**; it is reproduced for identity.
 | EVA 9, 5/6-tone (2009 capture) | 41 | `EV9.01.00.11 455M11-3     5/6 Tone radio` |
 | EZA 9 (hardware) | 37 | `EZ9.00.02.03 Copr,1987 Motorola GmbH` |
 
+> The EZA 9's length is hardcoded in its mask ROM: `proto_cmd_identify` begins `LDAA #$25` — 37 —
+> and the string sits at `0xFFC1`, 36 characters plus the `0x1A`. `doc/EZA9_MASKROM.md`. **[C]**
+
 **P-21** `)01`+addr — **attention / probe**. Returns `(01`+addr + **one byte**, `eeprom[addr]`. The
 capture's two calls return `0x36` then `0x73` — different values, so plainly codeplug data. **[C]**
 
@@ -107,6 +123,14 @@ capture's two calls return `0x36` then `0x73` — different values, so plainly c
 appears in none of the three captures, so it was a guess from the disassembly until an EZA 9
 answered it: `)020000` returned `FB 02`, and `)010000` / `)010001` on the same radio returned `FB`
 and `02`. It is a two-byte read, not a serial-number command. **[C]**
+
+> **There is one read path, and the count is just a byte.** The EZA 9 mask ROM parses every `)`
+> command the same way (`proto_parse_count_and_addr`, `FF6C`): read a count, NAK if it exceeds
+> `0x40`, read a two-byte address, **NAK unless the high byte is zero**, then reply `(` + count +
+> address and stream that many nibble-encoded bytes. `)01`, `)02` and `)40` are not separate
+> commands but the same one with counts 1, 2 and 64 — which is why the Radius M110 RSS's 14-byte
+> `)0>` works on this radio (`doc/M110.md`), and why the addressable space is exactly 256 bytes,
+> enforced in code rather than by convention. `doc/EZA9_MASKROM.md` §2. **[C]**
 
 **P-23** `)40`+addr — read 64 bytes, reply `(40`+addr + 128 nibble-characters. During a sequential
 read every record after the first is requested with a leading `0x06`, the acknowledgement of the
@@ -136,6 +160,11 @@ enforced in firmware and both worth respecting client-side:
 Accepting only one misparses the end of every read on the other. This is not a spec ambiguity to be
 resolved but a difference between radios, so accept both. **[C]**
 
+> In the EZA 9 mask ROM the bare form is not a special case but the *only* form: every error path —
+> count over `0x40`, a non-zero address high byte, an address that wraps past `0xFF`, a framing or
+> parity error — lands on `FF5B`, which sends a single `0x15` and returns to the command loop.
+> `doc/EZA9_MASKROM.md` §2. **[C]**
+
 **P-24a The end-of-memory NAK ends the session — on the radios tested.** After it the radio answers
 nothing — not the next command, and not even `*`. Measured on every radio put through the selftest so
 far: four Radius M110s (two `EZ3.01.00.44` CSQ/PL, 70 cm and 2 m; two `EZ9.01.00.45` Sel 5, 70 cm
@@ -163,6 +192,12 @@ been tried.
 **P-25** `(40`+addr+128 chars — write 64 bytes. The reply is **two bare ACK bytes, no header**: the
 first ~130 ms after the last data byte (command accepted), the second **~710 ms** later (EEPROM burn
 complete). Measured across all 8 blocks of the write capture, consistent to 3 ms. **[C]**
+
+> The EZA 9 mask ROM shows the shape behind the measurement. `proto_cmd_write` receives the data,
+> sends `0x06`, then loops **per byte** — `eeprom_write_byte` followed by a `LDX #$3C00 / DEX / BNE`
+> delay — and sends the second `0x06` only when the last byte is burnt. 15360 iterations a byte, and
+> ~710 ms across 64 bytes is ~11 ms each, the right order for an EEPROM write cycle.
+> `doc/EZA9_MASKROM.md` §2. **[C]**
 
 **P-26 Acknowledgement is contextual.** A `0x06` ACK follows a *read* record, and it is transmitted
 **in front of the next command**, not as a message of its own — the wire shows `06 29 34 30 30 30 34
@@ -281,6 +316,12 @@ The RX field holds the local oscillator; the displayed RX frequency is **field +
 first IF). `P` = 80, 80, 128, 254 for bands 1–4. Band index 7 means unprogrammed — ask the user,
 do not error. **[C]**
 
+> **What bit 2 physically does.** In the EZA 9 mask ROM, `tune_channel` tests it and uses it to pick
+> which reference-divider pair the PLL is loaded with: `LDX #$00C4 ; TIM #$04,$C8 ; INX ; INX` —
+> clear takes `0x0C4`, set takes `0x0C6`. The step size is not stored anywhere; it *is* the divider
+> that bit selects, which is why K-10a's dividers must survive verbatim. `doc/EZA9_MASKROM.md` §3.
+> **[C]**
+
 **K-10a The reference dividers are checkable.** `REF_DIV.001`, shipped beside the RSS on every disk
 set, is the operator's reference card, and its four values decode exactly as
 **`word = 2 × (Fref ÷ spacing) + 1`**:
@@ -333,6 +374,10 @@ meaning no PL). Without the snap the tool shows 88.6 where the operator typed 88
 | EZA 9 | `0x02F` | `0x031 + 2i` | `0x083` high nibble | `0x07F` |
 | EZA 1/3 | — | — | — | — |
 
+> The two columns are one array. The EZA 9 mask ROM indexes `0x02F + 2i` uniformly, so the "single
+> tone" is entry 0 and the "selectable list" is entry 1 onward; `0x031` is never loaded as a base
+> anywhere in that ROM. The EVA columns already say this — both are `0x047`. **[C]**
+
 Mode byte: `0x60` = single tone, `0xE0` = selectable (the operator picks from the list at the
 radio). The **count** byte's low nibble is a selectable-lockout marker and must be preserved (K-30).
 Range is 67.0–250.3 Hz, or 0 to disable; anything else is refused, never rounded (U-3). **[C]**
@@ -341,6 +386,12 @@ Range is 67.0–250.3 Hz, or 0 to disable; anything else is refused, never round
 padding, and preserving it across a mode change is a bug. The EVA firmware fetches the tone as
 `cp_pl_list[mode & 0x0F]` at `0x047 + 2i` — `F270`: `ANDB #$0F / ASLB / LDX #$47 / ABX` — gated on
 **bit 6** of the same byte, which is why both `0x60` and `0xE0` carry it. **[S]**
+
+**A second firmware, a second model, the same instruction shape.** The EZA 9's 4 KB mask ROM does
+it at its own base: `pl_load_tone_by_index` (`F58F`) is `ANDB #$0F / ASLB / LDX #$2F / ABX`, called
+once, from the path that has just read `0x07F` and tested bit 6. **No channel number reaches it**,
+which settles for this model the question of whether the radio indexes the slots per channel: it
+does not. `doc/EZA9_MASKROM.md` §3. **[S]**
 
 The consequence is concrete. In single-tone mode the tone is written to slot 0 (`pl_tone` ==
 `pl_list`), so a stale nibble makes the radio read a **different slot than the programmer wrote**:
@@ -406,6 +457,12 @@ both. Measurement on MCEZ13 had only bounded the decoder constant to `[61.1063, 
 1–127, i.e. 16–1984 ms. Radio-wide. Only the EZA 9 map has it, at `0x076`. Bit 7 is never set by
 the original software and its meaning is unknown, so it is preserved (K-30) and the value is the
 low seven bits. Values outside 16–1984 ms are refused, never clamped (U-3). **[C]**
+
+> **The radio does read it.** The EZA 9 mask ROM fetches `0x076` and hands it straight to the timer:
+> `LDX #$0076 ; JSR eeprom_read_byte ; LDAB #$80 ; JSR timer_schedule_deadline`, where the deadline
+> is `(tick >> 2) + A`. Until this ROM, K-15 could only say the repair build wrote the byte there;
+> that the firmware used it was inference. The `>> 2` is consistent with the 1/64 s unit measured
+> from the editor. `doc/EZA9_MASKROM.md` §3. **[C]**
 
 **K-16 Radio-wide timers.** The original's `T' sub-screen, twelve fields at `0x0B3`–`0x0C4`. It
 does not compute them one at a time. It walks **four parallel word arrays of twelve entries** —

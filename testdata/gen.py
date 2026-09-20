@@ -45,7 +45,7 @@ MODELS = {
     # MCEZ13's checksum covers the whole 128 bytes and lives at 0x003.  Every offset in this row
     # was two bytes low until the ident was fixed: the capture used to be stripped of two leading
     # bytes to make it read back, and that was compensating for a malformed synthetic ident rather
-    # than for anything the radio does.  See ../../doc/EEPROM_MAP_EZA.md.
+    # than for anything the radio does.  See doc/EEPROM_MAP_EZA.md.
     'eza_cspl': dict(size=128, cksum=0x003, cklen=0, chan=0x03B, nchan=8, stride=6, tx=0, rx=3,
                      band=0x039, refdiv=0x004, numbered=False),
 }

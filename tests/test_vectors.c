@@ -584,7 +584,7 @@ static void test_pl(void)
 /* ---- edits (K-11, K-22, K-30, U-3) ---------------------------------------------------------- */
 
 /* K-15, the auto-acknowledge delay.  Only the repair build of the 1987 software exposes it, so
- * every number here traces back to driving that build; see ../doc/BUILD_VARIANTS.md. */
+ * every number here traces back to driving that build; see doc/BUILD_VARIANTS.md. */
 static void test_aak(void)
 {
 	char *vec = slurp("testdata/aak/aak.vec", NULL), *line, *save;

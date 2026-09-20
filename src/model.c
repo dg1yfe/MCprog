@@ -194,7 +194,7 @@ static const mc_model MODELS[] = {
 	 * These offsets were all two bytes low until the ident was fixed.  tools/eza.py used to strip
 	 * two leading bytes off the INITIALIZE capture to make it read back, and every offset here was
 	 * then derived from the shifted image.  The strip was compensating for a malformed synthetic
-	 * ident, not for anything the radio does -- see ../doc/EEPROM_MAP_EZA.md. */
+	 * ident, not for anything the radio does -- see doc/EEPROM_MAP_EZA.md. */
 	{ .name = "eza_cspl", .size = 128, MC_MICRO,
 	  .cksum = 0x003, .chan = 0x03B, .band = 0x039, .refdiv = 0x004,
 	  .nchan = 8, .stride = 6, .tx = 0, .rx = 3, NF(FLAGS_EZ13),

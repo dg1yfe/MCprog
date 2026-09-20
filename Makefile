@@ -1,4 +1,4 @@
-# MC micro programmer -- C implementation.  See ../spec.md.
+# MC micro programmer -- C implementation.  See spec.md.
 #
 #   make          build mcprog
 #   make test     run the conformance suite against testdata/

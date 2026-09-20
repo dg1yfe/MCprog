@@ -747,7 +747,7 @@ int mc_pl_set_tone(mc_image *img, int i, unsigned dhz)
 
 /* ---- timers, K-16 -----------------------------------------------------------------------------
  * Measured on MCEV_56 by mutating each byte and re-rendering the original's timers sub-screen; see
- * ../doc/EEPROM_MAP.md.  Two of the twelve are not the plain x10 ms the rest are: the synthesiser
+ * doc/EEPROM_MAP.md.  Two of the twelve are not the plain x10 ms the rest are: the synthesiser
  * lock time is round(n x 5/6) + 10 ms -- two points look exactly like n-4 and a third refutes it --
  * and the TX time-out masks off bit 15 and carries a +4 s offset that the rekey timer beside it
  * does not.

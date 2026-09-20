@@ -21,7 +21,7 @@
  *
  *    SPDX-License-Identifier: GPL-3.0-or-later
  */
-/* MC micro serial protocol -- see ../../spec.md, sections 1-5 (P-n requirements).
+/* MC micro serial protocol -- see spec.md, sections 1-5 (P-n requirements).
  *
  * Layering: this file speaks in *logical* bytes, all <= 0x7F.  The 7O1-over-8N1 software parity of
  * P-2 belongs to the physical link and is applied inside a concrete transport, because it is a

@@ -21,7 +21,7 @@
  *
  *    SPDX-License-Identifier: GPL-3.0-or-later
  */
-/* MC micro codeplug decoding -- see ../../spec.md, section 6 (K-n requirements).
+/* MC micro codeplug decoding -- see spec.md, section 6 (K-n requirements).
  *
  * This layer is pure byte manipulation over an in-memory EEPROM image.  It does no I/O, knows
  * nothing about the serial link and nothing about the terminal, so it is testable headlessly and
@@ -296,7 +296,7 @@ void mc_flag_set(mc_image *img, int slot0, const mc_flag *f, int on);
 /* MC_PL_TABLE is for models with no mode byte at all -- MCEZ13 simply carries its tables. */
 /* ---- auto-acknowledge delay (K-15) ----------------------------------------------------------
  * One byte, a count of 1/64 s.  Only the repair build of the original software ever asks for it,
- * which is why it went unmapped for years; see ../doc/BUILD_VARIANTS.md.
+ * which is why it went unmapped for years; see doc/BUILD_VARIANTS.md.
  */
 #define MC_AAK_MIN_MS 16   /* count 1   */
 #define MC_AAK_MAX_MS 1984 /* count 127 */
@@ -353,7 +353,7 @@ int mc_timer_set_ms(mc_image *img, size_t i, unsigned ms);
 
 /* ---- the write counter (W-5) ------------------------------------------------------------------
  * Measured by chaining read-write cycles against the 1987 software and the simulated radio
- * (../tools/wcounter.py, ../doc/EEPROM_MAP_EV9.md, ../doc/EEPROM_MAP_EZA.md).  A read followed by
+ * (tools/wcounter.py, doc/EEPROM_MAP_EV9.md, doc/EEPROM_MAP_EZA.md).  A read followed by
  * a write with no edit in between moves exactly two bytes: this one and the checksum.
  *
  * It is NOT an eight-bit count.  Bits 0-3 count; on wrap they reset to zero and bit 4 is **set**,

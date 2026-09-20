@@ -12,6 +12,12 @@ References of the form `doc/…md`, `tools/…py` and `reports/run…` name file
 reverse-engineering repository and in local hardware run records. Where this file and those notes
 disagree, the disagreement is a bug in one of them.
 
+**They are deliberately not relative paths, and must never be written with a leading `../`.**
+MCprog is a submodule of that analysis repository, so a citation prefixed that way happens to
+resolve on the machine it was written on and resolves nowhere in a standalone clone — a dead link
+that looks like a live one. Nothing in this repository should reference a path outside it; anything
+that needs to name an external document names it the way the paragraph above describes.
+
 ---
 
 ## 1. Wire encoding
@@ -275,7 +281,7 @@ record predicts a **≈ 697 ms** gap between the two ACKs. **[S]**
 > the bit-banged I²C transaction on top — the same 0.94 ms this clause already allows for the EVA.
 >
 > So `MC_BURN_US_PER_BYTE` (10890) describes the EVA and **only** the EVA; an EZA 9 is ~50800. A
-> predictor that is not per-model will mis-predict by 5x on half the family. `../doc/EZA9_MASKROM.md`
+> predictor that is not per-model will mis-predict by 5x on half the family. `doc/EZA9_MASKROM.md`
 > §2. **[S]**
 
 **P-31b The two ACKs need different timeouts.** The first is sent when the record has been taken into
@@ -405,7 +411,7 @@ per model (`mc_model.pl_k`, in units of 1/10000); do not hard-code either value.
 > that is 8208.0 Hz **exactly**, so a second radio family, on different silicon, runs the same
 > sample clock that `k` and the 8.208 duration constant both come from. Its other two
 > output-compare rates are 400 cycles (3078 Hz, the signalling *decoder*) and 766 (1607 Hz).
-> `../doc/EZA9_MASKROM.md`. **[S]**
+> `doc/EZA9_MASKROM.md`. **[S]**
 
 **K-13 Signalling-format tone tables are COPIED, never computed.** The per-format tables have an
 internal scale of 5.28 which appears nowhere in the original software — it only copies them. An
@@ -608,7 +614,7 @@ TX, `+3..5` RX, with no number and no trakmode byte. **[C]**
 > the two things it means depends on whether the radio is keyed. That is the mechanism behind this
 > row reading "clock shift (RX half), RF power (TX half)", and it is why the TX-half reading was only
 > ever **[S]**: nothing in the editor exposes it because nothing in the radio distinguishes it.
-> `../doc/EZA9_MASKROM.md` §1a. **[S]**
+> `doc/EZA9_MASKROM.md` §1a. **[S]**
 
 **[C]** except as marked.
 

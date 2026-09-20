@@ -21,7 +21,7 @@
  *
  *    SPDX-License-Identifier: GPL-3.0-or-later
  */
-/* The terminal interface -- see ../../spec.md, section 7 (U-n).
+/* The terminal interface -- see spec.md, section 7 (U-n).
  *
  * The channel list is one row per channel with a visible marker where the table terminates and
  * stale rows dimmed below it (U-1, K-23); selecting a channel opens a page with every field it has

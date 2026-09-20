@@ -1,0 +1,16 @@
+# The conformance vectors are compared line by line against generated output, so they must be
+# LF on every platform.  Without this, a Windows checkout turns them into CRLF and every
+# comparison fails with `want' and `got' printing identically -- which is exactly what the first
+# CI run of v26.9.1 hit.  (tests/test_vectors.c strips CR as well, so either alone would do; both
+# is deliberate, because the file format should not depend on how git felt about it.)
+*.vec   text eol=lf
+*.c     text eol=lf
+*.h     text eol=lf
+*.md    text eol=lf
+*.py    text eol=lf
+Makefile text eol=lf
+
+# Codeplugs and captures are binary: never touch them.
+*.bin   binary
+*.DAT   binary
+*.dat   binary

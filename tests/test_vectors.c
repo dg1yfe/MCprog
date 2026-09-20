@@ -132,6 +132,23 @@ static void test_detect_ident(void)
 
 /* ---- codeplug golden decodes (K-2, K-10, K-20, K-21, K-23, K-24) ---------------------------- */
 
+/*
+ * strtok_r on "\n" leaves the CR of a CRLF line attached, and a vector file checked out on
+ * Windows has CRLF throughout.  The comparison then fails with `want' and `got' printing
+ * identically, which is a genuinely horrible thing to debug -- CI found it on the first Windows
+ * run of the 26.9.1 tag.  Strip it at the one place lines are produced.
+ */
+static char *chomp(char *line)
+{
+	size_t n;
+	if (!line)
+		return NULL;
+	n = strlen(line);
+	while (n && (line[n - 1] == '\r' || line[n - 1] == '\n'))
+		line[--n] = '\0';
+	return line;
+}
+
 static void test_codeplug(const char *vecrel)
 {
 	char *vec = slurp(vecrel, NULL), *img_bytes;
@@ -147,11 +164,13 @@ static void test_codeplug(const char *vecrel)
 	if (!vec)
 		return;
 	/* the expected file names its own inputs */
-	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+	for (line = chomp(strtok_r(vec, "\n", &save)); line;
+	     line = chomp(strtok_r(NULL, "\n", &save))) {
 		if (sscanf(line, "IMG %255s", imgpath) == 1)
 			break;
 	}
-	for (line = strtok_r(NULL, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+	for (line = chomp(strtok_r(NULL, "\n", &save)); line;
+	     line = chomp(strtok_r(NULL, "\n", &save))) {
 		if (sscanf(line, "MODEL %63s", modelname) == 1)
 			break;
 	}
@@ -192,8 +211,9 @@ static void test_codeplug(const char *vecrel)
 	want = slurp(vecrel, NULL);
 	{
 		char *wl, *ws, *gl, *gs;
-		gl = strtok_r(got, "\n", &gs);
-		for (wl = strtok_r(want, "\n", &ws); wl; wl = strtok_r(NULL, "\n", &ws)) {
+		gl = chomp(strtok_r(got, "\n", &gs));
+		for (wl = chomp(strtok_r(want, "\n", &ws)); wl;
+		     wl = chomp(strtok_r(NULL, "\n", &ws))) {
 			if (wl[0] == '#')
 				continue; /* generator provenance, not part of the contract */
 			lineno++;
@@ -208,7 +228,7 @@ static void test_codeplug(const char *vecrel)
 				mismatch = 1;
 				break;
 			}
-			gl = strtok_r(NULL, "\n", &gs);
+			gl = chomp(strtok_r(NULL, "\n", &gs));
 		}
 		if (!mismatch && gl)
 			failf("K-20", "%s: %d expected lines but output continues with %s", vecrel,
@@ -281,7 +301,8 @@ static void test_freq(void)
 	char *vec = slurp("testdata/freq/roundtrip.vec", NULL), *line, *save;
 	if (!vec)
 		return;
-	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+	for (line = chomp(strtok_r(vec, "\n", &save)); line;
+	     line = chomp(strtok_r(NULL, "\n", &save))) {
 		char rawhex[16], wanthex[16];
 		unsigned p, hz, step, flags, canon;
 		uint8_t raw[3], out[3];
@@ -332,7 +353,8 @@ static void test_parity(void)
 	char *vec = slurp("testdata/parity/parity.vec", NULL), *line, *save;
 	if (!vec)
 		return;
-	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+	for (line = chomp(strtok_r(vec, "\n", &save)); line;
+	     line = chomp(strtok_r(NULL, "\n", &save))) {
 		unsigned in, out, val, okflag;
 		uint8_t got;
 		if (sscanf(line, "TX in=%x out=%x", &in, &out) == 2) {
@@ -358,7 +380,8 @@ static void test_pl(void)
 	char *vec = slurp(FILES[vi], NULL), *line, *save;
 	if (!vec)
 		continue;
-	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+	for (line = chomp(strtok_r(vec, "\n", &save)); line;
+	     line = chomp(strtok_r(NULL, "\n", &save))) {
 		char mname[64], tname[64];
 		unsigned idx, dhz, word, tone, list, cnt, mode, dec, mx, off, mask, wid, den, add;
 
@@ -590,7 +613,8 @@ static void test_aak(void)
 	char *vec = slurp("testdata/aak/aak.vec", NULL), *line, *save;
 	if (!vec)
 		return;
-	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+	for (line = chomp(strtok_r(vec, "\n", &save)); line;
+	     line = chomp(strtok_r(NULL, "\n", &save))) {
 		char mname[64];
 		unsigned ms, count, off;
 
@@ -694,7 +718,8 @@ static void test_edits(void)
 	char *vec = slurp("testdata/edit/edits.vec", NULL), *line, *save;
 	if (!vec)
 		return;
-	for (line = strtok_r(vec, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+	for (line = chomp(strtok_r(vec, "\n", &save)); line;
+	     line = chomp(strtok_r(NULL, "\n", &save))) {
 		char imgp[256], mname[64], op[64], changed[1024];
 		int slot;
 		long long arg;

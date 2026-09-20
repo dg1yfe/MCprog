@@ -187,6 +187,11 @@ int mc_identify(mc_session *s, char *ident, size_t max, size_t *len)
 	uint8_t star = 0x2A, b[2];
 	size_t n = 0;
 
+	/* `*len' is kept current as the reply arrives, not just on success, so a caller can tell a
+	 * radio that never answered from one that answered and then stopped.  mc_connect turns that
+	 * distinction into "does not implement P-20" versus "the link broke". */
+	if (len)
+		*len = 0;
 	if (tx(s, &star, 1) != 0)
 		return -1;
 	/* P-20: nibble-encoded, terminated by 0x1A.  Read pairs until the terminator appears. */
@@ -200,23 +205,51 @@ int mc_identify(mc_session *s, char *ident, size_t max, size_t *len)
 			return fail(s, "identify: reply longer than %u bytes", (unsigned)max);
 		ident[n / 2] = (char)val;
 		n += 2;
+		if (len)
+			*len = n / 2;
 		if (val == 0x1A)
 			break;
 	}
-	if (len)
-		*len = n / 2;
 	return 0;
 }
 
 int mc_connect(mc_session *s, char *ident, size_t max, size_t *len)
 {
 	uint8_t v;
+	size_t got = 0;
+
 	/* Both read captures open exactly this way.  The ident is deliberately re-read rather than
 	 * cached: the 2011 capture asks twice, 36 s apart, and both are answered (P-20). */
 	if (mc_probe(s, 0, &v) != 0)
 		return -1;
-	if (mc_identify(s, ident, max, len) != 0)
-		return -1;
+
+	if (mc_identify(s, ident, max, &got) != 0) {
+		/*
+		 * P-20a: not every radio implements `*'.
+		 *
+		 * EZA33.BIN -- an EVA 9 at revision 51-02455M09, 5 Dec 1985 -- dispatches 0x28 and 0x29
+		 * and nothing else; 0x2A appears nowhere in the image, and there is no ident string to
+		 * answer with.  A later revision of the same part (455M11-3) does answer, so this is a
+		 * build difference, not a family one.  Refusing to talk to the earlier radio at all is
+		 * the wrong failure: the ident only ever NARROWS a model ambiguity the bytes could not
+		 * settle (mc_model_detect_ident), so a session without one is a session with slightly
+		 * less evidence, not an unsafe one.
+		 *
+		 * The distinction that makes this safe is `got':
+		 *
+		 *   0 bytes   nothing came back.  Combined with the probe above and the probe below --
+		 *             both of which exercise the same link -- that is a radio which is plainly
+		 *             talking and simply lacks the command.  Carry on unidentified.
+		 *   n > 0     it began answering and stopped, or answered something malformed.  That is
+		 *             a broken link or a confused radio, and it stays fatal.
+		 */
+		if (got != 0)
+			return -1;
+		s->err[0] = 0;
+	}
+	if (len)
+		*len = got;
+
 	if (mc_probe(s, 0, &v) != 0)
 		return -1;
 	return 0;

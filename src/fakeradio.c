@@ -67,6 +67,13 @@ int mc_fake_serve(mc_fake *f, mc_transport *t, unsigned idle_ms)
 
 		if (b == 0x2A) { /* P-20 identify */
 			uint8_t enc[MC_IDENT_MAX * 2];
+			/* P-20a: identlen 0 models a radio that has no such command -- EZA33.BIN, the
+			 * EVA 9 at revision 51-02455M09, dispatches 0x28 and 0x29 and nothing else.
+			 * It says nothing at all, which is exactly what mc_connect has to tolerate. */
+			if (f->identlen == 0) {
+				handled++;
+				continue;
+			}
 			mc_nib_encode((const uint8_t *)f->ident, f->identlen, enc);
 			if (t->send(t, enc, f->identlen * 2) != 0)
 				return handled;

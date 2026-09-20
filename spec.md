@@ -19,6 +19,17 @@ disagree, the disagreement is a bug in one of them.
 **P-1 Nibble encoding.** Payload bytes travel as two characters, high nibble first, each
 `0x30 + nibble`. So `0x9C` → `'9'`, `'<'` (0x39, 0x3C). Decoding accepts `0x30`–`0x3F` only. **[C]**
 
+> **The radios are laxer than this, and that asymmetry is deliberate on our side.** Both firmwares
+> decode a nibble with a bare `ANDA #$0F` — EZA 9 at `FFB8`, EVA 9 at `E821` — so bits 4–6 of a
+> nibble character are **don't-care on the wire**: `0x40 + nibble` decodes exactly as `0x30 + nibble`
+> does. `0x30` is a convention the radio does not enforce.
+>
+> Found by mutation testing (`tools/simmutate.py`): changing mcprog's encoder to emit `0x40 + n`
+> did not make the simulator harness fail, and chasing *why* it survived is what turned up the mask.
+> MCprog keeps emitting `0x30` and keeps **rejecting** anything outside `0x30`–`0x3F` on receive,
+> because being stricter than the peer is the right way round — but a capture showing a high nibble
+> outside that range is not necessarily corrupt, and this is the note that says so. **[C]**
+
 **P-2 Software parity.** The link is 1200 baud, 7 data bits, odd parity, 1 stop. Implementations
 open the port as **8N1** and do parity themselves:
 
@@ -107,6 +118,25 @@ Why the original pulses *twice* is **[?]**; it is reproduced for identity.
 
 **P-20** `*` (0x2A) — **identify**. Returns the ident string nibble-encoded, terminated by `0x1A`.
 **Its length varies by model**; `0x1A` is the terminator to trust, not a byte count. **[C]**
+
+**P-20a Not every radio implements it.** `EZA33.BIN` — an EVA 9 at revision `51-02455M09`,
+5 Dec 1985 — dispatches `0x28` and `0x29` and nothing else; `0x2A` appears nowhere in the image and
+there is no ident string to answer with. A later revision of the same part (`455M11-3`, the radio in
+the 2009/2011 captures) does answer, so this is a **build difference, not a family one**.
+
+MCprog therefore treats the ident as **optional**, and the rule that keeps that safe is the
+distinction between silence and a truncated reply:
+
+| what came back | reading | what MCprog does |
+|---|---|---|
+| **nothing** | the command is not implemented | carry on unidentified — the probes on either side of the `*` (P-27) already prove the link |
+| **some bytes, then nothing** | a broken link or a confused radio | **fatal**, as before |
+| malformed nibbles | ditto | **fatal**, as before |
+
+Losing the ident costs exactly one thing: it is the only input that separates `eva_sel5` from
+`eva_56` when the bytes cannot (`mc_model_detect_ident` narrows that one ambiguity and nothing
+else). So an unidentified read reports *"2 models fit … use --model to choose"* rather than
+guessing quietly. **[C]**
 
 | radio | bytes | ident |
 |---|---|---|

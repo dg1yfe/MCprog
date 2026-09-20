@@ -112,6 +112,9 @@ struct radio {
 	mc_session s;
 };
 
+/* P-20a: set to 0 to start a radio that does not implement `*' at all. */
+static size_t g_identlen = IDENTLEN;
+
 static int start_radio(struct radio *r, const uint8_t *image, size_t len)
 {
 	int master, slave, ready[2];
@@ -145,7 +148,7 @@ static int start_radio(struct radio *r, const uint8_t *image, size_t len)
 		f.eep = eep;
 		f.len = len;
 		f.ident = IDENT;
-		f.identlen = IDENTLEN;
+		f.identlen = g_identlen;   /* 0 models a radio with no identify command (P-20a) */
 		f.burn_ms = 5; /* P-25 shape without P-25 duration; the timing itself is test_serial's job */
 		if (write(ready[1], "1", 1) != 1)
 			_exit(3);
@@ -751,6 +754,52 @@ static void test_explain(void)
 	free(real);
 }
 
+/*
+ * P-20a: a radio that does not implement `*' at all still works.
+ *
+ * EZA33.BIN -- the EVA 9 at revision 51-02455M09, 5 Dec 1985 -- dispatches 0x28 and 0x29 and
+ * nothing else, and carries no ident string to answer with.  A later revision of the same part
+ * (455M11-3) does answer, so this is a build difference rather than a family one, and refusing to
+ * talk to the earlier radio would be the wrong failure: the ident only ever NARROWS a model
+ * ambiguity the bytes could not settle.
+ *
+ * What keeps that safe is the distinction between silence and a truncated reply.  Silence,
+ * bracketed by two probes that both succeed, is a radio that is plainly talking and simply lacks
+ * the command.  A reply that starts and then stops is a broken link, and stays fatal -- which is
+ * the half the simulator cannot produce, so it is asserted here.
+ */
+static void test_identify_optional(void)
+{
+	struct radio r;
+	char ident[MC_IDENT_MAX];
+	uint8_t *real, back[512];
+	size_t rlen = 0, ilen = 99, len = 0;
+
+	real = slurp("fixtures/eva9_real.bin", &rlen);
+	if (!real) {
+		failf("P-20a", "fixtures/eva9_real.bin is missing");
+		return;
+	}
+	g_identlen = 0;
+	if (start_radio(&r, real, rlen) != 0) {
+		failf("P-20a", "could not start a radio");
+		g_identlen = IDENTLEN;
+		free(real);
+		return;
+	}
+	ok(mc_connect(&r.s, ident, sizeof ident, &ilen) == 0, "P-20a",
+	   "a radio with no identify command still connects");
+	ok(ilen == 0, "P-20a", "and reports an ident of zero bytes rather than inventing one");
+	ok(mc_read_all(&r.s, back, sizeof back, &len) == 0 && len == rlen, "P-20a",
+	   "and reads normally, because the probes either side prove the link");
+	{
+		size_t dummy = 0;
+		free(stop_radio(&r, &dummy));   /* stop_radio always writes through `len' */
+	}
+	g_identlen = IDENTLEN;
+	free(real);
+}
+
 int main(int argc, char **argv)
 {
 	char cwd[512];
@@ -779,6 +828,7 @@ int main(int argc, char **argv)
 	test_backup_required();
 	test_verify_rule();
 	test_explain();
+	test_identify_optional();
 
 	printf("%d passed, %d failed\n", pass, fail);
 	return fail ? 1 : 0;

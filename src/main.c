@@ -325,9 +325,18 @@ static long read_radio(const char *port, const mc_serial_opts *o, const char *lo
 		mc_serial_close(t);
 		return -1;
 	}
-	printf("ident: %.*s\n", (int)(ilen ? ilen - 1 : 0), ident); /* without the 0x1A terminator */
-	memcpy(radio_ident, ident, ilen > sizeof radio_ident ? sizeof radio_ident : ilen);
-	radio_ident_len = ilen > sizeof radio_ident ? sizeof radio_ident : ilen;
+	if (ilen) {
+		printf("ident: %.*s\n", (int)(ilen - 1), ident); /* without the 0x1A terminator */
+		memcpy(radio_ident, ident, ilen > sizeof radio_ident ? sizeof radio_ident : ilen);
+		radio_ident_len = ilen > sizeof radio_ident ? sizeof radio_ident : ilen;
+	} else {
+		/* P-20a.  Say it plainly rather than printing an empty ident: this radio answered the
+		 * probes on either side of the `*', so it is talking and simply has no such command.
+		 * The model then comes from the codeplug alone, which is where it comes from anyway
+		 * unless the bytes leave an ambiguity the ident could settle. */
+		printf("no ident: this radio does not implement the identify command\n");
+		radio_ident_len = 0;
+	}
 	if (ident_only) {
 		if (tracef)
 			fclose(tracef);

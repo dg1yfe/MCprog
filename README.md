@@ -10,6 +10,23 @@ same object and open the same editor. Naming an output file makes the run non-in
 Normative contract: **`spec.md`** — numbered requirements (`P-n` protocol, `K-n` codeplug,
 `U-n` interface, `W-n` write safety) with provenance marks. Tests cite the numbers.
 
+Licensed **GPL-3.0-or-later**; see `LICENSE`.
+
+## 0. Releases
+
+**26.9.1** is the first release. Binaries for Linux (x86_64), macOS (arm64) and Windows (x86_64)
+are attached to the GitHub release and built by CI from the tagged commit; `mcprog --version`
+prints the release and the commit it came from.
+
+Building from source needs a C99 compiler and ncurses, and nothing else:
+
+```
+make            # build/mcprog
+make check      # unit tests, conformance vectors, a pty smoke test, and a Windows cross-compile
+```
+
+Versions are `year.month.release`.
+
 ## 1. Usage
 
 ```

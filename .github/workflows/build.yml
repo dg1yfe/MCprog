@@ -1,0 +1,148 @@
+name: build
+
+# Every push and pull request builds and tests on Linux and macOS, and builds on Windows.
+# Pushing a tag additionally publishes the three binaries as a GitHub release.
+on:
+  push:
+    branches: [main, Release]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write        # needed only by the release job, which runs on tags
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Linux and macOS: the full suite.  `make check' is all of it -- unit tests,
+  # the conformance vectors, the pty smoke test that drives the real ncurses
+  # binary, and the Windows cross-compile of the portable core.
+  # ---------------------------------------------------------------------------
+  posix:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+          - os: macos-latest
+            label: macos-arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # so `git describe' can name the commit
+
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libncursesw5-dev pkg-config mingw-w64
+
+      - name: Build
+        run: make
+
+      - name: Version
+        run: ./build/mcprog --version
+
+      - name: Test
+        run: make check
+
+      - name: Stage the binary
+        run: |
+          mkdir -p dist
+          cp build/mcprog dist/mcprog
+          cp README.md spec.md LICENSE dist/ 2>/dev/null || true
+          cd dist && tar czf ../mcprog-${{ matrix.label }}.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcprog-${{ matrix.label }}
+          path: mcprog-${{ matrix.label }}.tar.gz
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows, under MSYS2, because the TUI needs ncurses -- which is exactly what
+  # the Makefile's win-check note has always said.  The pty-based tests are NOT
+  # run here: Windows has no pty, so test_serial and test_write cannot build,
+  # and pretending otherwise would be a red build for a platform limitation.
+  # The two tests that need no pty do run.
+  # ---------------------------------------------------------------------------
+  windows:
+    name: windows-x86_64
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-ncurses
+            mingw-w64-ucrt-x86_64-pkg-config
+
+      - name: Build
+        run: make
+
+      - name: Version
+        run: ./build/mcprog.exe --version
+
+      - name: Test (the suites that do not need a pty)
+        run: |
+          make build/test_vectors build/test_protocol
+          ./build/test_vectors .
+          ./build/test_protocol .
+
+      - name: Stage the binary
+        run: |
+          mkdir -p dist
+          cp build/mcprog.exe dist/
+          cp README.md spec.md LICENSE dist/ 2>/dev/null || true
+          # Carry the runtime DLLs, or the exe will not start off a bare machine.
+          ldd build/mcprog.exe | awk '/ucrt64/ {print $3}' | xargs -r -I{} cp {} dist/
+          cd dist && tar czf ../mcprog-windows-x86_64.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcprog-windows-x86_64
+          path: mcprog-windows-x86_64.tar.gz
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Tags only.  Nothing is published unless all three platforms built.
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [posix, windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.tar.gz
+          generate_release_notes: true
+          body: |
+            Binaries for Linux (x86_64), macOS (arm64) and Windows (x86_64).
+
+            MCprog talks to an MC micro over a serial port at 1200 baud. DTR
+            supplies the level shifter and RTS drives the radio's HUB/PGM line,
+            so leave the line setup alone unless you know why you are skipping
+            it.
+
+            A write is refused unless `--enable-write` is given, backs the radio
+            up first, changes only the bytes this program knows how to write,
+            and reads every record back to verify it.

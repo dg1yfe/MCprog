@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "mc/version.h"
 #include "mc/codeplug.h"
 #include "mc/serial.h"
 #include "mc/tui.h"
@@ -49,6 +50,7 @@ static void usage(FILE *f)
 {
 	const mc_model *m;
 	size_t i;
+	fprintf(f, "mcprog %s (%s)\n\n", MC_VERSION, MC_BUILD);
 	fprintf(f,
 	        "usage: mcprog [options] [file.DAT]\n"
 	        "\n"
@@ -443,6 +445,10 @@ int main(int argc, char **argv)
 			enable_write = 1;
 		else if (!strcmp(argv[i], "--write") && i + 1 < argc)
 			writefrom = argv[++i];
+		else if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-V")) {
+			printf("mcprog %s (%s)\n", MC_VERSION, MC_BUILD);
+			return 0;
+		}
 		else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
 			usage(stdout);
 			return 0;

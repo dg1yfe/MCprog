@@ -11,6 +11,12 @@
 CC      ?= cc
 CFLAGS  ?= -O2 -g
 CFLAGS  += -std=c99 -Wall -Wextra -Wshadow -Wconversion -Iinclude
+
+# The version is in include/mc/version.h; the BUILD id is whatever tree produced this binary, so
+# a bug report can name a commit and not just a release.  A tarball with no .git says "unknown"
+# rather than failing the build.
+BUILD_ID ?= $(shell git describe --always --dirty --tags 2>/dev/null || echo unknown)
+CFLAGS  += -DMC_BUILD='"$(BUILD_ID)"'
 LDFLAGS ?=
 
 # glibc hides POSIX and BSD declarations when __STRICT_ANSI__ is set, which -std=c99 does, so on

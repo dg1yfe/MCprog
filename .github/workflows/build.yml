@@ -87,6 +87,7 @@ jobs:
           install: >-
             make
             git
+            zip
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-ncurses
             mingw-w64-ucrt-x86_64-pkg-config
@@ -104,18 +105,20 @@ jobs:
           ./build/test_protocol .
 
       - name: Stage the binary
+        # .zip, not .tar.gz: Windows opens one from the shell and needs a tool for
+        # the other, and an archive a user cannot open is a support question.
         run: |
           mkdir -p dist
           cp build/mcprog.exe dist/
           cp README.md spec.md LICENSE dist/ 2>/dev/null || true
           # Carry the runtime DLLs, or the exe will not start off a bare machine.
           ldd build/mcprog.exe | awk '/ucrt64/ {print $3}' | xargs -r -I{} cp {} dist/
-          cd dist && tar czf ../mcprog-windows-x86_64.tar.gz .
+          cd dist && zip -r ../mcprog-windows-x86_64.zip .
 
       - uses: actions/upload-artifact@v4
         with:
           name: mcprog-windows-x86_64
-          path: mcprog-windows-x86_64.tar.gz
+          path: mcprog-windows-x86_64.zip
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
@@ -133,10 +136,15 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*.tar.gz
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.zip
           generate_release_notes: true
           body: |
             Binaries for Linux (x86_64), macOS (arm64) and Windows (x86_64).
+            Linux and macOS ship as `.tar.gz`; Windows ships as `.zip`, which the
+            shell opens without anything extra. The Windows archive carries the
+            two runtime DLLs alongside the exe.
 
             MCprog talks to an MC micro over a serial port at 1200 baud. DTR
             supplies the level shifter and RTS drives the radio's HUB/PGM line,
